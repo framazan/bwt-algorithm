@@ -1,0 +1,8 @@
+# Tandem Repeats (BED format)
+# chrom	start	end	motif	copies	tier
+synthetic_chromosome	81	92	C	11.0	1
+synthetic_chromosome	26	36	G	10.0	1
+synthetic_chromosome	54	64	T	10.0	1
+synthetic_chromosome	10	26	AT	8.0	1
+synthetic_chromosome	64	82	AGC	6.0	1
+synthetic_chromosome	122	142	ATGC	5.0	1
