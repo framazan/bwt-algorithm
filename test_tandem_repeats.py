@@ -12,7 +12,6 @@ import sys
 from typing import List, Optional
 
 from bwt import TandemRepeatFinder
-from bwt import progress_iter
 
 
 def ensure_dir(path: str):
@@ -30,7 +29,6 @@ def process_fasta(
     enable_tier3: bool = False,
     long_reads: Optional[List[str]] = None,
     vcf_top: Optional[int] = 20,
-    show_progress: bool = False,
 ):
     """Process a FASTA: run finder per sequence and write per-sequence outputs."""
 
@@ -43,17 +41,16 @@ def process_fasta(
     print("=" * 60)
 
     # We'll load sequences first to get names and lengths, then process one-by-one
-    loader = TandemRepeatFinder(fasta_path, sa_sample_rate, show_progress=show_progress)
+    loader = TandemRepeatFinder(fasta_path, sa_sample_rate)
     sequences = loader.load_reference()
 
     base = os.path.splitext(os.path.basename(fasta_path))[0]
 
-    items = list(sequences.items())
-    for chrom, seq in progress_iter(items, total=len(items), desc="Sequences", enable=show_progress):
+    for chrom, seq in sequences.items():
         print(f"\n=== Running tandem repeat finder for {chrom} ({len(seq):,} bp) ===")
 
         # Build index only for this sequence to keep memory lower
-        finder = TandemRepeatFinder(fasta_path, sa_sample_rate, show_progress=show_progress)
+        finder = TandemRepeatFinder(fasta_path, sa_sample_rate)
         finder.build_indices({chrom: seq})
 
         repeats = finder.find_tandem_repeats(
@@ -168,7 +165,6 @@ def main():
     run_parser.add_argument("--tier3", action="store_true", default=False, help="Enable Tier 3 (very long repeats)")
     run_parser.add_argument("--long-reads", help="Optional long reads FASTA/FASTQ for Tier 3")
     run_parser.add_argument("--vcf-top", type=int, default=20, help="Limit VCF to top N by length (<=0 for all)")
-    run_parser.add_argument("--progress", action="store_true", help="Show progress bars where applicable")
 
     # Synthetic example
     subparsers.add_parser("synthetic", help="Run built-in synthetic test")
@@ -212,7 +208,6 @@ def main():
         enable_tier3=args.tier3,
         long_reads=long_reads,
         vcf_top=(args.vcf_top if args.vcf_top > 0 else None),
-        show_progress=args.progress,
     )
 
 if __name__ == "__main__":

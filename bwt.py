@@ -1,7 +1,8 @@
+#!/usr/bin/env python3
 """
-Advanced BWT-based tandem repeat finder infra
+Advanced BWT-based Tandem Repeat Finder for Genomics
 
-Implements three-tier approach (from Dr. Yim)
+Implements three-tier approach:
 1. Short tandem repeats (1-10bp) with FM-index
 2. Medium/long repeats (10s-1000s bp) with LCP arrays  
 3. Very long repeats (kb+) with long read evidence
@@ -18,51 +19,7 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 
-# Lightweight progress wrapper (uses tqdm if available, else no-op)
-def progress_iter(iterable: Iterable, total: Optional[int] = None, desc: Optional[str] = None, enable: bool = False):
-    """Wrap an iterable with tqdm progress bar when enabled.
-
-    Args:
-        iterable: Iterable to iterate over
-        total: Optional total for progress bar
-        desc: Optional label
-        enable: Whether to show progress (False -> passthrough)
-    """
-    if not enable:
-        return iterable
-    try:
-        from tqdm import tqdm  # type: ignore
-        return tqdm(iterable, total=total, desc=desc, leave=False)
-    except Exception:
-        # Fallback: simple textual progress on stderr when total is known
-        if total is None:
-            if desc:
-                print(desc)
-            return iterable
-
-        def _gen():
-            import sys as _sys
-            count = 0
-            last_pct = -1
-            bar_len = 24
-            if desc:
-                _sys.stderr.write(f"{desc}: 0/{total} [" + " " * bar_len + "] 0%\r")
-                _sys.stderr.flush()
-            for item in iterable:
-                count += 1
-                pct = int((count * 100) / max(1, total))
-                if pct != last_pct:
-                    filled = int(bar_len * count / max(1, total))
-                    bar = "#" * filled + "-" * (bar_len - filled)
-                    _sys.stderr.write(f"{desc or 'Progress'}: {count}/{total} [{bar}] {pct}%\r")
-                    _sys.stderr.flush()
-                    last_pct = pct
-                yield item
-            # finalize line
-            _sys.stderr.write("\n")
-            _sys.stderr.flush()
-
-        return _gen()
+# progress_iter removed per request; using plain iteration
 
 
 class BWTCore:
@@ -361,10 +318,10 @@ class Tier1STRFinder:
         """Find short tandem repeats (1-10bp motifs)."""
         repeats = []
 
-        for k in progress_iter(range(1, self.max_motif_length + 1), total=self.max_motif_length, desc="Tier1: motif length", enable=self.show_progress):
+        for k in range(1, self.max_motif_length + 1):
             motif_count = 0
 
-            for motif in progress_iter(MotifUtils.enumerate_motifs(k), desc=f"Tier1: k={k} motifs", enable=False):
+            for motif in MotifUtils.enumerate_motifs(k):
                 motif_count += 1
                 # Quiet: avoid verbose progress prints
                 # Fast counting with backward search
@@ -544,7 +501,7 @@ class Tier2LCPFinder:
         results: List[TandemRepeat] = []
         seen: Set[Tuple[int, int, str]] = set()
 
-        for p in progress_iter(range(min_p, max_p + 1), total=(max_p - min_p + 1), desc="Tier2: scanning periods", enable=self.show_progress):
+        for p in range(min_p, max_p + 1):
             i = 0
             while i + 2 * p <= n:
                 motif = s[i:i + p]
@@ -681,7 +638,7 @@ class Tier3LongReadFinder:
         """Find very long tandem repeats using long read evidence."""
         repeats = []
         
-        for read_idx, read in enumerate(progress_iter(long_reads, total=len(long_reads) if long_reads is not None else None, desc="Tier3: long reads", enable=self.show_progress)):
+        for read_idx, read in enumerate(long_reads):
             if len(read) < self.min_read_length:
                 continue
             
@@ -860,7 +817,7 @@ class TandemRepeatFinder:
     def build_indices(self, sequences: Dict[str, str]):
         """Build BWT and FM-index for each chromosome."""
         items = list(sequences.items())
-        for chrom, seq in progress_iter(items, total=len(items), desc="Building FM-index", enable=self.show_progress):
+        for chrom, seq in items:
             # Add a single sentinel character at the end (must not appear elsewhere)
             seq_with_sentinel = seq + "$"
 
@@ -882,7 +839,7 @@ class TandemRepeatFinder:
         all_repeats = []
         
         items = list(self.bwt_cores.items())
-        for chrom, bwt_core in progress_iter(items, total=len(items), desc="Chromosomes", enable=self.show_progress):
+        for chrom, bwt_core in items:
             print(f"\nAnalyzing chromosome {chrom}...")
             
             if enable_tier1:
