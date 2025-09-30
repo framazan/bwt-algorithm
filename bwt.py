@@ -1,25 +1,68 @@
-#!/usr/bin/env python3
 """
-Advanced BWT-based Tandem Repeat Finder for Genomics
+Advanced BWT-based tandem repeat finder infra
 
-Implements three-tier approach:
+Implements three-tier approach (from Dr. Yim)
 1. Short tandem repeats (1-10bp) with FM-index
 2. Medium/long repeats (10s-1000s bp) with LCP arrays  
 3. Very long repeats (kb+) with long read evidence
-
-Author: AI Assistant
 """
 
 import numpy as np
 import bisect
 from collections import defaultdict, namedtuple
-from typing import List, Tuple, Dict, Iterator, Optional, Set
+from typing import List, Tuple, Dict, Iterator, Optional, Set, Iterable
 import argparse
 import sys
 import os
 import re
 from dataclasses import dataclass
 from enum import Enum
+
+# Lightweight progress wrapper (uses tqdm if available, else no-op)
+def progress_iter(iterable: Iterable, total: Optional[int] = None, desc: Optional[str] = None, enable: bool = False):
+    """Wrap an iterable with tqdm progress bar when enabled.
+
+    Args:
+        iterable: Iterable to iterate over
+        total: Optional total for progress bar
+        desc: Optional label
+        enable: Whether to show progress (False -> passthrough)
+    """
+    if not enable:
+        return iterable
+    try:
+        from tqdm import tqdm  # type: ignore
+        return tqdm(iterable, total=total, desc=desc, leave=False)
+    except Exception:
+        # Fallback: simple textual progress on stderr when total is known
+        if total is None:
+            if desc:
+                print(desc)
+            return iterable
+
+        def _gen():
+            import sys as _sys
+            count = 0
+            last_pct = -1
+            bar_len = 24
+            if desc:
+                _sys.stderr.write(f"{desc}: 0/{total} [" + " " * bar_len + "] 0%\r")
+                _sys.stderr.flush()
+            for item in iterable:
+                count += 1
+                pct = int((count * 100) / max(1, total))
+                if pct != last_pct:
+                    filled = int(bar_len * count / max(1, total))
+                    bar = "#" * filled + "-" * (bar_len - filled)
+                    _sys.stderr.write(f"{desc or 'Progress'}: {count}/{total} [{bar}] {pct}%\r")
+                    _sys.stderr.flush()
+                    last_pct = pct
+                yield item
+            # finalize line
+            _sys.stderr.write("\n")
+            _sys.stderr.flush()
+
+        return _gen()
 
 
 class BWTCore:
@@ -308,19 +351,20 @@ class MotifUtils:
 class Tier1STRFinder:
     """Tier 1: Short Tandem Repeat Finder using FM-index."""
     
-    def __init__(self, bwt_core: BWTCore, max_motif_length: int = 6):
+    def __init__(self, bwt_core: BWTCore, max_motif_length: int = 6, show_progress: bool = False):
         self.bwt = bwt_core
         self.max_motif_length = max_motif_length
         self.min_copies = 2
+        self.show_progress = show_progress
     
     def find_strs(self, chromosome: str) -> List[TandemRepeat]:
         """Find short tandem repeats (1-10bp motifs)."""
         repeats = []
 
-        for k in range(1, self.max_motif_length + 1):
+        for k in progress_iter(range(1, self.max_motif_length + 1), total=self.max_motif_length, desc="Tier1: motif length", enable=self.show_progress):
             motif_count = 0
 
-            for motif in MotifUtils.enumerate_motifs(k):
+            for motif in progress_iter(MotifUtils.enumerate_motifs(k), desc=f"Tier1: k={k} motifs", enable=False):
                 motif_count += 1
                 # Quiet: avoid verbose progress prints
                 # Fast counting with backward search
@@ -404,11 +448,12 @@ class Tier1STRFinder:
 class Tier2LCPFinder:
     """Tier 2: Medium/Long Tandem Repeat Finder using LCP arrays."""
     
-    def __init__(self, bwt_core: BWTCore, min_period: int = 10, max_period: int = 1000):
+    def __init__(self, bwt_core: BWTCore, min_period: int = 10, max_period: int = 1000, show_progress: bool = False):
         self.bwt = bwt_core
         self.min_period = min_period
         self.max_period = max_period
         self.min_copies = 2
+        self.show_progress = show_progress
     
     def find_long_repeats(self, chromosome: str) -> List[TandemRepeat]:
         """Find medium to long tandem repeats using a lightweight period scan.
@@ -499,7 +544,7 @@ class Tier2LCPFinder:
         results: List[TandemRepeat] = []
         seen: Set[Tuple[int, int, str]] = set()
 
-        for p in range(min_p, max_p + 1):
+        for p in progress_iter(range(min_p, max_p + 1), total=(max_p - min_p + 1), desc="Tier2: scanning periods", enable=self.show_progress):
             i = 0
             while i + 2 * p <= n:
                 motif = s[i:i + p]
@@ -626,16 +671,17 @@ class Tier2LCPFinder:
 class Tier3LongReadFinder:
     """Tier 3: Very Long Tandem Repeat Finder using long read evidence."""
     
-    def __init__(self, bwt_core: BWTCore):
+    def __init__(self, bwt_core: BWTCore, show_progress: bool = False):
         self.bwt = bwt_core
         self.min_read_length = 1000  # Minimum read length for analysis
         self.min_span_length = 100   # Minimum repeat length to analyze
+        self.show_progress = show_progress
     
     def find_very_long_repeats(self, long_reads: List[str], chromosome: str) -> List[TandemRepeat]:
         """Find very long tandem repeats using long read evidence."""
         repeats = []
         
-        for read_idx, read in enumerate(long_reads):
+        for read_idx, read in enumerate(progress_iter(long_reads, total=len(long_reads) if long_reads is not None else None, desc="Tier3: long reads", enable=self.show_progress)):
             if len(read) < self.min_read_length:
                 continue
             
@@ -775,7 +821,7 @@ class Tier3LongReadFinder:
 class TandemRepeatFinder:
     """Main class coordinating all three tiers of tandem repeat finding."""
     
-    def __init__(self, reference_file: str, sa_sample_rate: int = 32):
+    def __init__(self, reference_file: str, sa_sample_rate: int = 32, show_progress: bool = False):
         """
         Initialize the tandem repeat finder.
         
@@ -786,6 +832,7 @@ class TandemRepeatFinder:
         self.reference_file = reference_file
         self.sa_sample_rate = sa_sample_rate
         self.bwt_cores = {}  # Store BWT for each chromosome
+        self.show_progress = show_progress
     
     def load_reference(self) -> Dict[str, str]:
         """Load reference sequences from FASTA file."""
@@ -812,7 +859,8 @@ class TandemRepeatFinder:
     
     def build_indices(self, sequences: Dict[str, str]):
         """Build BWT and FM-index for each chromosome."""
-        for chrom, seq in sequences.items():
+        items = list(sequences.items())
+        for chrom, seq in progress_iter(items, total=len(items), desc="Building FM-index", enable=self.show_progress):
             # Add a single sentinel character at the end (must not appear elsewhere)
             seq_with_sentinel = seq + "$"
 
@@ -833,23 +881,24 @@ class TandemRepeatFinder:
         """
         all_repeats = []
         
-        for chrom, bwt_core in self.bwt_cores.items():
+        items = list(self.bwt_cores.items())
+        for chrom, bwt_core in progress_iter(items, total=len(items), desc="Chromosomes", enable=self.show_progress):
             print(f"\nAnalyzing chromosome {chrom}...")
             
             if enable_tier1:
-                tier1 = Tier1STRFinder(bwt_core)
+                tier1 = Tier1STRFinder(bwt_core, show_progress=self.show_progress)
                 tier1_repeats = tier1.find_strs(chrom)
                 all_repeats.extend(tier1_repeats)
                 print(f"  Tier 1: {len(tier1_repeats)} STRs")
             
             if enable_tier2:
-                tier2 = Tier2LCPFinder(bwt_core)
+                tier2 = Tier2LCPFinder(bwt_core, show_progress=self.show_progress)
                 tier2_repeats = tier2.find_long_repeats(chrom)
                 all_repeats.extend(tier2_repeats)
                 print(f"  Tier 2: {len(tier2_repeats)} LTRs")
             
             if enable_tier3 and long_reads:
-                tier3 = Tier3LongReadFinder(bwt_core)
+                tier3 = Tier3LongReadFinder(bwt_core, show_progress=self.show_progress)
                 tier3_repeats = tier3.find_very_long_repeats(long_reads, chrom)
                 all_repeats.extend(tier3_repeats)
                 print(f"  Tier 3: {len(tier3_repeats)} VLTRs")
@@ -886,16 +935,17 @@ def main():
     parser.add_argument("reference", help="Reference genome FASTA file")
     parser.add_argument("-o", "--output", default="tandem_repeats.bed", help="Output file")
     parser.add_argument("--format", choices=["bed", "vcf"], default="bed", help="Output format")
-    parser.add_argument("--tier1", action="store_true", default=True, help="Enable tier 1 (short repeats)")
-    parser.add_argument("--tier2", action="store_true", default=True, help="Enable tier 2 (medium/long repeats)")
+    parser.add_argument("--tier1", action="store_true", help="Enable tier 1 (short repeats)")
+    parser.add_argument("--tier2", action="store_true", help="Enable tier 2 (medium/long repeats)")
     parser.add_argument("--tier3", action="store_true", help="Enable tier 3 (very long repeats)")
     parser.add_argument("--long-reads", help="Long reads file for tier 3")
     parser.add_argument("--sa-sample", type=int, default=32, help="Suffix array sampling rate")
+    parser.add_argument("--progress", action="store_true", help="Show progress bars where applicable")
     
     args = parser.parse_args()
     
     # Initialize finder
-    finder = TandemRepeatFinder(args.reference, args.sa_sample)
+    finder = TandemRepeatFinder(args.reference, args.sa_sample, show_progress=args.progress)
     
     # Load reference and build indices
     sequences = finder.load_reference()
@@ -921,11 +971,19 @@ def main():
         print(f"Loaded {len(long_reads)} long reads")
     
     # Find tandem repeats
+    # If no tiers were explicitly enabled, default to Tier1+Tier2 for convenience
+    enable_tier1 = args.tier1
+    enable_tier2 = args.tier2
+    enable_tier3 = args.tier3
+    if not (enable_tier1 or enable_tier2 or enable_tier3):
+        enable_tier1 = True
+        enable_tier2 = True
+
     repeats = finder.find_tandem_repeats(
-        enable_tier1=args.tier1,
-        enable_tier2=args.tier2, 
-        enable_tier3=args.tier3,
-        long_reads=long_reads if args.tier3 and long_reads else None
+        enable_tier1=enable_tier1,
+        enable_tier2=enable_tier2,
+        enable_tier3=enable_tier3,
+        long_reads=long_reads if enable_tier3 and long_reads else None
     )
     
     # Save results
