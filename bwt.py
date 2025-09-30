@@ -24,36 +24,78 @@ from enum import Enum
 
 class BWTCore:
     """Core BWT construction and FM-index operations."""
-    
-    def __init__(self, text: str, sa_sample_rate: int = 32):
+
+    def __init__(self, text: str, sa_sample_rate: int = 32, occ_sample_rate: int = 128):
         """
         Initialize BWT with FM-index.
-        
+
         Args:
-            text: Input text (should end with unique sentinel)
+            text: Input text (should end with a single '$' sentinel not present elsewhere)
             sa_sample_rate: Sample every nth suffix array position for space efficiency
+            occ_sample_rate: Occurrence checkpoints every nth position to reduce memory
         """
         self.text = text
         self.n = len(text)
         self.sa_sample_rate = sa_sample_rate
-        
-        # Build suffix array and BWT
+        self.occ_sample_rate = occ_sample_rate
+
+        # Build suffix array and BWT (memory-efficient)
         self.suffix_array = self._build_suffix_array()
         self.bwt = self._build_bwt()
-        
+
         # Build FM-index components
         self.alphabet = sorted(set(text))
-        self.char_counts = self._build_char_counts()
-        self.occurrence = self._build_occurrence_table()
-        
+        self.char_counts, self.char_totals = self._build_char_counts()
+        # Occurrence checkpoints for rank queries
+        self.occ_checkpoints = self._build_occurrence_checkpoints()
+
         # Sample suffix array for efficient locating
         self.sampled_sa = self._sample_suffix_array()
+
+    def clear(self):
+        """Release heavy memory structures to let GC reclaim memory."""
+        # Replace large attributes with minimal stubs
+        self.text = ""
+        self.bwt = ""
+        self.suffix_array = np.array([], dtype=np.int32)
+        self.sampled_sa = {}
+        self.occ_checkpoints = {}
+        self.char_counts = {}
+        self.char_totals = {}
+        self.alphabet = []
     
     def _build_suffix_array(self) -> np.ndarray:
-        """Build suffix array using numpy for efficiency."""
-        suffixes = [(self.text[i:], i) for i in range(self.n)]
-        suffixes.sort()
-        return np.array([suffix[1] for suffix in suffixes], dtype=np.int32)
+        """Build suffix array using prefix-doubling algorithm (O(n log n) time, O(n) memory)."""
+        # Try to use a C-optimized library if available
+        s = self.text
+        try:
+            import pydivsufsort  # type: ignore
+            sa_list = pydivsufsort.divsufsort(s)
+            return np.array(sa_list, dtype=np.int32)
+        except Exception:
+            pass
+        n = self.n
+        # Map characters to integer ranks (ensure deterministic order)
+        chars = sorted(set(s))
+        rank_map = {c: i for i, c in enumerate(chars)}
+        rank = [rank_map[c] for c in s]
+        sa = list(range(n))
+        k = 1
+        tmp = [0] * n
+        while k < n:
+            sa.sort(key=lambda i: (rank[i], rank[i + k] if i + k < n else -1))
+            tmp[sa[0]] = 0
+            for i in range(1, n):
+                prev = sa[i - 1]
+                cur = sa[i]
+                prev_key = (rank[prev], rank[prev + k] if prev + k < n else -1)
+                cur_key = (rank[cur], rank[cur + k] if cur + k < n else -1)
+                tmp[cur] = tmp[prev] + (1 if cur_key != prev_key else 0)
+            rank, tmp = tmp, rank
+            if rank[sa[-1]] == n - 1:
+                break
+            k <<= 1
+        return np.array(sa, dtype=np.int32)
     
     def _build_bwt(self) -> str:
         """Build BWT from suffix array."""
@@ -66,25 +108,37 @@ class BWTCore:
                 bwt_chars.append(self.text[sa_pos - 1])
         return ''.join(bwt_chars)
     
-    def _build_char_counts(self) -> Dict[str, int]:
-        """Count character frequencies and compute cumulative counts."""
-        counts = {}
+    def _build_char_counts(self) -> Tuple[Dict[str, int], Dict[str, int]]:
+        """Count character frequencies and compute cumulative counts C[char]."""
+        totals: Dict[str, int] = {c: 0 for c in self.alphabet}
+        for ch in self.text:
+            totals[ch] += 1
+        counts: Dict[str, int] = {}
         cumulative = 0
         for char in self.alphabet:
             counts[char] = cumulative
-            cumulative += self.text.count(char)
-        return counts
+            cumulative += totals[char]
+        return counts, totals
     
-    def _build_occurrence_table(self) -> Dict[str, List[int]]:
-        """Build occurrence table for efficient rank queries."""
-        occurrence = {char: [0] for char in self.alphabet}
-        
-        for i, char in enumerate(self.bwt):
+    def _build_occurrence_checkpoints(self) -> Dict[str, List[int]]:
+        """Build checkpointed occurrence counts for efficient rank queries with low memory.
+
+        For each character c, store counts at positions m * occ_sample_rate (prefix length).
+        """
+        k = self.occ_sample_rate
+        checkpoints = {c: [0] for c in self.alphabet}
+        counts = {c: 0 for c in self.alphabet}
+        # iterate bwt and record counts at each boundary
+        for i, ch in enumerate(self.bwt, start=1):
+            counts[ch] += 1
+            if i % k == 0:
+                for c in self.alphabet:
+                    checkpoints[c].append(counts[c])
+        # Ensure there's a final checkpoint covering len(bwt)
+        if len(self.bwt) % k != 0:
             for c in self.alphabet:
-                occurrence[c].append(occurrence[c][-1])
-            occurrence[char][-1] += 1
-        
-        return occurrence
+                checkpoints[c].append(counts[c])
+        return checkpoints
     
     def _sample_suffix_array(self) -> Dict[int, int]:
         """Sample suffix array positions for space-efficient locating."""
@@ -94,10 +148,29 @@ class BWTCore:
         return sampled
     
     def rank(self, char: str, pos: int) -> int:
-        """Count occurrences of char in bwt[0:pos]."""
-        if char not in self.occurrence:
+        """Count occurrences of char in bwt[0:pos]. Uses checkpoints + local scan.
+
+        Args:
+            char: character to count
+            pos: count occurrences in bwt[0:pos] (pos can be 0..n)
+        """
+        if pos <= 0:
             return 0
-        return self.occurrence[char][pos]
+        if pos > self.n:
+            pos = self.n
+        if char not in self.occ_checkpoints:
+            return 0
+        k = self.occ_sample_rate
+        cp_idx = pos // k
+        cp_pos = cp_idx * k
+        # Handle case when pos is exactly on a checkpoint boundary: checkpoints record counts up to cp_pos
+        base = self.occ_checkpoints[char][cp_idx]
+        # Scan remainder from cp_pos to pos-1
+        count = base
+        for i in range(cp_pos, pos):
+            if self.bwt[i] == char:
+                count += 1
+        return count
     
     def backward_search(self, pattern: str) -> Tuple[int, int]:
         """
@@ -113,19 +186,19 @@ class BWTCore:
         char = pattern[-1]
         if char not in self.char_counts:
             return (-1, -1)
-        
+        # sp inclusive, ep inclusive
         sp = self.char_counts[char]
-        ep = sp + self.text.count(char) - 1
+        ep = sp + self.char_totals[char] - 1
         
         # Process pattern right to left
         for i in range(len(pattern) - 2, -1, -1):
             char = pattern[i]
             if char not in self.char_counts:
                 return (-1, -1)
-            
+
             sp = self.char_counts[char] + self.rank(char, sp)
             ep = self.char_counts[char] + self.rank(char, ep + 1) - 1
-            
+
             if sp > ep:
                 return (-1, -1)
         
@@ -146,13 +219,11 @@ class BWTCore:
         sp, ep = self.backward_search(pattern)
         if sp == -1:
             return []
-        
-        positions = []
-        for i in range(sp, ep + 1):
-            pos = self._get_suffix_position(i)
-            positions.append(pos)
-        
-        return sorted(positions)
+
+        # Directly read positions from the suffix array (much faster than LF walking)
+        positions = self.suffix_array[sp:ep + 1].tolist()
+        positions.sort()
+        return positions
     
     def _get_suffix_position(self, sa_index: int) -> int:
         """Recover original text position from SA index using sampling."""
@@ -237,7 +308,7 @@ class MotifUtils:
 class Tier1STRFinder:
     """Tier 1: Short Tandem Repeat Finder using FM-index."""
     
-    def __init__(self, bwt_core: BWTCore, max_motif_length: int = 10):
+    def __init__(self, bwt_core: BWTCore, max_motif_length: int = 6):
         self.bwt = bwt_core
         self.max_motif_length = max_motif_length
         self.min_copies = 2
@@ -245,18 +316,13 @@ class Tier1STRFinder:
     def find_strs(self, chromosome: str) -> List[TandemRepeat]:
         """Find short tandem repeats (1-10bp motifs)."""
         repeats = []
-        
-        print(f"Tier 1: Scanning motifs 1-{self.max_motif_length}bp...")
-        
+
         for k in range(1, self.max_motif_length + 1):
-            print(f"  Processing {k}bp motifs...")
             motif_count = 0
-            
+
             for motif in MotifUtils.enumerate_motifs(k):
                 motif_count += 1
-                if motif_count % 100 == 0:
-                    print(f"    Processed {motif_count} {k}bp motifs...")
-                
+                # Quiet: avoid verbose progress prints
                 # Fast counting with backward search
                 count = self.bwt.count_occurrences(motif)
                 
@@ -345,14 +411,11 @@ class Tier2LCPFinder:
         self.min_copies = 2
     
     def find_long_repeats(self, chromosome: str) -> List[TandemRepeat]:
-        """Find medium to long tandem repeats using LCP analysis."""
-        print("Tier 2: Computing LCP array...")
-        lcp_array = self._compute_lcp_array()
-        
-        print("Tier 2: Detecting LCP plateaus...")
-        repeats = self._detect_lcp_plateaus(lcp_array, chromosome)
-        
-        return repeats
+        """Find medium to long tandem repeats using a lightweight period scan.
+
+        This avoids building large LCP structures and is fast for moderate sequences.
+        """
+        return self._find_repeats_simple(chromosome)
     
     def _compute_lcp_array(self) -> np.ndarray:
         """Compute LCP array from BWT using Phi array method."""
@@ -382,27 +445,110 @@ class Tier2LCPFinder:
         """Detect tandem repeats from LCP plateaus."""
         repeats = []
         n = len(lcp_array)
-        
-        # Scan for LCP plateaus
-        for threshold in range(self.min_period, min(self.max_period, np.max(lcp_array)) + 1):
+        if n == 0:
+            return repeats
+        # Choose a single conservative threshold: max(min_period, 20), but <= max LCP and <= max_period
+        lcp_max = int(np.max(lcp_array))
+        if lcp_max < self.min_period:
+            return repeats
+        threshold = min(self.max_period, lcp_max)
+        threshold = max(self.min_period, min(threshold, 20))
+
+        i = 0
+        while i < n:
+            if lcp_array[i] >= threshold:
+                j = i
+                while j < n and lcp_array[j] >= threshold:
+                    j += 1
+                tandem_repeats = self._analyze_sa_interval_for_tandems(
+                    i, j, threshold, chromosome
+                )
+                repeats.extend(tandem_repeats)
+                i = j
+            else:
+                i += 1
+
+        return repeats
+
+    def _smallest_period(self, s: str) -> int:
+        """Return the length of the smallest period of s via prefix-function (KMP)."""
+        n = len(s)
+        pi = [0] * n
+        for i in range(1, n):
+            j = pi[i - 1]
+            while j > 0 and s[i] != s[j]:
+                j = pi[j - 1]
+            if s[i] == s[j]:
+                j += 1
+            pi[i] = j
+        p = n - pi[-1]
+        return p if p != 0 and n % p == 0 else n
+
+    def _find_repeats_simple(self, chromosome: str) -> List[TandemRepeat]:
+        """Simple scanning detector for tandem repeats using candidate periods.
+
+        Designed for correctness on small/medium sequences without heavy indexes.
+        """
+        s = self.bwt.text
+        # Exclude trailing sentinel if present
+        n = len(s)
+        if n > 0 and s[-1] == '$':
+            n -= 1
+        max_p = min(self.max_period, max(64, self.min_period), max(1, n // 2))
+        min_p = self.min_period
+        results: List[TandemRepeat] = []
+        seen: Set[Tuple[int, int, str]] = set()
+
+        for p in range(min_p, max_p + 1):
             i = 0
-            while i < n:
-                if lcp_array[i] >= threshold:
-                    # Found start of plateau
-                    j = i
-                    while j < n and lcp_array[j] >= threshold:
-                        j += 1
-                    
-                    # Analyze SA interval [i, j) for tandem structure
-                    tandem_repeats = self._analyze_sa_interval_for_tandems(
-                        i, j, threshold, chromosome
-                    )
-                    repeats.extend(tandem_repeats)
-                    i = j
+            while i + 2 * p <= n:
+                motif = s[i:i + p]
+                if '$' in motif or 'N' in motif:
+                    i += 1
+                    continue
+                copies = 1
+                j = i + p
+                while j + p <= n and s[j:j + p] == motif:
+                    copies += 1
+                    j += p
+                if copies >= self.min_copies:
+                    # Normalize motif to its primitive period
+                    prim = self._smallest_period(motif)
+                    if prim < p:
+                        motif = motif[:prim]
+                        # adjust p to primitive
+                        p_eff = prim
+                    else:
+                        p_eff = p
+                    # Maximality: extend left/right by whole motifs
+                    start = i
+                    end = j
+                    while start - p_eff >= 0 and s[start - p_eff:start] == motif:
+                        start -= p_eff
+                        copies += 1
+                    while end + p_eff <= n and s[end:end + p_eff] == motif:
+                        end += p_eff
+                        copies += 1
+                    key = (start, end, motif)
+                    if key not in seen:
+                        seen.add(key)
+                        results.append(
+                            TandemRepeat(
+                                chrom=chromosome,
+                                start=start,
+                                end=end,
+                                motif=motif,
+                                copies=float((end - start) // len(motif)),
+                                length=end - start,
+                                tier=2,
+                                confidence=0.95,
+                            )
+                        )
+                    i = end  # jump past this repeat
                 else:
                     i += 1
-        
-        return repeats
+
+        return results
     
     def _analyze_sa_interval_for_tandems(self, start_idx: int, end_idx: int, 
                                        period: int, chromosome: str) -> List[TandemRepeat]:
@@ -487,15 +633,11 @@ class Tier3LongReadFinder:
     
     def find_very_long_repeats(self, long_reads: List[str], chromosome: str) -> List[TandemRepeat]:
         """Find very long tandem repeats using long read evidence."""
-        print("Tier 3: Analyzing long reads for very long repeats...")
         repeats = []
         
         for read_idx, read in enumerate(long_reads):
             if len(read) < self.min_read_length:
                 continue
-            
-            if read_idx % 100 == 0:
-                print(f"  Processed {read_idx} long reads...")
             
             # Find potential repeat regions in read
             read_repeats = self._analyze_read_for_repeats(read, chromosome, read_idx)
@@ -650,9 +792,7 @@ class TandemRepeatFinder:
         sequences = {}
         current_chrom = None
         current_seq = []
-        
-        print(f"Loading reference from {self.reference_file}...")
-        
+
         with open(self.reference_file, 'r') as f:
             for line in f:
                 line = line.strip()
@@ -662,7 +802,6 @@ class TandemRepeatFinder:
                     
                     current_chrom = line[1:].split()[0]  # Extract chromosome name
                     current_seq = []
-                    print(f"  Loading {current_chrom}...")
                 elif line:
                     current_seq.append(line.upper())
         
@@ -673,14 +812,10 @@ class TandemRepeatFinder:
     
     def build_indices(self, sequences: Dict[str, str]):
         """Build BWT and FM-index for each chromosome."""
-        print("Building BWT indices...")
-        
         for chrom, seq in sequences.items():
-            print(f"  Building index for {chrom} ({len(seq):,} bp)...")
-            
-            # Add unique sentinel for this chromosome
-            seq_with_sentinel = seq + f"${chrom}$"
-            
+            # Add a single sentinel character at the end (must not appear elsewhere)
+            seq_with_sentinel = seq + "$"
+
             # Build BWT core
             bwt_core = BWTCore(seq_with_sentinel, self.sa_sample_rate)
             self.bwt_cores[chrom] = bwt_core
@@ -705,26 +840,27 @@ class TandemRepeatFinder:
                 tier1 = Tier1STRFinder(bwt_core)
                 tier1_repeats = tier1.find_strs(chrom)
                 all_repeats.extend(tier1_repeats)
-                print(f"  Tier 1 found {len(tier1_repeats)} short tandem repeats")
+                print(f"  Tier 1: {len(tier1_repeats)} STRs")
             
             if enable_tier2:
                 tier2 = Tier2LCPFinder(bwt_core)
                 tier2_repeats = tier2.find_long_repeats(chrom)
                 all_repeats.extend(tier2_repeats)
-                print(f"  Tier 2 found {len(tier2_repeats)} medium/long tandem repeats")
+                print(f"  Tier 2: {len(tier2_repeats)} LTRs")
             
             if enable_tier3 and long_reads:
                 tier3 = Tier3LongReadFinder(bwt_core)
                 tier3_repeats = tier3.find_very_long_repeats(long_reads, chrom)
                 all_repeats.extend(tier3_repeats)
-                print(f"  Tier 3 found {len(tier3_repeats)} very long tandem repeats")
+                print(f"  Tier 3: {len(tier3_repeats)} VLTRs")
+
+            # Free per-chromosome memory ASAP
+            bwt_core.clear()
         
         return all_repeats
     
     def save_results(self, repeats: List[TandemRepeat], output_file: str, format_type: str = "bed"):
         """Save tandem repeat results to file."""
-        print(f"\nSaving {len(repeats)} tandem repeats to {output_file}...")
-        
         with open(output_file, 'w') as f:
             if format_type == "bed":
                 f.write("# Tandem Repeats (BED format)\n")

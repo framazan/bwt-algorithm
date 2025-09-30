@@ -1,103 +1,82 @@
 #!/usr/bin/env python3
 """
-Test script for the BWT-based Tandem Repeat Finder.
-Demonstrates usage on the Arabidopsis thaliana genome.
+Refactored test/driver for the BWT-based Tandem Repeat Finder.
+
+Given a FASTA file, iterate over all sequences, run the repeat finder,
+and write per-sequence result files. Keeps the synthetic test function.
 """
 
+import argparse
 import os
 import sys
+from typing import List, Optional
+
 from bwt import TandemRepeatFinder
 
-def test_on_small_chromosome(specific_chr=None):
-    """Test on a small chromosome file for quick validation."""
-    
-    # Check if we have extracted chromosome files
-    chr_files = ["Chr1.fa", "Chr2.fa", "Chr3.fa", "Chr4.fa", "Chr5.fa", "ChrC.fa", "ChrM.fa"]
-    chr_dir = "arabadopsis_chrs"
-    
-    available_chrs = []
-    for chr_file in chr_files:
-        chr_path = os.path.join(chr_dir, chr_file)
-        if os.path.exists(chr_path):
-            available_chrs.append(chr_path)
-    
-    if not available_chrs:
-        print("No chromosome files found in arabadopsis_chrs/")
-        print("Please run chromosomes_extract.py first to extract individual chromosomes.")
-        return
-    
-    # Show available chromosomes
-    print("Available chromosomes:")
-    for i, chr_path in enumerate(available_chrs):
-        size = os.path.getsize(chr_path) / (1024 * 1024)  # MB
-        print(f"  {i+1}. {os.path.basename(chr_path)} ({size:.1f} MB)")
-    print()
-    
-    # Select chromosome to test
-    test_file = None
-    if specific_chr:
-        # Try to find the specified chromosome
-        for chr_path in available_chrs:
-            if specific_chr.lower() in os.path.basename(chr_path).lower():
-                test_file = chr_path
-                break
-        if not test_file:
-            print(f"Chromosome '{specific_chr}' not found. Available: {[os.path.basename(p) for p in available_chrs]}")
-            return
-    else:
-        # Default: prefer smallest chromosomes (organellar genomes)
-        for chr_path in available_chrs:
-            if "ChrM.fa" in chr_path or "ChrC.fa" in chr_path:  # Organellar genomes are smaller
-                test_file = chr_path
-                break
-        
-        if not test_file:
-            test_file = available_chrs[0]  # Use first available
-    
-    print(f"Testing tandem repeat finder on {test_file}")
+
+def ensure_dir(path: str):
+    if path and not os.path.exists(path):
+        os.makedirs(path, exist_ok=True)
+
+
+def process_fasta(
+    fasta_path: str,
+    output_dir: str = ".",
+    output_format: str = "bed",
+    sa_sample_rate: int = 16,
+    enable_tier1: bool = True,
+    enable_tier2: bool = False,
+    enable_tier3: bool = False,
+    long_reads: Optional[List[str]] = None,
+    vcf_top: Optional[int] = 20,
+):
+    """Process a FASTA: run finder per sequence and write per-sequence outputs."""
+
+    if not os.path.isfile(fasta_path):
+        raise FileNotFoundError(f"FASTA not found: {fasta_path}")
+
+    ensure_dir(output_dir)
+
+    print(f"Processing FASTA: {fasta_path}")
     print("=" * 60)
-    
-    # Initialize the tandem repeat finder
-    finder = TandemRepeatFinder(test_file, sa_sample_rate=16)  # Smaller sampling for demo
-    
-    try:
-        # Load reference and build indices
-        sequences = finder.load_reference()
-        finder.build_indices(sequences)
-        
-        print("\nRunning Tier 1 (Short Tandem Repeats)...")
-        # Test Tier 1 only for quick demo (Tier 2 can be slow on large sequences)
+
+    # We'll load sequences first to get names and lengths, then process one-by-one
+    loader = TandemRepeatFinder(fasta_path, sa_sample_rate)
+    sequences = loader.load_reference()
+
+    base = os.path.splitext(os.path.basename(fasta_path))[0]
+
+    for chrom, seq in sequences.items():
+        print(f"\n=== Running tandem repeat finder for {chrom} ({len(seq):,} bp) ===")
+
+        # Build index only for this sequence to keep memory lower
+        finder = TandemRepeatFinder(fasta_path, sa_sample_rate)
+        finder.build_indices({chrom: seq})
+
         repeats = finder.find_tandem_repeats(
-            enable_tier1=True,
-            enable_tier2=False,  # Disable for demo speed
-            enable_tier3=False
+            enable_tier1=enable_tier1,
+            enable_tier2=enable_tier2,
+            enable_tier3=enable_tier3,
+            long_reads=long_reads if enable_tier3 else None,
         )
-        
-        print(f"\nFound {len(repeats)} tandem repeats!")
-        
-        # Show some examples
-        if repeats:
-            print("\nTop 10 tandem repeats found:")
-            print("Chrom\tStart\tEnd\tMotif\tCopies\tLength\tTier")
-            print("-" * 60)
-            
-            for i, repeat in enumerate(sorted(repeats, key=lambda x: x.length, reverse=True)[:10]):
-                print(f"{repeat.chrom}\t{repeat.start}\t{repeat.end}\t{repeat.motif}\t{repeat.copies:.1f}\t{repeat.length}\t{repeat.tier}")
-        
-        # Save results
-        output_file = f"test_results_{os.path.basename(test_file)}.bed"
-        finder.save_results(repeats, output_file, "bed")
-        print(f"\nResults saved to {output_file}")
-        
-        # Also create a small VCF example
-        vcf_file = f"test_results_{os.path.basename(test_file)}.vcf"
-        finder.save_results(repeats[:20], vcf_file, "vcf")  # Just first 20 for VCF demo
-        print(f"VCF example saved to {vcf_file}")
-        
-    except Exception as e:
-        print(f"Error during testing: {e}")
-        import traceback
-        traceback.print_exc()
+
+        print(f"Found {len(repeats)} tandem repeats in {chrom}")
+
+        # Save per-sequence outputs
+        bed_path = os.path.join(output_dir, f"{base}__{chrom}.bed")
+        vcf_path = os.path.join(output_dir, f"{base}__{chrom}.vcf")
+
+        if output_format in ("bed", "both"):
+            finder.save_results(repeats, bed_path, "bed")
+            print(f"Saved BED to {bed_path}")
+
+        if output_format in ("vcf", "both"):
+            # Optionally limit VCF to top N by length for readability
+            to_write = repeats
+            if vcf_top is not None and vcf_top > 0:
+                to_write = sorted(repeats, key=lambda r: r.length, reverse=True)[:vcf_top]
+            finder.save_results(to_write, vcf_path, "vcf")
+            print(f"Saved VCF to {vcf_path}")
 
 def create_synthetic_test():
     """Create a synthetic test sequence with known tandem repeats."""
@@ -160,28 +139,76 @@ def create_synthetic_test():
         traceback.print_exc()
 
 def main():
-    """Main test function."""
-    print("BWT-based Tandem Repeat Finder - Test Script")
-    print("=" * 60)
-    
-    if len(sys.argv) > 1:
-        if sys.argv[1] == "synthetic":
-            create_synthetic_test()
-        elif sys.argv[1] == "help" or sys.argv[1] == "-h":
-            print("Usage:")
-            print("  python test_tandem_repeats.py                    # Test on default small chromosome")
-            print("  python test_tandem_repeats.py synthetic          # Test on synthetic sequence")
-            print("  python test_tandem_repeats.py <chromosome>       # Test on specific chromosome")
-            print("\nAvailable chromosomes: Chr1, Chr2, Chr3, Chr4, Chr5, ChrC, ChrM")
-            print("Examples:")
-            print("  python test_tandem_repeats.py ChrM              # Test on mitochondrial genome")
-            print("  python test_tandem_repeats.py ChrC              # Test on chloroplast genome")
-            print("  python test_tandem_repeats.py Chr1              # Test on chromosome 1")
-        else:
-            # Test on specific chromosome
-            test_on_small_chromosome(sys.argv[1])
-    else:
-        test_on_small_chromosome()
+    """CLI entrypoint."""
+    parser = argparse.ArgumentParser(
+        description=(
+            "Run tandem repeat finding per sequence in a FASTA and write per-sequence results."
+        )
+    )
+
+    subparsers = parser.add_subparsers(dest="command")
+
+    # Main command: process a fasta
+    run_parser = subparsers.add_parser("run", help="Process a FASTA file")
+    run_parser.add_argument("fasta", help="Path to FASTA file")
+    run_parser.add_argument("--output-dir", "-o", default="results", help="Directory for outputs")
+    run_parser.add_argument(
+        "--format",
+        choices=["bed", "vcf", "both"],
+        default="bed",
+        help="Output format per sequence",
+    )
+    run_parser.add_argument("--sa-sample", type=int, default=16, help="Suffix array sampling rate")
+    run_parser.add_argument("--tier1", action="store_true", default=True, help="Enable Tier 1 (short repeats)")
+    run_parser.add_argument("--no-tier1", dest="tier1", action="store_false", help="Disable Tier 1")
+    run_parser.add_argument("--tier2", action="store_true", default=False, help="Enable Tier 2 (medium/long repeats)")
+    run_parser.add_argument("--tier3", action="store_true", default=False, help="Enable Tier 3 (very long repeats)")
+    run_parser.add_argument("--long-reads", help="Optional long reads FASTA/FASTQ for Tier 3")
+    run_parser.add_argument("--vcf-top", type=int, default=20, help="Limit VCF to top N by length (<=0 for all)")
+
+    # Synthetic example
+    subparsers.add_parser("synthetic", help="Run built-in synthetic test")
+
+    args = parser.parse_args()
+
+    if args.command == "synthetic":
+        create_synthetic_test()
+        return
+
+    if args.command != "run":
+        parser.print_help()
+        return
+
+    # Optional: load long reads for Tier 3
+    long_reads = None
+    if args.tier3 and args.long_reads:
+        long_reads = []
+        seq = ""
+        with open(args.long_reads, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                if line.startswith(">") or line.startswith("@"):  # FASTA/FASTQ header
+                    if seq:
+                        long_reads.append(seq)
+                        seq = ""
+                elif not line.startswith("+"):  # Skip FASTQ separator
+                    seq += line.upper()
+        if seq:
+            long_reads.append(seq)
+
+    process_fasta(
+        fasta_path=args.fasta,
+        output_dir=args.output_dir,
+        output_format=args.format,
+        sa_sample_rate=args.sa_sample,
+        enable_tier1=args.tier1,
+        enable_tier2=args.tier2,
+        enable_tier3=args.tier3,
+        long_reads=long_reads,
+        vcf_top=(args.vcf_top if args.vcf_top > 0 else None),
+    )
 
 if __name__ == "__main__":
     main()
