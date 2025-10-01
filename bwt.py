@@ -9,21 +9,78 @@ Implements three-tier approach:
 """
 
 import numpy as np
-import bisect
-from collections import defaultdict, namedtuple
-from typing import List, Tuple, Dict, Iterator, Optional, Set, Iterable
+from typing import List, Tuple, Dict, Iterator, Optional, Set
 import argparse
-import sys
-import os
-import re
 from dataclasses import dataclass
-from enum import Enum
 
-# progress_iter removed per request; using plain iteration
+# Optional: JIT acceleration with numba when available
+HAVE_NUMBA = False
+try:
+    import numba as _nb  # type: ignore
+    HAVE_NUMBA = True
+except Exception:
+    _nb = None  # type: ignore
+
+if HAVE_NUMBA:
+    @_nb.njit(cache=True)
+    def _count_equal_range(arr: np.ndarray, start: int, end: int, code: int) -> int:  # type: ignore
+        c = 0
+        for i in range(start, end):
+            if arr[i] == code:
+                c += 1
+        return c
+
+    @_nb.njit(cache=True)
+    def _kasai_lcp_uint8(text_codes: np.ndarray, sa: np.ndarray) -> np.ndarray:  # type: ignore
+        n = text_codes.size
+        lcp = np.zeros(n, dtype=np.int32)
+        rank = np.zeros(n, dtype=np.int32)
+        for i in range(n):
+            rank[sa[i]] = i
+        h = 0
+        for i in range(n):
+            r = rank[i]
+            if r > 0:
+                j = sa[r - 1]
+                while i + h < n and j + h < n and text_codes[i + h] == text_codes[j + h]:
+                    h += 1
+                lcp[r] = h
+                if h > 0:
+                    h -= 1
+        return lcp
+else:
+    def _count_equal_range(arr: np.ndarray, start: int, end: int, code: int) -> int:
+        # Pure-python/numpy fallback
+        return int(np.count_nonzero(arr[start:end] == code))
+
+    def _kasai_lcp_uint8(text_codes: np.ndarray, sa: np.ndarray) -> np.ndarray:
+        # Fallback non-jitted Kasai
+        n = text_codes.size
+        lcp = np.zeros(n, dtype=np.int32)
+        rank = np.zeros(n, dtype=np.int32)
+        for i in range(n):
+            rank[sa[i]] = i
+        h = 0
+        for i in range(n):
+            r = rank[i]
+            if r > 0:
+                j = sa[r - 1]
+                while i + h < n and j + h < n and text_codes[i + h] == text_codes[j + h]:
+                    h += 1
+                lcp[r] = h
+                if h > 0:
+                    h -= 1
+        return lcp
 
 
 class BWTCore:
-    """Core BWT construction and FM-index operations."""
+    """Core BWT construction and FM-index operations.
+
+    Performance notes:
+    - Uses pydivsufsort for suffix array when available (C backend).
+    - Stores text and BWT as NumPy uint8 arrays (ASCII codes) for vectorized rank.
+    - Keeps original text string for compatibility with higher tiers.
+    """
 
     def __init__(self, text: str, sa_sample_rate: int = 32, occ_sample_rate: int = 128):
         """
@@ -34,19 +91,33 @@ class BWTCore:
             sa_sample_rate: Sample every nth suffix array position for space efficiency
             occ_sample_rate: Occurrence checkpoints every nth position to reduce memory
         """
-        self.text = text
+        # Keep string for external consumers, but build numeric views for speed
+        self.text: str = text
         self.n = len(text)
-        self.sa_sample_rate = sa_sample_rate
+        self.sa_sample_rate = sa_sample_rate   
         self.occ_sample_rate = occ_sample_rate
+
+        # Numeric views (ASCII codes)
+        self.text_arr: np.ndarray = np.frombuffer(text.encode('ascii'), dtype=np.uint8)
 
         # Build suffix array and BWT (memory-efficient)
         self.suffix_array = self._build_suffix_array()
-        self.bwt = self._build_bwt()
+        # BWT stored as uint8 array; also expose lightweight string view on demand
+        self.bwt_arr: np.ndarray = self._build_bwt_array()
 
-        # Build FM-index components
+        # Build alphabet/mappings from the original text
         self.alphabet = sorted(set(text))
+        # Char<->code maps (ASCII)
+        self.char_to_code: Dict[str, int] = {c: ord(c) for c in self.alphabet}
+        self.code_to_char: Dict[int, str] = {ord(c): c for c in self.alphabet}
+
+        # FM-index components
         self.char_counts, self.char_totals = self._build_char_counts()
-        # Occurrence checkpoints for rank queries
+        # Code-keyed variants for internal numeric operations
+        self.char_counts_code: Dict[int, int] = {ord(k): v for k, v in self.char_counts.items()}
+        self.char_totals_code: Dict[int, int] = {ord(k): v for k, v in self.char_totals.items()}
+
+        # Occurrence checkpoints for rank queries (code -> np.ndarray)
         self.occ_checkpoints = self._build_occurrence_checkpoints()
 
         # Sample suffix array for efficient locating
@@ -56,57 +127,79 @@ class BWTCore:
         """Release heavy memory structures to let GC reclaim memory."""
         # Replace large attributes with minimal stubs
         self.text = ""
-        self.bwt = ""
+        self.text_arr = np.array([], dtype=np.uint8)
+        self.bwt_arr = np.array([], dtype=np.uint8)
         self.suffix_array = np.array([], dtype=np.int32)
         self.sampled_sa = {}
         self.occ_checkpoints = {}
         self.char_counts = {}
         self.char_totals = {}
         self.alphabet = []
+        self.char_to_code = {}
+        self.code_to_char = {}
+        self.char_counts_code = {}
+        self.char_totals_code = {}
     
     def _build_suffix_array(self) -> np.ndarray:
-        """Build suffix array using prefix-doubling algorithm (O(n log n) time, O(n) memory)."""
-        # Try to use a C-optimized library if available
+        """Build suffix array, preferring pydivsufsort (C backend) with a NumPy fallback.
+
+        Fallback uses prefix-doubling with NumPy lexsort (significantly faster than
+        Python list.sort + lambdas). Complexity ~O(n log n) sorts.
+        """
+        # Prefer fast C implementation when available
         s = self.text
         try:
             import pydivsufsort  # type: ignore
             sa_list = pydivsufsort.divsufsort(s)
             return np.array(sa_list, dtype=np.int32)
         except Exception:
-            pass
+            print("[WARN] pydivsufsort not available; using NumPy-based suffix array fallback.")
+
         n = self.n
-        # Map characters to integer ranks (ensure deterministic order)
-        chars = sorted(set(s))
-        rank_map = {c: i for i, c in enumerate(chars)}
-        rank = [rank_map[c] for c in s]
-        sa = list(range(n))
+        if n == 0:
+            return np.array([], dtype=np.int32)
+
+        # Initial rank from character codes
+        codes = self.text_arr.astype(np.int32, copy=False)
+        # Compress codes to 0..sigma-1 for stability
+        uniq_codes, inv = np.unique(codes, return_inverse=True)
+        rank = inv.astype(np.int32, copy=False)
+        sa = np.arange(n, dtype=np.int32)
+
         k = 1
-        tmp = [0] * n
+        tmp_rank = np.empty(n, dtype=np.int32)
+        idx = np.arange(n, dtype=np.int32)
         while k < n:
-            sa.sort(key=lambda i: (rank[i], rank[i + k] if i + k < n else -1))
-            tmp[sa[0]] = 0
-            for i in range(1, n):
-                prev = sa[i - 1]
-                cur = sa[i]
-                prev_key = (rank[prev], rank[prev + k] if prev + k < n else -1)
-                cur_key = (rank[cur], rank[cur + k] if cur + k < n else -1)
-                tmp[cur] = tmp[prev] + (1 if cur_key != prev_key else 0)
-            rank, tmp = tmp, rank
+            # secondary key is rank[i+k] else -1
+            ipk = idx + k
+            key2 = np.where(ipk < n, rank[ipk], -1)
+            # Sort by (rank[i], key2[i]) using lexsort with primary last
+            sa = np.lexsort((key2, rank))
+            # Compute new ranks
+            r_sa = rank[sa]
+            k2_sa = key2[sa]
+            # mark changes
+            change = np.empty(n, dtype=np.int32)
+            change[0] = 0
+            change[1:] = (r_sa[1:] != r_sa[:-1]) | (k2_sa[1:] != k2_sa[:-1])
+            new_rank_ordered = np.cumsum(change, dtype=np.int32)
+            # remap to original index order
+            tmp_rank[sa] = new_rank_ordered
+            rank, tmp_rank = tmp_rank, rank
             if rank[sa[-1]] == n - 1:
                 break
             k <<= 1
-        return np.array(sa, dtype=np.int32)
+        return sa.astype(np.int32, copy=False)
     
-    def _build_bwt(self) -> str:
-        """Build BWT from suffix array."""
-        bwt_chars = []
-        for i in range(self.n):
-            sa_pos = self.suffix_array[i]
-            if sa_pos == 0:
-                bwt_chars.append(self.text[-1])  # Last character (sentinel)
-            else:
-                bwt_chars.append(self.text[sa_pos - 1])
-        return ''.join(bwt_chars)
+    def _build_bwt_array(self) -> np.ndarray:
+        """Build BWT from suffix array as uint8 NumPy array (ASCII codes)."""
+        if self.n == 0:
+            return np.array([], dtype=np.uint8)
+        sa = self.suffix_array.astype(np.int64, copy=False)
+        # previous index (sa-1) % n
+        prev_idx = (sa - 1) % self.n
+        # Gather from numeric text array
+        return self.text_arr[prev_idx]
     
     def _build_char_counts(self) -> Tuple[Dict[str, int], Dict[str, int]]:
         """Count character frequencies and compute cumulative counts C[char]."""
@@ -120,24 +213,44 @@ class BWTCore:
             cumulative += totals[char]
         return counts, totals
     
-    def _build_occurrence_checkpoints(self) -> Dict[str, List[int]]:
+    def _build_occurrence_checkpoints(self) -> Dict[int, np.ndarray]:
         """Build checkpointed occurrence counts for efficient rank queries with low memory.
 
-        For each character c, store counts at positions m * occ_sample_rate (prefix length).
+        Returns a mapping from ASCII code -> np.ndarray of counts at positions m*k
+        (prefix length), with cp[0] = 0. If the last block is partial, a final
+        checkpoint with the total count at n is appended to mirror previous behavior.
         """
-        k = self.occ_sample_rate
-        checkpoints = {c: [0] for c in self.alphabet}
-        counts = {c: 0 for c in self.alphabet}
-        # iterate bwt and record counts at each boundary
-        for i, ch in enumerate(self.bwt, start=1):
-            counts[ch] += 1
-            if i % k == 0:
-                for c in self.alphabet:
-                    checkpoints[c].append(counts[c])
-        # Ensure there's a final checkpoint covering len(bwt)
-        if len(self.bwt) % k != 0:
-            for c in self.alphabet:
-                checkpoints[c].append(counts[c])
+        bwt = self.bwt_arr
+        n = bwt.size
+        k = int(self.occ_sample_rate)
+        if n == 0:
+            return {}
+
+        checkpoints: Dict[int, np.ndarray] = {}
+        # Precompute full cumsum once per distinct code as we have small alphabets
+        distinct_codes = np.unique(bwt)
+        # indices where boundaries end (1-based length m*k corresponds to index m*k-1)
+        block_ends = np.arange(k - 1, n, k, dtype=np.int64)
+
+        for code in distinct_codes.tolist():
+            mask = (bwt == code)
+            csum = np.cumsum(mask, dtype=np.int32)
+            # cp[0]=0, then take counts at each block end
+            cp_list = [0]
+            if block_ends.size:
+                cp_list.extend(csum[block_ends].tolist())
+            # Optionally append final count for partial block remainder
+            if n % k != 0:
+                cp_list.append(int(csum[-1]))
+            checkpoints[int(code)] = np.asarray(cp_list, dtype=np.int32)
+        # Ensure every alphabet character has a checkpoint array (even if absent)
+        for c in self.alphabet:
+            code = ord(c)
+            if code not in checkpoints:
+                # Build an all-zeros checkpoint array of same length as others
+                # Determine representative length from any existing array
+                any_cp = next(iter(checkpoints.values())) if checkpoints else np.array([0], dtype=np.int32)
+                checkpoints[code] = np.zeros_like(any_cp)
         return checkpoints
     
     def _sample_suffix_array(self) -> Dict[int, int]:
@@ -147,30 +260,29 @@ class BWTCore:
             sampled[i] = self.suffix_array[i]
         return sampled
     
-    def rank(self, char: str, pos: int) -> int:
-        """Count occurrences of char in bwt[0:pos]. Uses checkpoints + local scan.
+    def rank(self, char: str | int, pos: int) -> int:
+        """Count occurrences of `char` in bwt[0:pos]. Vectorized with checkpoints.
 
         Args:
-            char: character to count
+            char: character (str) or ASCII code (int) to count
             pos: count occurrences in bwt[0:pos] (pos can be 0..n)
         """
         if pos <= 0:
             return 0
         if pos > self.n:
             pos = self.n
-        if char not in self.occ_checkpoints:
+        code = ord(char) if isinstance(char, str) else int(char)
+        cp = self.occ_checkpoints.get(code)
+        if cp is None:
             return 0
-        k = self.occ_sample_rate
+        k = int(self.occ_sample_rate)
         cp_idx = pos // k
         cp_pos = cp_idx * k
-        # Handle case when pos is exactly on a checkpoint boundary: checkpoints record counts up to cp_pos
-        base = self.occ_checkpoints[char][cp_idx]
-        # Scan remainder from cp_pos to pos-1
-        count = base
-        for i in range(cp_pos, pos):
-            if self.bwt[i] == char:
-                count += 1
-        return count
+        base = int(cp[cp_idx])
+        # Fast remainder scan (Numba-accelerated if available)
+        if pos > cp_pos:
+            base += int(_count_equal_range(self.bwt_arr, cp_pos, pos, code))
+        return base
     
     def backward_search(self, pattern: str) -> Tuple[int, int]:
         """
@@ -235,8 +347,8 @@ class BWTCore:
         current_idx = sa_index
         
         while current_idx not in self.sampled_sa:
-            char = self.bwt[current_idx]
-            current_idx = self.char_counts[char] + self.rank(char, current_idx)
+            code = int(self.bwt_arr[current_idx])
+            current_idx = self.char_counts_code[code] + self.rank(code, current_idx)
             steps += 1
         
         return (self.sampled_sa[current_idx] + steps) % self.n
@@ -420,28 +532,14 @@ class Tier2LCPFinder:
         return self._find_repeats_simple(chromosome)
     
     def _compute_lcp_array(self) -> np.ndarray:
-        """Compute LCP array from BWT using Phi array method."""
+        """Compute LCP array using Kasai over uint8 codes (Numba-accelerated when available)."""
         n = self.bwt.n
-        lcp = np.zeros(n, dtype=np.int32)
-        
-        # Build rank array (inverse of suffix array)
-        rank = np.zeros(n, dtype=np.int32)
-        for i in range(n):
-            rank[self.bwt.suffix_array[i]] = i
-        
-        # Compute LCP using Kasai algorithm
-        h = 0
-        for i in range(n):
-            if rank[i] > 0:
-                j = self.bwt.suffix_array[rank[i] - 1]
-                while (i + h < n and j + h < n and 
-                       self.bwt.text[i + h] == self.bwt.text[j + h]):
-                    h += 1
-                lcp[rank[i]] = h
-                if h > 0:
-                    h -= 1
-        
-        return lcp
+        if n == 0:
+            return np.zeros(0, dtype=np.int32)
+        # Use the text codes directly for fast comparisons
+        text_codes = self.bwt.text_arr
+        sa = self.bwt.suffix_array.astype(np.int32, copy=False)
+        return _kasai_lcp_uint8(text_codes, sa)
     
     def _detect_lcp_plateaus(self, lcp_array: np.ndarray, chromosome: str) -> List[TandemRepeat]:
         """Detect tandem repeats from LCP plateaus."""
@@ -485,16 +583,32 @@ class Tier2LCPFinder:
             pi[i] = j
         p = n - pi[-1]
         return p if p != 0 and n % p == 0 else n
+    
+    def _smallest_period_codes(self, arr: np.ndarray) -> int:
+        """Smallest period for a uint8 array using prefix-function (no strings)."""
+        n = int(arr.size)
+        if n == 0:
+            return 0
+        pi = np.zeros(n, dtype=np.int32)
+        j = 0
+        for i in range(1, n):
+            while j > 0 and arr[i] != arr[j]:
+                j = int(pi[j - 1])
+            if arr[i] == arr[j]:
+                j += 1
+            pi[i] = j
+        p = n - int(pi[-1])
+        return p if p != 0 and n % p == 0 else n
 
     def _find_repeats_simple(self, chromosome: str) -> List[TandemRepeat]:
         """Simple scanning detector for tandem repeats using candidate periods.
 
         Designed for correctness on small/medium sequences without heavy indexes.
         """
-        s = self.bwt.text
-        # Exclude trailing sentinel if present
-        n = len(s)
-        if n > 0 and s[-1] == '$':
+        s_arr = self.bwt.text_arr
+        n = int(s_arr.size)
+        # Exclude trailing sentinel if present ('$' == 36)
+        if n > 0 and s_arr[n - 1] == 36:
             n -= 1
         max_p = min(self.max_period, max(64, self.min_period), max(1, n // 2))
         min_p = self.min_period
@@ -504,20 +618,22 @@ class Tier2LCPFinder:
         for p in range(min_p, max_p + 1):
             i = 0
             while i + 2 * p <= n:
-                motif = s[i:i + p]
-                if '$' in motif or 'N' in motif:
+                motif_view = s_arr[i:i + p]
+                # Skip motifs containing '$'(36) or 'N'(78)
+                if np.any(motif_view == 36) or np.any(motif_view == 78):
                     i += 1
                     continue
                 copies = 1
                 j = i + p
-                while j + p <= n and s[j:j + p] == motif:
+                # Extend with array comparisons (views only, no string slicing)
+                while j + p <= n and np.array_equal(s_arr[j:j + p], motif_view):
                     copies += 1
                     j += p
                 if copies >= self.min_copies:
                     # Normalize motif to its primitive period
-                    prim = self._smallest_period(motif)
+                    prim = self._smallest_period_codes(motif_view)
                     if prim < p:
-                        motif = motif[:prim]
+                        motif_view = motif_view[:prim]
                         # adjust p to primitive
                         p_eff = prim
                     else:
@@ -525,13 +641,14 @@ class Tier2LCPFinder:
                     # Maximality: extend left/right by whole motifs
                     start = i
                     end = j
-                    while start - p_eff >= 0 and s[start - p_eff:start] == motif:
+                    while start - p_eff >= 0 and np.array_equal(s_arr[start - p_eff:start], motif_view):
                         start -= p_eff
                         copies += 1
-                    while end + p_eff <= n and s[end:end + p_eff] == motif:
+                    while end + p_eff <= n and np.array_equal(s_arr[end:end + p_eff], motif_view):
                         end += p_eff
                         copies += 1
-                    key = (start, end, motif)
+                    motif_str = motif_view.tobytes().decode('ascii')
+                    key = (start, end, motif_str)
                     if key not in seen:
                         seen.add(key)
                         results.append(
@@ -539,8 +656,8 @@ class Tier2LCPFinder:
                                 chrom=chromosome,
                                 start=start,
                                 end=end,
-                                motif=motif,
-                                copies=float((end - start) // len(motif)),
+                                motif=motif_str,
+                                copies=float((end - start) // len(motif_view)),
                                 length=end - start,
                                 tier=2,
                                 confidence=0.95,
@@ -579,22 +696,21 @@ class Tier2LCPFinder:
                     break
             
             if copies >= self.min_copies:
-                # Extract and validate motif
+                # Extract and validate motif using arrays
                 motif_start = start_pos
                 motif_end = motif_start + period
-                if motif_end <= len(self.bwt.text):
-                    motif = self.bwt.text[motif_start:motif_end]
-                    
-                    # Validate periodicity
+                if motif_end <= int(self.bwt.text_arr.size):
+                    motif_arr = self.bwt.text_arr[motif_start:motif_end]
                     total_length = copies * period
-                    repeat_text = self.bwt.text[start_pos:start_pos + total_length]
-                    
-                    if self._validate_periodicity(repeat_text, motif, period):
+                    rep_end = start_pos + total_length
+                    repeat_arr = self.bwt.text_arr[start_pos:rep_end]
+                    if self._validate_periodicity_arr(repeat_arr, motif_arr, period):
+                        motif_str = motif_arr.tobytes().decode('ascii')
                         repeat = TandemRepeat(
                             chrom=chromosome,
                             start=start_pos,
-                            end=start_pos + total_length,
-                            motif=motif,
+                            end=rep_end,
+                            motif=motif_str,
                             copies=copies,
                             length=total_length,
                             tier=2,
@@ -604,25 +720,16 @@ class Tier2LCPFinder:
         
         return repeats
     
-    def _validate_periodicity(self, text: str, motif: str, period: int) -> bool:
-        """Validate that text has the expected periodic structure."""
-        if len(text) < 2 * period:
+    def _validate_periodicity_arr(self, text_arr: np.ndarray, motif_arr: np.ndarray, period: int) -> bool:
+        """Validate periodic structure by vectorized uint8 comparison."""
+        m = text_arr.size
+        if m < 2 * period:
             return False
-        
-        # Check if text is approximately periodic with given motif
-        matches = 0
-        total_positions = 0
-        
-        for i in range(len(text)):
-            motif_pos = i % period
-            if motif_pos < len(motif):
-                total_positions += 1
-                if text[i] == motif[motif_pos]:
-                    matches += 1
-        
-        # Allow some mismatches for imperfect repeats
-        similarity = matches / total_positions if total_positions > 0 else 0
-        return similarity >= 0.8
+        idx = np.arange(m, dtype=np.int32) % period
+        # Compare each position to motif at idx
+        matches = np.count_nonzero(text_arr == motif_arr[idx])
+        similarity = matches / m if m > 0 else 0.0
+        return bool(similarity >= 0.8)
 
 
 class Tier3LongReadFinder:
