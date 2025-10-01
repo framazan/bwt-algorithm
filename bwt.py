@@ -75,11 +75,6 @@ else:
 
 class BWTCore:
     """Core BWT construction and FM-index operations.
-
-    Performance notes:
-    - Uses pydivsufsort for suffix array when available (C backend).
-    - Stores text and BWT as NumPy uint8 arrays (ASCII codes) for vectorized rank.
-    - Keeps original text string for compatibility with higher tiers.
     """
 
     def __init__(self, text: str, sa_sample_rate: int = 32, occ_sample_rate: int = 128):
@@ -91,36 +86,24 @@ class BWTCore:
             sa_sample_rate: Sample every nth suffix array position for space efficiency
             occ_sample_rate: Occurrence checkpoints every nth position to reduce memory
         """
-        # Keep string for external consumers, but build numeric views for speed
         self.text: str = text
         self.n = len(text)
         self.sa_sample_rate = sa_sample_rate   
         self.occ_sample_rate = occ_sample_rate
 
-        # Numeric views (ASCII codes)
-        self.text_arr: np.ndarray = np.frombuffer(text.encode('ascii'), dtype=np.uint8)
+
+        self.text_arr = np.frombuffer(text.encode('utf-8'), dtype=np.uint8)
 
         # Build suffix array and BWT (memory-efficient)
         self.suffix_array = self._build_suffix_array()
-        # BWT stored as uint8 array; also expose lightweight string view on demand
-        self.bwt_arr: np.ndarray = self._build_bwt_array()
-
-        # Build alphabet/mappings from the original text
+        self.bwt_arr = self._build_bwt_array()
         self.alphabet = sorted(set(text))
-        # Char<->code maps (ASCII)
-        self.char_to_code: Dict[str, int] = {c: ord(c) for c in self.alphabet}
-        self.code_to_char: Dict[int, str] = {ord(c): c for c in self.alphabet}
-
-        # FM-index components
+        self.char_to_code = {c: ord(c) for c in self.alphabet}
+        self.code_to_char = {ord(c): c for c in self.alphabet}
         self.char_counts, self.char_totals = self._build_char_counts()
-        # Code-keyed variants for internal numeric operations
-        self.char_counts_code: Dict[int, int] = {ord(k): v for k, v in self.char_counts.items()}
-        self.char_totals_code: Dict[int, int] = {ord(k): v for k, v in self.char_totals.items()}
-
-        # Occurrence checkpoints for rank queries (code -> np.ndarray)
+        self.char_counts_code = {ord(k): v for k, v in self.char_counts.items()}
+        self.char_totals_code = {ord(k): v for k, v in self.char_totals.items()}
         self.occ_checkpoints = self._build_occurrence_checkpoints()
-
-        # Sample suffix array for efficient locating
         self.sampled_sa = self._sample_suffix_array()
 
     def clear(self):
