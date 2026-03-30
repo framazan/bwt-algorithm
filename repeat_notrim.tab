@@ -1,0 +1,37 @@
+BWT-based Tandem Repeat Finder
+============================================================
+Reference:    test.fa
+Output:       repeat.tab (strfinder format)
+Tiers:        Tier 1 + Tier 2 (short + medium repeats)
+Parallelism:  4 CPU cores
+
+Detection Parameters:
+  Tier 1 motif length: 1-9 bp
+  Tier 2 period range: 10-1000 bp
+  Min copies required: 3
+  Min entropy (bits):  1.0
+  Mismatch tolerance:  Enabled (10% of full sequence)
+  SA sampling rate:    32
+  Flank trimming:      0 bp from each end
+
+Building BWT indices...
+[░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 0.0% Building index for 0 (35 bp) - 0s[████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 20.0% Building index for 1 (84 bp) - 0s[████████████████░░░░░░░░░░░░░░░░░░░░░░░░] 40.0% Building index for 2 (1,225 bp) - 0s[████████████████████████░░░░░░░░░░░░░░░░] 60.0% Building index for 3 (350 bp) - 0s[████████████████████████████████░░░░░░░░] 80.0% Building index for 4 (77 bp) - 0s[████████████████████████████████████████] 100.0% BWT indices built for 5 chromosome(s) - 0s     
+
+Parallel mode: Using 4 CPU cores for 5 chromosomes
+
+Processing 5 chromosome(s)...
+
+[████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 20.0% (1/5) chromosomes completed - 0s[████████████████░░░░░░░░░░░░░░░░░░░░░░░░] 40.0% (2/5) chromosomes completed - 0s[████████████████████████░░░░░░░░░░░░░░░░] 60.0% (3/5) chromosomes completed - 0s[████████████████████████████████░░░░░░░░] 80.0% (4/5) chromosomes completed - 0s[████████████████████████████████████████] 100.0% (5/5) chromosomes completed - 1s[DEBUG] Seq 1: n=84, min_copies=3, max_possible_unit=28
+[DEBUG] Seq 1: Starting scan for unit_len=12
+[DEBUG] Seq 1: Testing position i=0
+[DEBUG] Seq 1: Found repeat at i=0, count=7, motif=ACCCCTCAGGGT
+
+
+Nested call suppression: 169 -> 38 repeats
+Analysis complete! Found 26 unique repeats (deduplicated 136).
+
+============================================================
+Completed! Found 26 total tandem repeats.
+Average mismatch rate: 0.002
+Imperfect repeats: 1 (3.8%)
+Results saved to repeat.tab
