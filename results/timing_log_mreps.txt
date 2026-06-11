@@ -1,1 +1,0 @@
-mreps -res 3 -fasta  > mreps_Chr4.txt  42.03s user 2.17s system 91% cpu 48.271 total

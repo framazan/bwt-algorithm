@@ -1,9 +1,0 @@
-Parent Command: python scripts/run_trf.py tests/fixtures/synth_mixed.fa
-TRF Command: trf /data/gpfs/assoc/pgl/data/bwtandem/tests/fixtures/synth_mixed.fa 2 7 7 80 10 50 2000 -l 6 -ngs -h
-
-Processing sequence: synth_mixed.fa
-  [TRF] Running Core Engine (2 7 7 80 10 50 2000)...
-  [TRF] STDERR (if any): None
-Total repeats found: 9
-Total time: 0.22s
-Results converted and written to -> /data/gpfs/assoc/pgl/data/bwtandem/results/trf_synth_mixed.bed

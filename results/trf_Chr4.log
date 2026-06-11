@@ -1,9 +1,0 @@
-Parent Command: python ../scripts/run_trf.py ../arabadopsis_chrs/Chr4.fa
-TRF Command: trf /Users/filipr/Downloads/bwt-algorithm/bwt-algorithm/arabadopsis_chrs/Chr4.fa 2 7 7 80 10 50 2000 -l 6 -ngs -h
-
-Processing sequence: Chr4.fa
-  [TRF] Running Core Engine (2 7 7 80 10 50 2000)...
-  [TRF] STDERR (if any): None
-Total repeats found: 4549
-Total time: 33.56s
-Results converted and written to -> /Users/filipr/Downloads/bwt-algorithm/bwt-algorithm/results/trf_Chr4.bed

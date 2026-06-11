@@ -1,1 +1,0 @@
-ultra --read_all -p 500 -t 3 -i 3 -d 3 -o ultra_Chr4.tsv   758.23s user 334.20s system 75% cpu 24:10.74 total
