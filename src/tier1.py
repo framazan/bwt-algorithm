@@ -38,6 +38,8 @@ class Tier1STRFinder:
         self.min_copies = int(os.environ.get("TIER1_MIN_COPIES", "3"))
         self.min_array_length = int(os.environ.get("TIER1_MIN_ARRAY_LEN", "26"))
         self.min_entropy = float(os.environ.get("TIER1_MIN_ENTROPY", "1.0"))
+        # entropy gate is OFF by default (preserves baseline); opt-in for sweeps
+        self.entropy_gate = bool(int(os.environ.get("TIER1_ENTROPY_GATE", "0")))
         self.min_score = float(os.environ.get("TIER1_MIN_SCORE", "30"))
         # dynamic_min_copies = max(min_copies, copy_base // motif_len + copy_add)
         self.copy_base = int(os.environ.get("TIER1_COPYBASE", "12"))
@@ -153,6 +155,12 @@ class Tier1STRFinder:
                     continue
 
                 entropy = MotifUtils.calculate_entropy(motif)
+
+                # Optional low-complexity quality gate (opt-in; default off so
+                # baseline behaviour is preserved). Suppresses spurious calls on
+                # low-entropy motifs when aggressive length/score thresholds are used.
+                if self.entropy_gate and entropy < self.min_entropy:
+                    continue
 
                 refined = MotifUtils.refine_repeat(
                     sequence_str,

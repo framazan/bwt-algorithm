@@ -1,5 +1,6 @@
 import math
 import ctypes
+import os
 
 import numpy as np
 from typing import List, Tuple, Set, Optional
@@ -63,13 +64,18 @@ class Tier2LCPFinder:
         self.min_period = max(10, min_period)
         self.max_period = max_period
         self.max_short_motif = max_short_motif  # For FM-index search (1-9bp)
-        self.min_copies = 3  # Require at least 3 copies
-        self.min_array_length = 6  # Minimum total array length (for short repeats)
+        # Detection thresholds — tunable via env vars for parameter sweeps.
+        # Defaults reproduce the original hardcoded behaviour exactly.
+        self.min_copies = int(os.environ.get("TIER2_MIN_COPIES", "3"))  # Require at least 3 copies
+        self.min_array_length = int(os.environ.get("TIER2_MIN_ARRAY_LEN", "6"))
         self.min_entropy = 1.0  # Minimum Shannon entropy
+        # required copies for short (<20bp) periods in the simple scan
+        self.short_req_copies = int(os.environ.get("TIER2_SHORT_REQ_COPIES", "3"))
         self.allow_mismatches = allow_mismatches
         self.show_progress = show_progress
         self.period_step = 1  # Step size for period scanning (increase to speed up)
-        self.allowed_mismatch_rate = max(0.0, allowed_mismatch_rate)
+        _mm = os.environ.get("TIER2_MISMATCH")
+        self.allowed_mismatch_rate = max(0.0, float(_mm) if _mm else allowed_mismatch_rate)
         self.allowed_indel_rate = max(0.0, allowed_indel_rate)
         self.sequence_str = self.bwt.text_arr.tobytes().decode('ascii', errors='replace')
         self._lcp_cache = None  # Lazily computed LCP array
@@ -366,7 +372,7 @@ class Tier2LCPFinder:
                     continue
 
                 arr_start, arr_end, copies, full_start, full_end = res
-                required_copies = 2 if period >= 20 else self.min_copies
+                required_copies = 2 if period >= 20 else self.short_req_copies
                 if copies < required_copies:
                     continue
 
