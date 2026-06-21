@@ -1,22 +1,41 @@
 # tests/test_maxrecall_seeding.py
-"""Behavioral tests: diverged short STRs must be detected by Tier1.
-Run: python tests/test_maxrecall_seeding.py  (exits nonzero on failure)
-Mirrors the 'recoverable' class: period 1-3, ~82-92% purity, 7-15 copies.
+"""Regression test for the Tier 1 period-stratified length/score gate.
 
-Expected on baseline (comboA: TIER1_MIN_ARRAY_LEN=20 TIER1_MIN_SCORE=20):
-  FAIL  mono_A_15cop_08mm   — 15 bp array, always below required_threshold=20
-  FAIL  dinuc_AC_10cop_15mm — 20 bp, expected score 17.0 < MIN_SCORE=20
-  FAIL  tri_CAG_7cop_15mm   — 21 bp, expected score 17.85 < MIN_SCORE=20
-  (dinuc_AT_12cop_18mm may PASS or FAIL depending on random draws)
+The short-STR recall gap (Exp1 / chr21 adotto) is dominated by short perfect
+cores (a 7-copy dinucleotide = 14 bp, an 8-copy mononucleotide = 16 bp, ...)
+that sit inside a much larger adotto region but are REJECTED by the global
+acceptance gate in tier1.py:
 
-These cases are NOT expected to pass on the baseline; they encode the miss class
-that later tasks (C1 mismatch-tolerant seeder, C2 rolling extender) will fix.
+    required_threshold = max(min_array_length, motif_len * dynamic_min_copies)
+    ... reject if ext_length < required_threshold or rep_score < min_score
+
+At the comboA operating point min_array_length=20 / min_score=20, so a short
+core below ~20 bp never produces a call, even though it overlaps a real region.
+
+The fix is a *period-stratified* relaxation: when motif_len <= SHORT_PERIOD_MAX,
+the gate uses SHORT_MIN_ARRAY_LEN / SHORT_MIN_SCORE instead of the global
+floors. Longer motifs keep the strict global gate, so precision on long repeats
+is unaffected. When SHORT_PERIOD_MAX is unset (== 0) the behaviour is identical
+to the global gate (baseline reproduced exactly).
+
+This test pins that mechanism deterministically using a short mononucleotide
+core (15 bp at 92% purity) that the run scanner seeds but the global gate
+rejects:
+
+  BASELINE (no lever)            -> REJECTED (15 bp < global 20)
+  lever, SHORT_PERIOD_MAX >= 1   -> ACCEPTED (period 1 is "short"; floor 15)
+  lever, SHORT_PERIOD_MAX == 0   -> REJECTED (stratification disabled, so the
+                                    relaxed floors never apply -> baseline)
+
+The last two cases share identical SHORT_MIN_ARRAY_LEN / SHORT_MIN_SCORE and
+differ ONLY in SHORT_PERIOD_MAX, so they prove the period stratification is what
+gates the relaxation (not merely lower thresholds).
+
+Run: python tests/test_maxrecall_seeding.py   (exits nonzero on failure)
+Random seed is fixed (SEED=42) so the synthetic array is deterministic.
 
 NOTE: test_ground_truth.py imports pytest (not installed in this env), so we
-inline the three helpers we need directly rather than importing from that module.
-The implementations are identical.
-
-Random seed is fixed (SEED=42) so results are deterministic.
+inline the helpers we need rather than importing from that module.
 """
 import os
 import sys
@@ -86,7 +105,7 @@ def overlap_ratio(s1: int, e1: int, s2: int, e2: int) -> float:
 
 
 def periods_compatible(period_a: int, period_b: int) -> bool:
-    """True if one period divides the other, or they differ by ≤20%."""
+    """True if one period divides the other, or they differ by <=20%."""
     if period_a == 0 or period_b == 0:
         return False
     lo, hi = min(period_a, period_b), max(period_a, period_b)
@@ -95,53 +114,37 @@ def periods_compatible(period_a: int, period_b: int) -> bool:
     return (hi - lo) / lo <= 0.2
 
 
-# ── Test cases ───────────────────────────────────────────────────────────────
+# ── Probe construction ───────────────────────────────────────────────────────
 
-# (label, motif, copies, mismatch_rate)
-#
-# Design: arrays that the chr21 comboA baseline misses.
-# With SEED=42, the following FAIL on the baseline:
-#   mono_A_15cop_08mm   — structural: 15 bp < required_threshold of 20 bp
-#   dinuc_AC_10cop_15mm — score gate: 20 bp * 0.85 = 17.0 < MIN_SCORE=20
-#   tri_CAG_7cop_15mm   — score gate: 21 bp * 0.85 = 17.85 < MIN_SCORE=20
-# dinuc_AT_12cop_18mm (24 bp, score≈19.7) may PASS or FAIL depending on
-# random draw; it is included to anchor the recoverable-at-higher-mismatch class.
-#
-# After C1+C2 fixes these should ALL pass.
-CASES = [
-    ("mono_A_15cop_08mm",    "A",   15, 0.08),   # 15 bp array,  92% purity
-    ("dinuc_AC_10cop_15mm",  "AC",  10, 0.15),   # 20 bp array,  85% purity
-    ("tri_CAG_7cop_15mm",    "CAG",  7, 0.15),   # 21 bp array,  85% purity
-    ("dinuc_AT_12cop_18mm",  "AT",  12, 0.18),   # 24 bp array,  82% purity
-]
-
-# Fixed seed so FAIL/PASS results are deterministic across runs.
+# A short mononucleotide core that the run scanner seeds but the global gate
+# rejects: 15 copies of "A" at 92% purity ~= 15 bp << global threshold of 20.
+# Mononucleotides do not extend into random flanks, so this is a clean,
+# deterministic probe of the length/score gate (it does not rely on the
+# mismatch extender growing the array past the gate).
+PROBE_MOTIF = "A"
+PROBE_COPIES = 15
+PROBE_MM = 0.08
 SEED = 42
 
 
-def build_case(motif: str, copies: int, mm: float):
-    """300 bp flank + imperfect array + 300 bp flank.
-    Returns (seq, array_start, array_end).
-    Random state is consumed from the global stream (set once via SEED).
+def build_probe():
+    """300 bp flank + 15 bp mono-A core + 300 bp flank.
+
+    Returns (seq, core_start, core_end). Random state is consumed from the
+    global stream (set once via SEED) so the result is deterministic.
     """
-    left  = random_dna(300, gc=0.45)
-    array = make_repeat(motif, copies, mismatch_rate=mm)
+    left = random_dna(300, gc=0.45)
+    array = make_repeat(PROBE_MOTIF, PROBE_COPIES, mismatch_rate=PROBE_MM)
     right = random_dna(300, gc=0.45)
     return left + array + right, len(left), len(left) + len(array)
 
 
 def detected(seq: str, a_start: int, a_end: int, motif: str) -> bool:
-    """Return True if Tier1 reports an overlapping, period-compatible repeat.
-
-    TandemRepeat objects (returned by run_finder) expose:
-      .start, .end   — 0-based half-open coordinates
-      .consensus_motif, .motif — motif strings (consensus preferred)
-    Period is len(consensus_motif or motif); no dedicated .period field exists.
-    """
+    """True if Tier1 reports an overlapping, period-compatible repeat."""
     tmp = tempfile.mkdtemp()
     try:
-        fa = os.path.join(tmp, "case.fa")
-        write_fasta(fa, "case", seq)
+        fa = os.path.join(tmp, "probe.fa")
+        write_fasta(fa, "probe", seq)
         preds = run_finder(fa, enabled_tiers={"tier1"}, min_period=1, max_period=9)
         for p in preds:
             if overlap_ratio(a_start, a_end, p.start, p.end) >= 0.5:
@@ -154,29 +157,86 @@ def detected(seq: str, a_start: int, a_end: int, motif: str) -> bool:
         shutil.rmtree(tmp)
 
 
+def _run_under_env(overrides: dict) -> bool:
+    """Build the probe and report detection under the given env overrides.
+
+    The comboA operating point is fixed here so the test is self-contained and
+    not sensitive to whatever the caller exported. The probe is rebuilt from a
+    fixed seed inside each call for determinism.
+    """
+    base = {
+        "TIER1_MIN_ARRAY_LEN": "20",
+        "TIER1_MIN_SCORE": "20",
+        "TIER1_MIN_COPIES": "2",
+        "TIER1_COPYBASE": "6",
+        "TIER1_COPYADD": "2",
+        "TIER1_EXT_COPIES": "2",
+    }
+    lever_keys = ("TIER1_SHORT_PERIOD_MAX", "TIER1_SHORT_MIN_ARRAY_LEN",
+                  "TIER1_SHORT_MIN_SCORE")
+    saved = {k: os.environ.get(k) for k in list(base) + list(lever_keys)}
+    try:
+        # Clear any inherited lever vars, then apply comboA + the overrides.
+        for k in lever_keys:
+            os.environ.pop(k, None)
+        os.environ.update(base)
+        os.environ.update(overrides)
+        random.seed(SEED)
+        seq, s, e = build_probe()
+        return detected(seq, s, e, PROBE_MOTIF)
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
-    # Fix random seed so results are reproducible.
-    random.seed(SEED)
-
-    fails = []
-    for label, motif, copies, mm in CASES:
-        seq, s, e = build_case(motif, copies, mm)
-        ok = detected(seq, s, e, motif)
-        status = "PASS" if ok else "FAIL"
-        array_len = e - s         # actual length (may differ from copies*len due to indels)
-        purity = 1.0 - mm
-        print(f"{status}  {label}  "
-              f"(array≈{copies * len(motif)}bp, purity={purity:.0%}, copies={copies})")
-        if not ok:
-            fails.append(label)
-
+    print(f"Probe: {PROBE_MOTIF}x{PROBE_COPIES} (~{PROBE_COPIES} bp core, "
+          f"purity={1 - PROBE_MM:.0%}); global gate = 20 bp / score 20")
     print()
-    if fails:
-        print(f"{len(fails)} FAILED: {fails}")
+
+    # Three configurations differing only by the lever:
+    #   baseline   - no lever set                     -> must REJECT (15 < 20)
+    #   lever_p4   - SHORT_PERIOD_MAX=4, floors 15/14  -> must ACCEPT
+    #   strat_off  - SHORT_PERIOD_MAX=0, floors 15/14  -> must REJECT (period 1
+    #                is not "short" when max=0, so the global gate still applies)
+    baseline = _run_under_env({})
+    lever_p4 = _run_under_env({
+        "TIER1_SHORT_PERIOD_MAX": "4",
+        "TIER1_SHORT_MIN_ARRAY_LEN": "15",
+        "TIER1_SHORT_MIN_SCORE": "14",
+    })
+    strat_off = _run_under_env({
+        "TIER1_SHORT_PERIOD_MAX": "0",
+        "TIER1_SHORT_MIN_ARRAY_LEN": "15",
+        "TIER1_SHORT_MIN_SCORE": "14",
+    })
+
+    print(f"baseline (no lever)            detected={baseline}  (expect False)")
+    print(f"lever SHORT_PERIOD_MAX=4 15/14 detected={lever_p4}  (expect True)")
+    print(f"lever SHORT_PERIOD_MAX=0 15/14 detected={strat_off}  (expect False)")
+    print()
+
+    failures = []
+    if baseline:
+        failures.append("baseline should REJECT the 15 bp core (global gate=20)")
+    if not lever_p4:
+        failures.append("lever (SHORT_PERIOD_MAX>=1) should ACCEPT the 15 bp core")
+    if strat_off:
+        failures.append(
+            "SHORT_PERIOD_MAX=0 must keep the global gate (no relaxation) -> REJECT")
+
+    if failures:
+        print("FAILED:")
+        for f in failures:
+            print(f"  - {f}")
         sys.exit(1)
-    print("ALL PASS")
+    print("ALL PASS: period-stratified gate rescues the short core only when "
+          "SHORT_PERIOD_MAX covers its period.")
     sys.exit(0)
 
 

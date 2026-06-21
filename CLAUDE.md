@@ -54,6 +54,24 @@ means baseline. Set them on the command line, e.g.
   (perfect seed copies required before mismatch extension), `TIER1_MISMATCH`,
   `TIER1_ENTROPY_GATE`/`TIER1_MIN_ENTROPY` (opt-in low-complexity filter, default
   off — empirically it lowers recall without raising precision on short STRs).
+  - **Period-stratified gate** (recovers short-period STR recall):
+    `TIER1_SHORT_PERIOD_MAX` (default 0 = disabled → baseline) plus
+    `TIER1_SHORT_MIN_ARRAY_LEN` / `TIER1_SHORT_MIN_SCORE` (default = the global
+    `MIN_ARRAY_LEN` / `MIN_SCORE`). When `motif_len <= SHORT_PERIOD_MAX` the
+    length/score acceptance gate uses these relaxed floors instead of the global
+    ones, so short perfect cores (e.g. a 7-copy dinucleotide) that sit inside a
+    larger region are no longer rejected, while longer motifs stay strict.
+    **Recommended (Exp1, on top of comboA):**
+    `TIER1_SHORT_PERIOD_MAX=4 TIER1_SHORT_MIN_ARRAY_LEN=18 TIER1_SHORT_MIN_SCORE=18`
+    — measured chr21 region recall 52.33%→56.69% at 59.17% precision and
+    chr22 55.69%→59.58% at 65.71% precision (per-period p1-9 recall +5pp on
+    both), all above tantan's 57.66% precision floor. Lowering the floors
+    further or raising `SHORT_PERIOD_MAX` keeps buying recall but collapses
+    precision (e.g. period≤9 / floor 14 ≈ 74% recall at 34% precision).
+  - **Stitch-seeding** (`TIER1_STITCH_GAP`, default 0 = disabled): merges
+    phase-aligned adjacent perfect sub-runs of the same period separated by
+    `<= STITCH_GAP * motif_len` bp before extension. Tested but ≈neutral on
+    chr21 short-period recall (+0.2pp); kept opt-in for longer-period cores.
 - **Tier 2** (`tier2.py`, period 10-20 simple scan): `TIER2_MIN_COPIES`,
   `TIER2_MIN_ARRAY_LEN`, `TIER2_SHORT_REQ_COPIES` (copies required for periods
   <20 bp), `TIER2_MISMATCH`.

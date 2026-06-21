@@ -41,11 +41,30 @@ class Tier1STRFinder:
         # entropy gate is OFF by default (preserves baseline); opt-in for sweeps
         self.entropy_gate = bool(int(os.environ.get("TIER1_ENTROPY_GATE", "0")))
         self.min_score = float(os.environ.get("TIER1_MIN_SCORE", "30"))
+        # Period-stratified relaxation of the length/score acceptance gate.
+        # Short motifs (motif_len <= short_period_max) frequently form short
+        # perfect cores (e.g. a 7-copy dinucleotide = 14 bp) that sit inside a
+        # much larger adotto region but get rejected by the global
+        # required_threshold / min_score gates. These knobs let the gate be
+        # relaxed ONLY for short motifs while keeping longer motifs strict.
+        # Defaults reproduce baseline exactly: short_period_max=0 disables the
+        # stratification, and the short thresholds inherit the global ones.
+        self.short_period_max = int(os.environ.get("TIER1_SHORT_PERIOD_MAX", "0"))
+        self.short_min_array_length = int(
+            os.environ.get("TIER1_SHORT_MIN_ARRAY_LEN", str(self.min_array_length)))
+        self.short_min_score = float(
+            os.environ.get("TIER1_SHORT_MIN_SCORE", str(self.min_score)))
         # dynamic_min_copies = max(min_copies, copy_base // motif_len + copy_add)
         self.copy_base = int(os.environ.get("TIER1_COPYBASE", "12"))
         self.copy_add = int(os.environ.get("TIER1_COPYADD", "3"))
         # perfect seed copies required before mismatch extension is attempted
         self.ext_copies_short = int(os.environ.get("TIER1_EXT_COPIES", "5"))
+        # Stitch-seeding: merge adjacent same-period perfect sub-runs separated
+        # by a short, phase-aligned gap (<= stitch_gap * motif_len) into a single
+        # candidate before extend/refine. Recovers cores fragmented by isolated
+        # mismatches that drop individual sub-runs below the copy threshold.
+        # Default 0 = disabled (baseline behaviour preserved).
+        self.stitch_gap = int(os.environ.get("TIER1_STITCH_GAP", "0"))
         _mm = os.environ.get("TIER1_MISMATCH")
         self.allowed_mismatch_rate = max(0.0, float(_mm) if _mm else allowed_mismatch_rate)
         self.allowed_indel_rate = max(0.0, allowed_indel_rate)
@@ -53,6 +72,43 @@ class Tier1STRFinder:
 
     def _build_repeat(self, chromosome: str, refined, tier: int = 1) -> TandemRepeat:
         return MotifUtils.refined_to_repeat(chromosome, refined, tier, self.text_arr, strand='+')
+
+    def _stitch_candidates(self, candidates, motif_len, sequence_str, n, seen_mask):
+        """Merge phase-aligned adjacent perfect sub-runs of the same period.
+
+        Two candidates are stitched when the next run starts within
+        ``stitch_gap * motif_len`` bp of the current run's end, the gap is a
+        whole number of motif units (phase-aligned, so both runs share the same
+        period frame), and both encode the same motif. Returns a new candidate
+        list of ``(start, end, copies)`` tuples; copies are recomputed from the
+        merged span. Candidates are assumed sorted by start (the run scanner
+        emits them in order).
+        """
+        max_gap = self.stitch_gap * motif_len
+        merged = []
+        cur_s, cur_e, _ = candidates[0]
+        cur_motif = sequence_str[cur_s:cur_s + motif_len]
+        for nxt_s, nxt_e, _ in candidates[1:]:
+            gap = nxt_s - cur_e
+            phase_aligned = gap >= 0 and (gap % motif_len) == 0
+            same_motif = sequence_str[nxt_s:nxt_s + motif_len] == cur_motif
+            if gap <= max_gap and phase_aligned and same_motif:
+                # Extend the current merged run; skip if the stitch span has
+                # been claimed by a longer motif already.
+                mid = (cur_s + nxt_e) // 2
+                if seen_mask[cur_s] or seen_mask[min(mid, n - 1)]:
+                    # Current run is in claimed territory — flush and restart.
+                    merged.append((cur_s, cur_e, (cur_e - cur_s) // motif_len))
+                    cur_s, cur_e = nxt_s, nxt_e
+                    cur_motif = sequence_str[nxt_s:nxt_s + motif_len]
+                    continue
+                cur_e = nxt_e
+            else:
+                merged.append((cur_s, cur_e, (cur_e - cur_s) // motif_len))
+                cur_s, cur_e = nxt_s, nxt_e
+                cur_motif = sequence_str[nxt_s:nxt_s + motif_len]
+        merged.append((cur_s, cur_e, (cur_e - cur_s) // motif_len))
+        return merged
 
     def find_strs(self, chromosome: str) -> List[TandemRepeat]:
         t0 = time.time()
@@ -73,9 +129,14 @@ class Tier1STRFinder:
 
         # Process longest motifs first so they claim space before shorter ones
         for motif_len in range(max_len, min_len - 1, -1):
+            # Period-stratified gate: short motifs may use a relaxed length/score
+            # floor (defaults to the global values, so unset == baseline).
+            is_short = motif_len <= self.short_period_max
+            eff_min_array_length = self.short_min_array_length if is_short else self.min_array_length
+            eff_min_score = self.short_min_score if is_short else self.min_score
             # Dynamic min copies: shorter motifs need more copies
             dynamic_min_copies = max(self.min_copies, self.copy_base // motif_len + self.copy_add)
-            required_threshold = max(self.min_array_length, motif_len * dynamic_min_copies)
+            required_threshold = max(eff_min_array_length, motif_len * dynamic_min_copies)
             min_run = required_threshold // motif_len  # minimum consecutive matching positions
 
             seed_min_copies = 2
@@ -121,6 +182,14 @@ class Tier1STRFinder:
                     if '$' in motif_check or 'N' in motif_check:
                         continue
                     candidates.append((array_start, array_end, seed_copies))
+
+            # Stitch-seeding: merge phase-aligned adjacent perfect sub-runs of
+            # this period that are separated by a short gap. Fragmented cores
+            # (split by isolated mismatches) are rejoined so the combined span
+            # clears the length/copy gates. No-op when stitch_gap == 0.
+            if self.stitch_gap > 0 and len(candidates) > 1:
+                candidates = self._stitch_candidates(
+                    candidates, motif_len, sequence_str, n, seen_mask)
 
             for array_start, array_end, seed_copies in candidates:
                 seed_length = array_end - array_start
@@ -188,7 +257,7 @@ class Tier1STRFinder:
                     rep = self._build_repeat(chromosome, refined, tier=1)
                     # Quality filter: score = length * (1 - mismatch_rate) must be >= 30
                     rep_score = (rep.end - rep.start) * (1.0 - rep.mismatch_rate)
-                    if rep_score < self.min_score:
+                    if rep_score < eff_min_score:
                         continue
                     repeats.append(rep)
                     seed_end = min(array_start + perfect_length, n)
