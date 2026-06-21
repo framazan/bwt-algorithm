@@ -35,6 +35,34 @@ setup(script_args=['build_ext', '--inplace'], ext_modules=cythonize(ext_modules,
 "
 ```
 
+Rebuild scope: only edits to `_accelerators.pyx` require recompiling the `.so`.
+Edits to the pure-Python tier files (`tier1.py`, `tier2.py`, `tier3.py`,
+`finder.py`, `bwt_seed.py`, etc.) take effect immediately with no rebuild.
+
+## Tuning detection sensitivity (env vars)
+
+The tier detection thresholds are hardcoded constants exposed as environment-
+variable overrides so the sensitivity/precision trade-off can be swept without
+editing code. **All defaults reproduce the original behaviour exactly** — unset
+means baseline. Set them on the command line, e.g.
+`TIER1_MIN_ARRAY_LEN=20 TIER1_MIN_SCORE=20 python3 -m src.main ...`.
+
+- **Tier 1** (`tier1.py`, short STRs): `TIER1_MIN_COPIES`, `TIER1_MIN_ARRAY_LEN`
+  (min reported span, default 26), `TIER1_MIN_SCORE` (length×purity gate,
+  default 30), `TIER1_COPYBASE`/`TIER1_COPYADD` (the `dynamic_min_copies =
+  max(min_copies, COPYBASE//motif_len + COPYADD)` formula), `TIER1_EXT_COPIES`
+  (perfect seed copies required before mismatch extension), `TIER1_MISMATCH`,
+  `TIER1_ENTROPY_GATE`/`TIER1_MIN_ENTROPY` (opt-in low-complexity filter, default
+  off — empirically it lowers recall without raising precision on short STRs).
+- **Tier 2** (`tier2.py`, period 10-20 simple scan): `TIER2_MIN_COPIES`,
+  `TIER2_MIN_ARRAY_LEN`, `TIER2_SHORT_REQ_COPIES` (copies required for periods
+  <20 bp), `TIER2_MISMATCH`.
+
+The dominant short-STR recall levers are `TIER1_MIN_ARRAY_LEN` + `TIER1_MIN_SCORE`
+(copy-count knobs have little effect); lowering them raises recall but drops
+precision. See `docs/2026-06-20-exp1-human-sensitivity.md` for the measured
+recall/precision frontier and the chosen operating point.
+
 ## Dependencies
 
 - **Required**: numpy, pydivsufsort (fast suffix array construction; falls back to NumPy prefix-doubling if unavailable)
