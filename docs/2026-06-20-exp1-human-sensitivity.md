@@ -79,3 +79,78 @@ tantan (75.17%), below trf (41.33%). Peak memory is **41.98 GB** on GRCh38.
 - Benchmarks #4 (maize) and #5 (arabidopsis) — preserved on
   `wip/maize-satellite-sensitivity`, addressed later.
 - CHM13 — out of scope until memory is reduced.
+
+---
+
+## Results (chr21 + chr22, scored vs full public adotto v1.2.1 catalog)
+
+Harness validated: a fresh baseline run on the instrumented code (no env vars)
+reproduces the published baseline exactly (chr21 region recall 29.50%,
+precision 79.50%), and the tool ranking matches filip's report
+(ultra/tantan high recall, bwtandem/trf low). Absolute numbers differ from
+filip's because we score against the full 1.78M-region adotto catalog, not the
+locked 65 KB curated subset.
+
+### Diagnosis (verified)
+
+The recall gap is concentrated in **short periods**: dominant period ≤20 bp
+covers 85.6% of adotto regions, and that is exactly where baseline bwtandem is
+weak (period 1-6: 21%, 7-9: 16%, 10-20: 30% recall) while it matches ultra at
+period 21-100. 53.6% of all regions are baseline-missed but ultra-hittable
+(= recoverable). The miss is driven by Tier1's strict short-STR thresholds
+(`min_array_length=26`, high `dynamic_min_copies`, `min_score>=30`), not region
+length (adotto regions are mostly >=54 bp).
+
+### Chosen config (`comboA`)
+
+Tier1: `MIN_ARRAY_LEN=20 MIN_SCORE=20 MIN_COPIES=2 COPYBASE=6 COPYADD=2
+EXT_COPIES=2`; Tier2: `SHORT_REQ_COPIES=2 MISMATCH=0.25`.
+
+| metric | chr21 base | chr21 comboA | chr22 base | chr22 comboA |
+|---|---|---|---|---|
+| region recall | 29.50% | **52.33%** | 29.79% | **55.69%** |
+| raw precision | 79.50% | 65.77% | 83.02% | 71.81% |
+| adjusted precision* | ~99.9% | **83.1%** | — | **86.3%** |
+| bp recall | 34.98% | 42.83% | 29.46% | 38.78% |
+
+\* adjusted precision = fraction of calls overlapping adotto **OR** confirmed by
+ultra/tantan. The large raw-precision drop is mostly catalog incompleteness:
+~half of the "new" calls outside adotto are confirmed by an independent de novo
+tool. Genuine over-calling is only ~10-15% of calls. After tuning, bwtandem's
+**raw** precision (66-72%) is still higher than ultra (54-59%) and tantan
+(58-62%) — it remains the most precise general-TR tool while roughly doubling
+recall (~+24 pp, generalises across both chromosomes).
+
+### Negative result: entropy gate does not work
+
+An opt-in low-complexity entropy gate (`TIER1_ENTROPY_GATE`) was tested to
+suppress over-calling at aggressive thresholds. It **fails**: it removes real
+low-entropy short STRs (AT/AAT-type) so recall drops sharply while adjusted
+precision does not improve. Spurious and genuine short STRs are intrinsically
+indistinguishable, so there is no clean quality gate for this regime. Kept in
+the code as a documented, default-off option.
+
+### Tier2 contribution
+
+Lowering the period-10-20 simple-scan thresholds
+(`TIER2_SHORT_REQ_COPIES 3->2`, `MISMATCH 0.2->0.25`) lifts period-10-20 recall
+~45% -> 54% on chr21 for a small overall gain (+1.6 pp) at minor precision cost.
+A more aggressive Tier2 (`comboB`: also `MIN_COPIES=2 MISMATCH=0.3`) reaches
+54.9% overall recall but at 80% adjusted precision — diminishing returns, so
+`comboA` is the chosen operating point.
+
+### Honest ceiling
+
+Raising recall to ultra's raw level (~82%) is not achievable without trading
+away precision (at `len16_sc16`, recall hits 61% but ~half the new calls are
+unsupported garbage). The honest, defensible outcome for #3: bwtandem becomes
+**much more competitive on recall (~2x) while remaining the most precise tool**,
+and the `adjusted precision` reframing simultaneously addresses the #3
+precision-methodology to-do.
+
+### Pending
+
+Full-genome (hg38 primary chromosomes) validation of `comboA` running on SLURM
+(`cpu-s2-core-0`, job submitted) to produce the headline before/after on the
+whole genome, scored against the full adotto catalog alongside all reference
+tools.
