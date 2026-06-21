@@ -1,6 +1,7 @@
 # cython: language_level=3, boundscheck=False, wraparound=False, cdivision=True, initializedcheck=False
 """Cython accelerators for tandem repeat extension loops."""
 
+import os
 import numpy as np
 cimport numpy as cnp
 from libc.math cimport ceil
@@ -11,6 +12,19 @@ from libc.stdint cimport uint64_t
 
 cdef extern from *:
     int __builtin_popcountll(unsigned long long) nogil
+
+# ── Mismatch-extender behaviour knobs (read once at module load) ──────────────
+# TIER1_EXT_ROLLING (default 0): when 0 the extender uses the ORIGINAL fixed-seed
+# consensus + cumulative-mismatch break (baseline preserved exactly). When 1 it
+# uses a per-position rolling-majority consensus with a windowed "K consecutive
+# bad copies" break, extending in both directions from the seed.
+# TIER1_EXT_BAD_RUN (default 2, only used when ROLLING=1): number of consecutive
+# bad copies (per-copy mismatch fraction over the allowed rate) tolerated before
+# the extension in that direction stops.
+cdef bint _EXT_ROLLING = bool(int(os.environ.get("TIER1_EXT_ROLLING", "0")))
+cdef int _EXT_BAD_RUN = int(os.environ.get("TIER1_EXT_BAD_RUN", "2"))
+if _EXT_BAD_RUN < 1:
+    _EXT_BAD_RUN = 1
 
 cdef unsigned char[256] _base_map
 cdef bint _base_map_initialized = False
@@ -129,10 +143,13 @@ cdef inline int _hamming_distance_2bit(const unsigned char[:] packed, int start1
     return mismatches
 
 cdef inline int _max_mismatch_threshold(int period, int copies, double allowed_rate):
-    """Reproduce Python mismatch threshold logic in Cython."""
+    """Reproduce Python mismatch threshold logic in Cython.
+
+    Note: the original implementation special-cased ``period == 1`` to return 0
+    (zero tolerance for homopolymers). That special case has been removed so
+    homopolymers get the normal allowed rate like every other period.
+    """
     if period <= 0 or copies <= 0:
-        return 0
-    if period == 1:
         return 0
 
     if allowed_rate < 0.01:
@@ -198,12 +215,146 @@ cdef inline int _hamming_distance(const unsigned char[:] arr1, const unsigned ch
             mismatches += 1
     return mismatches
 
+cdef tuple _extend_rolling(const unsigned char[:] text_arr,
+                           int start_pos, int period, int n,
+                           double allowed_mismatch_rate,
+                           int bad_run_limit):
+    """Rolling-consensus, windowed-break bidirectional extension.
+
+    Compares each new copy to a per-position MAJORITY consensus that is updated
+    as copies are accepted (instead of a fixed seed copy compared on cumulative
+    mismatch). Extension in each direction stops only after ``bad_run_limit``
+    *consecutive* bad copies, where a copy is "bad" if its per-copy mismatch
+    fraction vs the current consensus exceeds ``allowed_mismatch_rate``. Trailing
+    bad copies are trimmed so the reported core ends on a good copy.
+
+    Returns (array_start, array_end, copies, full_start, full_end).
+    """
+    # Per-position vote table over raw bytes; period is small so 256 cols is fine.
+    cdef cnp.ndarray[cnp.int32_t, ndim=2] votes_arr = np.zeros(
+        (period, 256), dtype=np.int32
+    )
+    cdef int[:, :] votes = votes_arr
+    # Current majority byte per position (the rolling consensus).
+    cdef cnp.ndarray[UINT8, ndim=1] consensus_arr = np.empty(period, dtype=np.uint8)
+    cdef unsigned char[:] consensus = consensus_arr
+
+    cdef int pos, b, best_b, best_cnt
+    cdef unsigned char ch
+
+    # Seed the consensus from the first copy.
+    for pos in range(period):
+        ch = text_arr[start_pos + pos]
+        votes[pos, ch] += 1
+        consensus[pos] = ch
+
+    cdef int start = start_pos
+    cdef int end = start_pos + period
+    cdef int copies = 1
+
+    # Per-copy mismatch budget: at least 1 so a single SNP per copy never trips.
+    cdef double rate = allowed_mismatch_rate
+    if rate < 0.0:
+        rate = 0.0
+    elif rate > 0.5:
+        rate = 0.5
+    cdef int per_copy_max = <int>(rate * period)
+    if per_copy_max < 1:
+        per_copy_max = 1
+
+    cdef int copy_start, mm
+    cdef int bad_run, last_good_end, last_good_start
+
+    # ── Extend right ─────────────────────────────────────────────────────────
+    bad_run = 0
+    last_good_end = end
+    while end + period <= n:
+        copy_start = end
+        # Count mismatches of the candidate copy vs the current consensus.
+        mm = 0
+        for pos in range(period):
+            if text_arr[copy_start + pos] != consensus[pos]:
+                mm += 1
+        if mm > per_copy_max:
+            bad_run += 1
+            if bad_run >= bad_run_limit:
+                break
+        else:
+            bad_run = 0
+            # Accept: fold this copy into the consensus votes and refresh majority.
+            for pos in range(period):
+                ch = text_arr[copy_start + pos]
+                votes[pos, ch] += 1
+                if votes[pos, ch] > votes[pos, consensus[pos]]:
+                    consensus[pos] = ch
+            last_good_end = copy_start + period
+        copies += 1
+        end += period
+    end = last_good_end
+
+    # ── Extend left ──────────────────────────────────────────────────────────
+    bad_run = 0
+    last_good_start = start
+    while start - period >= 0:
+        copy_start = start - period
+        mm = 0
+        for pos in range(period):
+            if text_arr[copy_start + pos] != consensus[pos]:
+                mm += 1
+        if mm > per_copy_max:
+            bad_run += 1
+            if bad_run >= bad_run_limit:
+                break
+        else:
+            bad_run = 0
+            for pos in range(period):
+                ch = text_arr[copy_start + pos]
+                votes[pos, ch] += 1
+                if votes[pos, ch] > votes[pos, consensus[pos]]:
+                    consensus[pos] = ch
+            last_good_start = copy_start
+        start -= period
+    start = last_good_start
+
+    # Recompute the accepted copy count from the trimmed [start, end) span.
+    copies = (end - start) // period
+
+    cdef int full_start = start
+    cdef int full_end = end
+    cdef int array_start, array_end
+    cdef int partial_left, partial_right
+
+    # Partial right extension (exact matching against the final consensus).
+    partial_right = 0
+    while partial_right < period and full_end + partial_right < n:
+        if text_arr[full_end + partial_right] != consensus[partial_right]:
+            break
+        partial_right += 1
+    array_end = full_end + partial_right
+
+    # Partial left extension (exact matching against the final consensus).
+    partial_left = 0
+    while partial_left < period and full_start - partial_left - 1 >= 0:
+        if text_arr[full_start - partial_left - 1] != consensus[period - 1 - partial_left]:
+            break
+        partial_left += 1
+    array_start = full_start - partial_left
+
+    return array_start, array_end, copies, full_start, full_end
+
+
 cpdef tuple extend_with_mismatches(const unsigned char[:] s_arr,
                                    int start_pos, int period, int n,
                                    double allowed_mismatch_rate):
     """Accelerated version of Tier2/Tier1 bidirectional extension.
 
     Returns (array_start, array_end, copies, full_start, full_end) or None on failure.
+
+    Behaviour is selected by the module-level ``TIER1_EXT_ROLLING`` env flag
+    (read once at import). Default (0) keeps the original fixed-seed-consensus +
+    cumulative-mismatch break; (1) uses the rolling-consensus windowed-break
+    extender (``_extend_rolling``) which extends diverged arrays to their true
+    boundaries.
     """
     if period <= 0:
         return None
@@ -214,6 +365,10 @@ cpdef tuple extend_with_mismatches(const unsigned char[:] s_arr,
 
     if start_pos < 0 or start_pos + period > n:
         return None
+
+    if _EXT_ROLLING:
+        return _extend_rolling(s_arr, start_pos, period, n,
+                               allowed_mismatch_rate, _EXT_BAD_RUN)
 
     cdef cnp.ndarray[UINT8, ndim=1] consensus_arr = np.array(
         s_arr[start_pos:start_pos + period], copy=True
