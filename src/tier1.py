@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import ctypes
 import time
@@ -32,10 +33,19 @@ class Tier1STRFinder:
         self.bwt = bwt_core
         self.max_motif_length = max(1, max_motif_length)
         self.min_motif_length = max(1, min(min_motif_length, self.max_motif_length))
-        self.min_copies = 3
-        self.min_array_length = 26
-        self.min_entropy = 1.0
-        self.allowed_mismatch_rate = max(0.0, allowed_mismatch_rate)
+        # Detection thresholds — tunable via env vars for parameter sweeps.
+        # Defaults reproduce the original hardcoded behaviour exactly.
+        self.min_copies = int(os.environ.get("TIER1_MIN_COPIES", "3"))
+        self.min_array_length = int(os.environ.get("TIER1_MIN_ARRAY_LEN", "26"))
+        self.min_entropy = float(os.environ.get("TIER1_MIN_ENTROPY", "1.0"))
+        self.min_score = float(os.environ.get("TIER1_MIN_SCORE", "30"))
+        # dynamic_min_copies = max(min_copies, copy_base // motif_len + copy_add)
+        self.copy_base = int(os.environ.get("TIER1_COPYBASE", "12"))
+        self.copy_add = int(os.environ.get("TIER1_COPYADD", "3"))
+        # perfect seed copies required before mismatch extension is attempted
+        self.ext_copies_short = int(os.environ.get("TIER1_EXT_COPIES", "5"))
+        _mm = os.environ.get("TIER1_MISMATCH")
+        self.allowed_mismatch_rate = max(0.0, float(_mm) if _mm else allowed_mismatch_rate)
         self.allowed_indel_rate = max(0.0, allowed_indel_rate)
         self.show_progress = show_progress
 
@@ -62,7 +72,7 @@ class Tier1STRFinder:
         # Process longest motifs first so they claim space before shorter ones
         for motif_len in range(max_len, min_len - 1, -1):
             # Dynamic min copies: shorter motifs need more copies
-            dynamic_min_copies = max(self.min_copies, 12 // motif_len + 3)
+            dynamic_min_copies = max(self.min_copies, self.copy_base // motif_len + self.copy_add)
             required_threshold = max(self.min_array_length, motif_len * dynamic_min_copies)
             min_run = required_threshold // motif_len  # minimum consecutive matching positions
 
@@ -124,7 +134,7 @@ class Tier1STRFinder:
                 ext_end = array_end
                 ext_length = seed_length
                 ext_copies = seed_copies
-                min_copies_for_ext = 5 if motif_len <= 3 else 2
+                min_copies_for_ext = self.ext_copies_short if motif_len <= 3 else 2
                 if seed_copies >= min_copies_for_ext:
                     ext_res = extend_with_mismatches(
                         text_arr, array_start, motif_len, n,
@@ -170,7 +180,7 @@ class Tier1STRFinder:
                     rep = self._build_repeat(chromosome, refined, tier=1)
                     # Quality filter: score = length * (1 - mismatch_rate) must be >= 30
                     rep_score = (rep.end - rep.start) * (1.0 - rep.mismatch_rate)
-                    if rep_score < 30:
+                    if rep_score < self.min_score:
                         continue
                     repeats.append(rep)
                     seed_end = min(array_start + perfect_length, n)
