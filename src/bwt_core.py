@@ -116,7 +116,10 @@ class BWTCore:
 
         self.text_arr = np.frombuffer(text.encode('utf-8'), dtype=np.uint8)
 
-        self._build_kmer_hash()
+        # kmer_hash disabled: its only consumer get_kmer_positions() is never
+        # called and falls back to the FM-index anyway. Building per-position
+        # Python int lists for a whole chromosome wasted many GB of RAM.
+        self.kmer_hash = {}
 
         # Build suffix array and BWT (memory-efficient)
         self.suffix_array = self._build_suffix_array()
@@ -128,7 +131,11 @@ class BWTCore:
         self.char_counts_code = {ord(k): v for k, v in self.char_counts.items()}
         self.char_totals_code = {ord(k): v for k, v in self.char_totals.items()}
         self.occ_checkpoints = self._build_occurrence_checkpoints()
-        self.sampled_sa = self._sample_suffix_array()
+        # sampled_sa disabled: locate_positions() reads suffix_array directly and
+        # _get_suffix_position() (its only consumer) is never called. With
+        # sa_sample_rate=1 this dict duplicated the entire suffix array as Python
+        # ints (~tens of GB per large chromosome). Keep empty.
+        self.sampled_sa = {}
 
         # Prepare C-accelerated data structures for backward search
         self._c_bwt_ptr = None
