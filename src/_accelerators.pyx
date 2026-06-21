@@ -264,10 +264,19 @@ cdef tuple _extend_rolling(const unsigned char[:] text_arr,
 
     cdef int copy_start, mm
     cdef int bad_run, last_good_end, last_good_start
+    # Cumulative-purity guard: track mismatches vs the rolling consensus over the
+    # ACCEPTED span and stop once the overall mismatch fraction exceeds the
+    # allowed rate. Without this the windowed break alone runs away across long
+    # low-complexity / homopolymer stretches (period 1 can never be "bad" per
+    # copy), which both over-extends and explodes downstream refinement cost.
+    cdef long acc_mm = 0          # mismatches over accepted copies (this side)
+    cdef long acc_copies = 0      # accepted copies (this side), excludes the seed
 
     # ── Extend right ─────────────────────────────────────────────────────────
     bad_run = 0
     last_good_end = end
+    acc_mm = 0
+    acc_copies = 0
     while end + period <= n:
         copy_start = end
         # Count mismatches of the candidate copy vs the current consensus.
@@ -281,6 +290,14 @@ cdef tuple _extend_rolling(const unsigned char[:] text_arr,
                 break
         else:
             bad_run = 0
+            # Cumulative purity: would accepting this copy push the running
+            # mismatch fraction over the allowed rate? Compare in integer space:
+            # (acc_mm + mm) > rate * (acc_copies + 1) * period, with +1 grace so
+            # a single SNP in a short array is not cut.
+            if (acc_mm + mm) > rate * ((acc_copies + 1) * period) + 1.0:
+                break
+            acc_mm += mm
+            acc_copies += 1
             # Accept: fold this copy into the consensus votes and refresh majority.
             for pos in range(period):
                 ch = text_arr[copy_start + pos]
@@ -295,6 +312,8 @@ cdef tuple _extend_rolling(const unsigned char[:] text_arr,
     # ── Extend left ──────────────────────────────────────────────────────────
     bad_run = 0
     last_good_start = start
+    acc_mm = 0
+    acc_copies = 0
     while start - period >= 0:
         copy_start = start - period
         mm = 0
@@ -307,6 +326,10 @@ cdef tuple _extend_rolling(const unsigned char[:] text_arr,
                 break
         else:
             bad_run = 0
+            if (acc_mm + mm) > rate * ((acc_copies + 1) * period) + 1.0:
+                break
+            acc_mm += mm
+            acc_copies += 1
             for pos in range(period):
                 ch = text_arr[copy_start + pos]
                 votes[pos, ch] += 1

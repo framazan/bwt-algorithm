@@ -1856,7 +1856,7 @@ struct __pyx_opt_args_3src_13_accelerators_find_periodic_patterns;
 struct __pyx_opt_args_3src_13_accelerators_find_periodic_runs;
 struct __pyx_opt_args_3src_13_accelerators_lcp_tandem_candidates;
 
-/* "src/_accelerators.pyx":437
+/* "src/_accelerators.pyx":460
  *     return array_start, array_end, copies, full_start, full_end
  * 
  * cpdef list scan_unit_repeats(const unsigned char[:] text_arr, int n, int unit_len, int min_copies, int max_mismatch, const unsigned char[:] packed_arr=None):             # <<<<<<<<<<<<<<
@@ -1868,7 +1868,7 @@ struct __pyx_opt_args_3src_13_accelerators_scan_unit_repeats {
   __Pyx_memviewslice packed_arr;
 };
 
-/* "src/_accelerators.pyx":583
+/* "src/_accelerators.pyx":606
  *     return results
  * 
  * cpdef list find_periodic_patterns(long[:] positions, int min_period, int max_period, int min_copies, double tolerance_ratio=0.01):             # <<<<<<<<<<<<<<
@@ -1880,7 +1880,7 @@ struct __pyx_opt_args_3src_13_accelerators_find_periodic_patterns {
   double tolerance_ratio;
 };
 
-/* "src/_accelerators.pyx":631
+/* "src/_accelerators.pyx":654
  *     return results
  * 
  * cpdef list find_periodic_runs(long[:] positions, int min_period, int max_period, int min_copies, double tolerance_ratio=0.01):             # <<<<<<<<<<<<<<
@@ -1892,7 +1892,7 @@ struct __pyx_opt_args_3src_13_accelerators_find_periodic_runs {
   double tolerance_ratio;
 };
 
-/* "src/_accelerators.pyx":938
+/* "src/_accelerators.pyx":961
  *         free(ptr)
  * 
  * cpdef list lcp_tandem_candidates(             # <<<<<<<<<<<<<<
@@ -20051,6 +20051,8 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
   int __pyx_v_bad_run;
   int __pyx_v_last_good_end;
   int __pyx_v_last_good_start;
+  long __pyx_v_acc_mm;
+  long __pyx_v_acc_copies;
   int __pyx_v_full_start;
   int __pyx_v_full_end;
   int __pyx_v_array_start;
@@ -20433,27 +20435,63 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
   }
 
-  /* "src/_accelerators.pyx":269
+  /* "src/_accelerators.pyx":272
+ *     # low-complexity / homopolymer stretches (period 1 can never be "bad" per
+ *     # copy), which both over-extends and explodes downstream refinement cost.
+ *     cdef long acc_mm = 0          # mismatches over accepted copies (this side)             # <<<<<<<<<<<<<<
+ *     cdef long acc_copies = 0      # accepted copies (this side), excludes the seed
+ * 
+*/
+  __pyx_v_acc_mm = 0;
+
+  /* "src/_accelerators.pyx":273
+ *     # copy), which both over-extends and explodes downstream refinement cost.
+ *     cdef long acc_mm = 0          # mismatches over accepted copies (this side)
+ *     cdef long acc_copies = 0      # accepted copies (this side), excludes the seed             # <<<<<<<<<<<<<<
+ * 
+ *     #  Extend right
+*/
+  __pyx_v_acc_copies = 0;
+
+  /* "src/_accelerators.pyx":276
  * 
  *     #  Extend right
  *     bad_run = 0             # <<<<<<<<<<<<<<
  *     last_good_end = end
- *     while end + period <= n:
+ *     acc_mm = 0
 */
   __pyx_v_bad_run = 0;
 
-  /* "src/_accelerators.pyx":270
+  /* "src/_accelerators.pyx":277
  *     #  Extend right
  *     bad_run = 0
  *     last_good_end = end             # <<<<<<<<<<<<<<
- *     while end + period <= n:
- *         copy_start = end
+ *     acc_mm = 0
+ *     acc_copies = 0
 */
   __pyx_v_last_good_end = __pyx_v_end;
 
-  /* "src/_accelerators.pyx":271
+  /* "src/_accelerators.pyx":278
  *     bad_run = 0
  *     last_good_end = end
+ *     acc_mm = 0             # <<<<<<<<<<<<<<
+ *     acc_copies = 0
+ *     while end + period <= n:
+*/
+  __pyx_v_acc_mm = 0;
+
+  /* "src/_accelerators.pyx":279
+ *     last_good_end = end
+ *     acc_mm = 0
+ *     acc_copies = 0             # <<<<<<<<<<<<<<
+ *     while end + period <= n:
+ *         copy_start = end
+*/
+  __pyx_v_acc_copies = 0;
+
+  /* "src/_accelerators.pyx":280
+ *     acc_mm = 0
+ *     acc_copies = 0
  *     while end + period <= n:             # <<<<<<<<<<<<<<
  *         copy_start = end
  *         # Count mismatches of the candidate copy vs the current consensus.
@@ -20462,8 +20500,8 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
     __pyx_t_14 = ((__pyx_v_end + __pyx_v_period) <= __pyx_v_n);
     if (!__pyx_t_14) break;
 
-    /* "src/_accelerators.pyx":272
- *     last_good_end = end
+    /* "src/_accelerators.pyx":281
+ *     acc_copies = 0
  *     while end + period <= n:
  *         copy_start = end             # <<<<<<<<<<<<<<
  *         # Count mismatches of the candidate copy vs the current consensus.
@@ -20471,7 +20509,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
     __pyx_v_copy_start = __pyx_v_end;
 
-    /* "src/_accelerators.pyx":274
+    /* "src/_accelerators.pyx":283
  *         copy_start = end
  *         # Count mismatches of the candidate copy vs the current consensus.
  *         mm = 0             # <<<<<<<<<<<<<<
@@ -20480,7 +20518,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
     __pyx_v_mm = 0;
 
-    /* "src/_accelerators.pyx":275
+    /* "src/_accelerators.pyx":284
  *         # Count mismatches of the candidate copy vs the current consensus.
  *         mm = 0
  *         for pos in range(period):             # <<<<<<<<<<<<<<
@@ -20492,7 +20530,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
     for (__pyx_t_12 = 0; __pyx_t_12 < __pyx_t_11; __pyx_t_12+=1) {
       __pyx_v_pos = __pyx_t_12;
 
-      /* "src/_accelerators.pyx":276
+      /* "src/_accelerators.pyx":285
  *         mm = 0
  *         for pos in range(period):
  *             if text_arr[copy_start + pos] != consensus[pos]:             # <<<<<<<<<<<<<<
@@ -20504,7 +20542,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
       __pyx_t_14 = ((*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_text_arr.data + __pyx_t_13 * __pyx_v_text_arr.strides[0]) ))) != (*((unsigned char *) ( /* dim=0 */ (__pyx_v_consensus.data + __pyx_t_15 * __pyx_v_consensus.strides[0]) ))));
       if (__pyx_t_14) {
 
-        /* "src/_accelerators.pyx":277
+        /* "src/_accelerators.pyx":286
  *         for pos in range(period):
  *             if text_arr[copy_start + pos] != consensus[pos]:
  *                 mm += 1             # <<<<<<<<<<<<<<
@@ -20513,7 +20551,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
         __pyx_v_mm = (__pyx_v_mm + 1);
 
-        /* "src/_accelerators.pyx":276
+        /* "src/_accelerators.pyx":285
  *         mm = 0
  *         for pos in range(period):
  *             if text_arr[copy_start + pos] != consensus[pos]:             # <<<<<<<<<<<<<<
@@ -20523,7 +20561,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
       }
     }
 
-    /* "src/_accelerators.pyx":278
+    /* "src/_accelerators.pyx":287
  *             if text_arr[copy_start + pos] != consensus[pos]:
  *                 mm += 1
  *         if mm > per_copy_max:             # <<<<<<<<<<<<<<
@@ -20533,7 +20571,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
     __pyx_t_14 = (__pyx_v_mm > __pyx_v_per_copy_max);
     if (__pyx_t_14) {
 
-      /* "src/_accelerators.pyx":279
+      /* "src/_accelerators.pyx":288
  *                 mm += 1
  *         if mm > per_copy_max:
  *             bad_run += 1             # <<<<<<<<<<<<<<
@@ -20542,7 +20580,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
       __pyx_v_bad_run = (__pyx_v_bad_run + 1);
 
-      /* "src/_accelerators.pyx":280
+      /* "src/_accelerators.pyx":289
  *         if mm > per_copy_max:
  *             bad_run += 1
  *             if bad_run >= bad_run_limit:             # <<<<<<<<<<<<<<
@@ -20552,7 +20590,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
       __pyx_t_14 = (__pyx_v_bad_run >= __pyx_v_bad_run_limit);
       if (__pyx_t_14) {
 
-        /* "src/_accelerators.pyx":281
+        /* "src/_accelerators.pyx":290
  *             bad_run += 1
  *             if bad_run >= bad_run_limit:
  *                 break             # <<<<<<<<<<<<<<
@@ -20561,7 +20599,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
         goto __pyx_L8_break;
 
-        /* "src/_accelerators.pyx":280
+        /* "src/_accelerators.pyx":289
  *         if mm > per_copy_max:
  *             bad_run += 1
  *             if bad_run >= bad_run_limit:             # <<<<<<<<<<<<<<
@@ -20570,7 +20608,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
       }
 
-      /* "src/_accelerators.pyx":278
+      /* "src/_accelerators.pyx":287
  *             if text_arr[copy_start + pos] != consensus[pos]:
  *                 mm += 1
  *         if mm > per_copy_max:             # <<<<<<<<<<<<<<
@@ -20580,18 +20618,64 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
       goto __pyx_L12;
     }
 
-    /* "src/_accelerators.pyx":283
+    /* "src/_accelerators.pyx":292
  *                 break
  *         else:
  *             bad_run = 0             # <<<<<<<<<<<<<<
- *             # Accept: fold this copy into the consensus votes and refresh majority.
- *             for pos in range(period):
+ *             # Cumulative purity: would accepting this copy push the running
+ *             # mismatch fraction over the allowed rate? Compare in integer space:
 */
     /*else*/ {
       __pyx_v_bad_run = 0;
 
-      /* "src/_accelerators.pyx":285
- *             bad_run = 0
+      /* "src/_accelerators.pyx":297
+ *             # (acc_mm + mm) > rate * (acc_copies + 1) * period, with +1 grace so
+ *             # a single SNP in a short array is not cut.
+ *             if (acc_mm + mm) > rate * ((acc_copies + 1) * period) + 1.0:             # <<<<<<<<<<<<<<
+ *                 break
+ *             acc_mm += mm
+*/
+      __pyx_t_14 = ((__pyx_v_acc_mm + __pyx_v_mm) > ((__pyx_v_rate * ((__pyx_v_acc_copies + 1) * __pyx_v_period)) + 1.0));
+      if (__pyx_t_14) {
+
+        /* "src/_accelerators.pyx":298
+ *             # a single SNP in a short array is not cut.
+ *             if (acc_mm + mm) > rate * ((acc_copies + 1) * period) + 1.0:
+ *                 break             # <<<<<<<<<<<<<<
+ *             acc_mm += mm
+ *             acc_copies += 1
+*/
+        goto __pyx_L8_break;
+
+        /* "src/_accelerators.pyx":297
+ *             # (acc_mm + mm) > rate * (acc_copies + 1) * period, with +1 grace so
+ *             # a single SNP in a short array is not cut.
+ *             if (acc_mm + mm) > rate * ((acc_copies + 1) * period) + 1.0:             # <<<<<<<<<<<<<<
+ *                 break
+ *             acc_mm += mm
+*/
+      }
+
+      /* "src/_accelerators.pyx":299
+ *             if (acc_mm + mm) > rate * ((acc_copies + 1) * period) + 1.0:
+ *                 break
+ *             acc_mm += mm             # <<<<<<<<<<<<<<
+ *             acc_copies += 1
+ *             # Accept: fold this copy into the consensus votes and refresh majority.
+*/
+      __pyx_v_acc_mm = (__pyx_v_acc_mm + __pyx_v_mm);
+
+      /* "src/_accelerators.pyx":300
+ *                 break
+ *             acc_mm += mm
+ *             acc_copies += 1             # <<<<<<<<<<<<<<
+ *             # Accept: fold this copy into the consensus votes and refresh majority.
+ *             for pos in range(period):
+*/
+      __pyx_v_acc_copies = (__pyx_v_acc_copies + 1);
+
+      /* "src/_accelerators.pyx":302
+ *             acc_copies += 1
  *             # Accept: fold this copy into the consensus votes and refresh majority.
  *             for pos in range(period):             # <<<<<<<<<<<<<<
  *                 ch = text_arr[copy_start + pos]
@@ -20602,7 +20686,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
       for (__pyx_t_12 = 0; __pyx_t_12 < __pyx_t_11; __pyx_t_12+=1) {
         __pyx_v_pos = __pyx_t_12;
 
-        /* "src/_accelerators.pyx":286
+        /* "src/_accelerators.pyx":303
  *             # Accept: fold this copy into the consensus votes and refresh majority.
  *             for pos in range(period):
  *                 ch = text_arr[copy_start + pos]             # <<<<<<<<<<<<<<
@@ -20612,7 +20696,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
         __pyx_t_15 = (__pyx_v_copy_start + __pyx_v_pos);
         __pyx_v_ch = (*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_text_arr.data + __pyx_t_15 * __pyx_v_text_arr.strides[0]) )));
 
-        /* "src/_accelerators.pyx":287
+        /* "src/_accelerators.pyx":304
  *             for pos in range(period):
  *                 ch = text_arr[copy_start + pos]
  *                 votes[pos, ch] += 1             # <<<<<<<<<<<<<<
@@ -20623,7 +20707,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
         __pyx_t_7 = __pyx_v_ch;
         *((int *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_votes.data + __pyx_t_15 * __pyx_v_votes.strides[0]) ) + __pyx_t_7 * __pyx_v_votes.strides[1]) )) += 1;
 
-        /* "src/_accelerators.pyx":288
+        /* "src/_accelerators.pyx":305
  *                 ch = text_arr[copy_start + pos]
  *                 votes[pos, ch] += 1
  *                 if votes[pos, ch] > votes[pos, consensus[pos]]:             # <<<<<<<<<<<<<<
@@ -20638,7 +20722,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
         __pyx_t_14 = ((*((int *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_votes.data + __pyx_t_15 * __pyx_v_votes.strides[0]) ) + __pyx_t_7 * __pyx_v_votes.strides[1]) ))) > (*((int *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_votes.data + __pyx_t_16 * __pyx_v_votes.strides[0]) ) + __pyx_t_17 * __pyx_v_votes.strides[1]) ))));
         if (__pyx_t_14) {
 
-          /* "src/_accelerators.pyx":289
+          /* "src/_accelerators.pyx":306
  *                 votes[pos, ch] += 1
  *                 if votes[pos, ch] > votes[pos, consensus[pos]]:
  *                     consensus[pos] = ch             # <<<<<<<<<<<<<<
@@ -20648,7 +20732,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
           __pyx_t_13 = __pyx_v_pos;
           *((unsigned char *) ( /* dim=0 */ (__pyx_v_consensus.data + __pyx_t_13 * __pyx_v_consensus.strides[0]) )) = __pyx_v_ch;
 
-          /* "src/_accelerators.pyx":288
+          /* "src/_accelerators.pyx":305
  *                 ch = text_arr[copy_start + pos]
  *                 votes[pos, ch] += 1
  *                 if votes[pos, ch] > votes[pos, consensus[pos]]:             # <<<<<<<<<<<<<<
@@ -20658,7 +20742,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
         }
       }
 
-      /* "src/_accelerators.pyx":290
+      /* "src/_accelerators.pyx":307
  *                 if votes[pos, ch] > votes[pos, consensus[pos]]:
  *                     consensus[pos] = ch
  *             last_good_end = copy_start + period             # <<<<<<<<<<<<<<
@@ -20669,7 +20753,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
     }
     __pyx_L12:;
 
-    /* "src/_accelerators.pyx":291
+    /* "src/_accelerators.pyx":308
  *                     consensus[pos] = ch
  *             last_good_end = copy_start + period
  *         copies += 1             # <<<<<<<<<<<<<<
@@ -20678,7 +20762,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
     __pyx_v_copies = (__pyx_v_copies + 1);
 
-    /* "src/_accelerators.pyx":292
+    /* "src/_accelerators.pyx":309
  *             last_good_end = copy_start + period
  *         copies += 1
  *         end += period             # <<<<<<<<<<<<<<
@@ -20689,7 +20773,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
   }
   __pyx_L8_break:;
 
-  /* "src/_accelerators.pyx":293
+  /* "src/_accelerators.pyx":310
  *         copies += 1
  *         end += period
  *     end = last_good_end             # <<<<<<<<<<<<<<
@@ -20698,27 +20782,45 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
   __pyx_v_end = __pyx_v_last_good_end;
 
-  /* "src/_accelerators.pyx":296
+  /* "src/_accelerators.pyx":313
  * 
  *     #  Extend left
  *     bad_run = 0             # <<<<<<<<<<<<<<
  *     last_good_start = start
- *     while start - period >= 0:
+ *     acc_mm = 0
 */
   __pyx_v_bad_run = 0;
 
-  /* "src/_accelerators.pyx":297
+  /* "src/_accelerators.pyx":314
  *     #  Extend left
  *     bad_run = 0
  *     last_good_start = start             # <<<<<<<<<<<<<<
- *     while start - period >= 0:
- *         copy_start = start - period
+ *     acc_mm = 0
+ *     acc_copies = 0
 */
   __pyx_v_last_good_start = __pyx_v_start;
 
-  /* "src/_accelerators.pyx":298
+  /* "src/_accelerators.pyx":315
  *     bad_run = 0
  *     last_good_start = start
+ *     acc_mm = 0             # <<<<<<<<<<<<<<
+ *     acc_copies = 0
+ *     while start - period >= 0:
+*/
+  __pyx_v_acc_mm = 0;
+
+  /* "src/_accelerators.pyx":316
+ *     last_good_start = start
+ *     acc_mm = 0
+ *     acc_copies = 0             # <<<<<<<<<<<<<<
+ *     while start - period >= 0:
+ *         copy_start = start - period
+*/
+  __pyx_v_acc_copies = 0;
+
+  /* "src/_accelerators.pyx":317
+ *     acc_mm = 0
+ *     acc_copies = 0
  *     while start - period >= 0:             # <<<<<<<<<<<<<<
  *         copy_start = start - period
  *         mm = 0
@@ -20727,8 +20829,8 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
     __pyx_t_14 = ((__pyx_v_start - __pyx_v_period) >= 0);
     if (!__pyx_t_14) break;
 
-    /* "src/_accelerators.pyx":299
- *     last_good_start = start
+    /* "src/_accelerators.pyx":318
+ *     acc_copies = 0
  *     while start - period >= 0:
  *         copy_start = start - period             # <<<<<<<<<<<<<<
  *         mm = 0
@@ -20736,7 +20838,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
     __pyx_v_copy_start = (__pyx_v_start - __pyx_v_period);
 
-    /* "src/_accelerators.pyx":300
+    /* "src/_accelerators.pyx":319
  *     while start - period >= 0:
  *         copy_start = start - period
  *         mm = 0             # <<<<<<<<<<<<<<
@@ -20745,7 +20847,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
     __pyx_v_mm = 0;
 
-    /* "src/_accelerators.pyx":301
+    /* "src/_accelerators.pyx":320
  *         copy_start = start - period
  *         mm = 0
  *         for pos in range(period):             # <<<<<<<<<<<<<<
@@ -20757,7 +20859,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
     for (__pyx_t_12 = 0; __pyx_t_12 < __pyx_t_11; __pyx_t_12+=1) {
       __pyx_v_pos = __pyx_t_12;
 
-      /* "src/_accelerators.pyx":302
+      /* "src/_accelerators.pyx":321
  *         mm = 0
  *         for pos in range(period):
  *             if text_arr[copy_start + pos] != consensus[pos]:             # <<<<<<<<<<<<<<
@@ -20769,7 +20871,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
       __pyx_t_14 = ((*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_text_arr.data + __pyx_t_13 * __pyx_v_text_arr.strides[0]) ))) != (*((unsigned char *) ( /* dim=0 */ (__pyx_v_consensus.data + __pyx_t_16 * __pyx_v_consensus.strides[0]) ))));
       if (__pyx_t_14) {
 
-        /* "src/_accelerators.pyx":303
+        /* "src/_accelerators.pyx":322
  *         for pos in range(period):
  *             if text_arr[copy_start + pos] != consensus[pos]:
  *                 mm += 1             # <<<<<<<<<<<<<<
@@ -20778,7 +20880,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
         __pyx_v_mm = (__pyx_v_mm + 1);
 
-        /* "src/_accelerators.pyx":302
+        /* "src/_accelerators.pyx":321
  *         mm = 0
  *         for pos in range(period):
  *             if text_arr[copy_start + pos] != consensus[pos]:             # <<<<<<<<<<<<<<
@@ -20788,7 +20890,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
       }
     }
 
-    /* "src/_accelerators.pyx":304
+    /* "src/_accelerators.pyx":323
  *             if text_arr[copy_start + pos] != consensus[pos]:
  *                 mm += 1
  *         if mm > per_copy_max:             # <<<<<<<<<<<<<<
@@ -20798,7 +20900,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
     __pyx_t_14 = (__pyx_v_mm > __pyx_v_per_copy_max);
     if (__pyx_t_14) {
 
-      /* "src/_accelerators.pyx":305
+      /* "src/_accelerators.pyx":324
  *                 mm += 1
  *         if mm > per_copy_max:
  *             bad_run += 1             # <<<<<<<<<<<<<<
@@ -20807,7 +20909,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
       __pyx_v_bad_run = (__pyx_v_bad_run + 1);
 
-      /* "src/_accelerators.pyx":306
+      /* "src/_accelerators.pyx":325
  *         if mm > per_copy_max:
  *             bad_run += 1
  *             if bad_run >= bad_run_limit:             # <<<<<<<<<<<<<<
@@ -20817,16 +20919,16 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
       __pyx_t_14 = (__pyx_v_bad_run >= __pyx_v_bad_run_limit);
       if (__pyx_t_14) {
 
-        /* "src/_accelerators.pyx":307
+        /* "src/_accelerators.pyx":326
  *             bad_run += 1
  *             if bad_run >= bad_run_limit:
  *                 break             # <<<<<<<<<<<<<<
  *         else:
  *             bad_run = 0
 */
-        goto __pyx_L18_break;
+        goto __pyx_L19_break;
 
-        /* "src/_accelerators.pyx":306
+        /* "src/_accelerators.pyx":325
  *         if mm > per_copy_max:
  *             bad_run += 1
  *             if bad_run >= bad_run_limit:             # <<<<<<<<<<<<<<
@@ -20835,29 +20937,75 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
       }
 
-      /* "src/_accelerators.pyx":304
+      /* "src/_accelerators.pyx":323
  *             if text_arr[copy_start + pos] != consensus[pos]:
  *                 mm += 1
  *         if mm > per_copy_max:             # <<<<<<<<<<<<<<
  *             bad_run += 1
  *             if bad_run >= bad_run_limit:
 */
-      goto __pyx_L22;
+      goto __pyx_L23;
     }
 
-    /* "src/_accelerators.pyx":309
+    /* "src/_accelerators.pyx":328
  *                 break
  *         else:
  *             bad_run = 0             # <<<<<<<<<<<<<<
- *             for pos in range(period):
- *                 ch = text_arr[copy_start + pos]
+ *             if (acc_mm + mm) > rate * ((acc_copies + 1) * period) + 1.0:
+ *                 break
 */
     /*else*/ {
       __pyx_v_bad_run = 0;
 
-      /* "src/_accelerators.pyx":310
+      /* "src/_accelerators.pyx":329
  *         else:
  *             bad_run = 0
+ *             if (acc_mm + mm) > rate * ((acc_copies + 1) * period) + 1.0:             # <<<<<<<<<<<<<<
+ *                 break
+ *             acc_mm += mm
+*/
+      __pyx_t_14 = ((__pyx_v_acc_mm + __pyx_v_mm) > ((__pyx_v_rate * ((__pyx_v_acc_copies + 1) * __pyx_v_period)) + 1.0));
+      if (__pyx_t_14) {
+
+        /* "src/_accelerators.pyx":330
+ *             bad_run = 0
+ *             if (acc_mm + mm) > rate * ((acc_copies + 1) * period) + 1.0:
+ *                 break             # <<<<<<<<<<<<<<
+ *             acc_mm += mm
+ *             acc_copies += 1
+*/
+        goto __pyx_L19_break;
+
+        /* "src/_accelerators.pyx":329
+ *         else:
+ *             bad_run = 0
+ *             if (acc_mm + mm) > rate * ((acc_copies + 1) * period) + 1.0:             # <<<<<<<<<<<<<<
+ *                 break
+ *             acc_mm += mm
+*/
+      }
+
+      /* "src/_accelerators.pyx":331
+ *             if (acc_mm + mm) > rate * ((acc_copies + 1) * period) + 1.0:
+ *                 break
+ *             acc_mm += mm             # <<<<<<<<<<<<<<
+ *             acc_copies += 1
+ *             for pos in range(period):
+*/
+      __pyx_v_acc_mm = (__pyx_v_acc_mm + __pyx_v_mm);
+
+      /* "src/_accelerators.pyx":332
+ *                 break
+ *             acc_mm += mm
+ *             acc_copies += 1             # <<<<<<<<<<<<<<
+ *             for pos in range(period):
+ *                 ch = text_arr[copy_start + pos]
+*/
+      __pyx_v_acc_copies = (__pyx_v_acc_copies + 1);
+
+      /* "src/_accelerators.pyx":333
+ *             acc_mm += mm
+ *             acc_copies += 1
  *             for pos in range(period):             # <<<<<<<<<<<<<<
  *                 ch = text_arr[copy_start + pos]
  *                 votes[pos, ch] += 1
@@ -20867,8 +21015,8 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
       for (__pyx_t_12 = 0; __pyx_t_12 < __pyx_t_11; __pyx_t_12+=1) {
         __pyx_v_pos = __pyx_t_12;
 
-        /* "src/_accelerators.pyx":311
- *             bad_run = 0
+        /* "src/_accelerators.pyx":334
+ *             acc_copies += 1
  *             for pos in range(period):
  *                 ch = text_arr[copy_start + pos]             # <<<<<<<<<<<<<<
  *                 votes[pos, ch] += 1
@@ -20877,7 +21025,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
         __pyx_t_16 = (__pyx_v_copy_start + __pyx_v_pos);
         __pyx_v_ch = (*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_text_arr.data + __pyx_t_16 * __pyx_v_text_arr.strides[0]) )));
 
-        /* "src/_accelerators.pyx":312
+        /* "src/_accelerators.pyx":335
  *             for pos in range(period):
  *                 ch = text_arr[copy_start + pos]
  *                 votes[pos, ch] += 1             # <<<<<<<<<<<<<<
@@ -20888,7 +21036,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
         __pyx_t_17 = __pyx_v_ch;
         *((int *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_votes.data + __pyx_t_16 * __pyx_v_votes.strides[0]) ) + __pyx_t_17 * __pyx_v_votes.strides[1]) )) += 1;
 
-        /* "src/_accelerators.pyx":313
+        /* "src/_accelerators.pyx":336
  *                 ch = text_arr[copy_start + pos]
  *                 votes[pos, ch] += 1
  *                 if votes[pos, ch] > votes[pos, consensus[pos]]:             # <<<<<<<<<<<<<<
@@ -20903,7 +21051,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
         __pyx_t_14 = ((*((int *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_votes.data + __pyx_t_16 * __pyx_v_votes.strides[0]) ) + __pyx_t_17 * __pyx_v_votes.strides[1]) ))) > (*((int *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_votes.data + __pyx_t_15 * __pyx_v_votes.strides[0]) ) + __pyx_t_7 * __pyx_v_votes.strides[1]) ))));
         if (__pyx_t_14) {
 
-          /* "src/_accelerators.pyx":314
+          /* "src/_accelerators.pyx":337
  *                 votes[pos, ch] += 1
  *                 if votes[pos, ch] > votes[pos, consensus[pos]]:
  *                     consensus[pos] = ch             # <<<<<<<<<<<<<<
@@ -20913,7 +21061,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
           __pyx_t_13 = __pyx_v_pos;
           *((unsigned char *) ( /* dim=0 */ (__pyx_v_consensus.data + __pyx_t_13 * __pyx_v_consensus.strides[0]) )) = __pyx_v_ch;
 
-          /* "src/_accelerators.pyx":313
+          /* "src/_accelerators.pyx":336
  *                 ch = text_arr[copy_start + pos]
  *                 votes[pos, ch] += 1
  *                 if votes[pos, ch] > votes[pos, consensus[pos]]:             # <<<<<<<<<<<<<<
@@ -20923,7 +21071,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
         }
       }
 
-      /* "src/_accelerators.pyx":315
+      /* "src/_accelerators.pyx":338
  *                 if votes[pos, ch] > votes[pos, consensus[pos]]:
  *                     consensus[pos] = ch
  *             last_good_start = copy_start             # <<<<<<<<<<<<<<
@@ -20932,9 +21080,9 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
       __pyx_v_last_good_start = __pyx_v_copy_start;
     }
-    __pyx_L22:;
+    __pyx_L23:;
 
-    /* "src/_accelerators.pyx":316
+    /* "src/_accelerators.pyx":339
  *                     consensus[pos] = ch
  *             last_good_start = copy_start
  *         start -= period             # <<<<<<<<<<<<<<
@@ -20943,9 +21091,9 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
     __pyx_v_start = (__pyx_v_start - __pyx_v_period);
   }
-  __pyx_L18_break:;
+  __pyx_L19_break:;
 
-  /* "src/_accelerators.pyx":317
+  /* "src/_accelerators.pyx":340
  *             last_good_start = copy_start
  *         start -= period
  *     start = last_good_start             # <<<<<<<<<<<<<<
@@ -20954,7 +21102,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
   __pyx_v_start = __pyx_v_last_good_start;
 
-  /* "src/_accelerators.pyx":320
+  /* "src/_accelerators.pyx":343
  * 
  *     # Recompute the accepted copy count from the trimmed [start, end) span.
  *     copies = (end - start) // period             # <<<<<<<<<<<<<<
@@ -20963,7 +21111,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
   __pyx_v_copies = ((__pyx_v_end - __pyx_v_start) / __pyx_v_period);
 
-  /* "src/_accelerators.pyx":322
+  /* "src/_accelerators.pyx":345
  *     copies = (end - start) // period
  * 
  *     cdef int full_start = start             # <<<<<<<<<<<<<<
@@ -20972,7 +21120,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
   __pyx_v_full_start = __pyx_v_start;
 
-  /* "src/_accelerators.pyx":323
+  /* "src/_accelerators.pyx":346
  * 
  *     cdef int full_start = start
  *     cdef int full_end = end             # <<<<<<<<<<<<<<
@@ -20981,7 +21129,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
   __pyx_v_full_end = __pyx_v_end;
 
-  /* "src/_accelerators.pyx":328
+  /* "src/_accelerators.pyx":351
  * 
  *     # Partial right extension (exact matching against the final consensus).
  *     partial_right = 0             # <<<<<<<<<<<<<<
@@ -20990,7 +21138,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
   __pyx_v_partial_right = 0;
 
-  /* "src/_accelerators.pyx":329
+  /* "src/_accelerators.pyx":352
  *     # Partial right extension (exact matching against the final consensus).
  *     partial_right = 0
  *     while partial_right < period and full_end + partial_right < n:             # <<<<<<<<<<<<<<
@@ -21002,14 +21150,14 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
     if (__pyx_t_18) {
     } else {
       __pyx_t_14 = __pyx_t_18;
-      goto __pyx_L29_bool_binop_done;
+      goto __pyx_L31_bool_binop_done;
     }
     __pyx_t_18 = ((__pyx_v_full_end + __pyx_v_partial_right) < __pyx_v_n);
     __pyx_t_14 = __pyx_t_18;
-    __pyx_L29_bool_binop_done:;
+    __pyx_L31_bool_binop_done:;
     if (!__pyx_t_14) break;
 
-    /* "src/_accelerators.pyx":330
+    /* "src/_accelerators.pyx":353
  *     partial_right = 0
  *     while partial_right < period and full_end + partial_right < n:
  *         if text_arr[full_end + partial_right] != consensus[partial_right]:             # <<<<<<<<<<<<<<
@@ -21021,16 +21169,16 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
     __pyx_t_14 = ((*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_text_arr.data + __pyx_t_13 * __pyx_v_text_arr.strides[0]) ))) != (*((unsigned char *) ( /* dim=0 */ (__pyx_v_consensus.data + __pyx_t_15 * __pyx_v_consensus.strides[0]) ))));
     if (__pyx_t_14) {
 
-      /* "src/_accelerators.pyx":331
+      /* "src/_accelerators.pyx":354
  *     while partial_right < period and full_end + partial_right < n:
  *         if text_arr[full_end + partial_right] != consensus[partial_right]:
  *             break             # <<<<<<<<<<<<<<
  *         partial_right += 1
  *     array_end = full_end + partial_right
 */
-      goto __pyx_L28_break;
+      goto __pyx_L30_break;
 
-      /* "src/_accelerators.pyx":330
+      /* "src/_accelerators.pyx":353
  *     partial_right = 0
  *     while partial_right < period and full_end + partial_right < n:
  *         if text_arr[full_end + partial_right] != consensus[partial_right]:             # <<<<<<<<<<<<<<
@@ -21039,7 +21187,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
     }
 
-    /* "src/_accelerators.pyx":332
+    /* "src/_accelerators.pyx":355
  *         if text_arr[full_end + partial_right] != consensus[partial_right]:
  *             break
  *         partial_right += 1             # <<<<<<<<<<<<<<
@@ -21048,9 +21196,9 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
     __pyx_v_partial_right = (__pyx_v_partial_right + 1);
   }
-  __pyx_L28_break:;
+  __pyx_L30_break:;
 
-  /* "src/_accelerators.pyx":333
+  /* "src/_accelerators.pyx":356
  *             break
  *         partial_right += 1
  *     array_end = full_end + partial_right             # <<<<<<<<<<<<<<
@@ -21059,7 +21207,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
   __pyx_v_array_end = (__pyx_v_full_end + __pyx_v_partial_right);
 
-  /* "src/_accelerators.pyx":336
+  /* "src/_accelerators.pyx":359
  * 
  *     # Partial left extension (exact matching against the final consensus).
  *     partial_left = 0             # <<<<<<<<<<<<<<
@@ -21068,7 +21216,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
   __pyx_v_partial_left = 0;
 
-  /* "src/_accelerators.pyx":337
+  /* "src/_accelerators.pyx":360
  *     # Partial left extension (exact matching against the final consensus).
  *     partial_left = 0
  *     while partial_left < period and full_start - partial_left - 1 >= 0:             # <<<<<<<<<<<<<<
@@ -21080,14 +21228,14 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
     if (__pyx_t_18) {
     } else {
       __pyx_t_14 = __pyx_t_18;
-      goto __pyx_L34_bool_binop_done;
+      goto __pyx_L36_bool_binop_done;
     }
     __pyx_t_18 = (((__pyx_v_full_start - __pyx_v_partial_left) - 1) >= 0);
     __pyx_t_14 = __pyx_t_18;
-    __pyx_L34_bool_binop_done:;
+    __pyx_L36_bool_binop_done:;
     if (!__pyx_t_14) break;
 
-    /* "src/_accelerators.pyx":338
+    /* "src/_accelerators.pyx":361
  *     partial_left = 0
  *     while partial_left < period and full_start - partial_left - 1 >= 0:
  *         if text_arr[full_start - partial_left - 1] != consensus[period - 1 - partial_left]:             # <<<<<<<<<<<<<<
@@ -21099,16 +21247,16 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
     __pyx_t_14 = ((*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_text_arr.data + __pyx_t_15 * __pyx_v_text_arr.strides[0]) ))) != (*((unsigned char *) ( /* dim=0 */ (__pyx_v_consensus.data + __pyx_t_13 * __pyx_v_consensus.strides[0]) ))));
     if (__pyx_t_14) {
 
-      /* "src/_accelerators.pyx":339
+      /* "src/_accelerators.pyx":362
  *     while partial_left < period and full_start - partial_left - 1 >= 0:
  *         if text_arr[full_start - partial_left - 1] != consensus[period - 1 - partial_left]:
  *             break             # <<<<<<<<<<<<<<
  *         partial_left += 1
  *     array_start = full_start - partial_left
 */
-      goto __pyx_L33_break;
+      goto __pyx_L35_break;
 
-      /* "src/_accelerators.pyx":338
+      /* "src/_accelerators.pyx":361
  *     partial_left = 0
  *     while partial_left < period and full_start - partial_left - 1 >= 0:
  *         if text_arr[full_start - partial_left - 1] != consensus[period - 1 - partial_left]:             # <<<<<<<<<<<<<<
@@ -21117,7 +21265,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
     }
 
-    /* "src/_accelerators.pyx":340
+    /* "src/_accelerators.pyx":363
  *         if text_arr[full_start - partial_left - 1] != consensus[period - 1 - partial_left]:
  *             break
  *         partial_left += 1             # <<<<<<<<<<<<<<
@@ -21126,9 +21274,9 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
     __pyx_v_partial_left = (__pyx_v_partial_left + 1);
   }
-  __pyx_L33_break:;
+  __pyx_L35_break:;
 
-  /* "src/_accelerators.pyx":341
+  /* "src/_accelerators.pyx":364
  *             break
  *         partial_left += 1
  *     array_start = full_start - partial_left             # <<<<<<<<<<<<<<
@@ -21137,7 +21285,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
 */
   __pyx_v_array_start = (__pyx_v_full_start - __pyx_v_partial_left);
 
-  /* "src/_accelerators.pyx":343
+  /* "src/_accelerators.pyx":366
  *     array_start = full_start - partial_left
  * 
  *     return array_start, array_end, copies, full_start, full_end             # <<<<<<<<<<<<<<
@@ -21145,28 +21293,28 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
  * 
 */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __Pyx_PyLong_From_int(__pyx_v_array_start); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 343, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyLong_From_int(__pyx_v_array_start); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 366, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_6 = __Pyx_PyLong_From_int(__pyx_v_array_end); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 343, __pyx_L1_error)
+  __pyx_t_6 = __Pyx_PyLong_From_int(__pyx_v_array_end); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 366, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
-  __pyx_t_5 = __Pyx_PyLong_From_int(__pyx_v_copies); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 343, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyLong_From_int(__pyx_v_copies); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 366, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_2 = __Pyx_PyLong_From_int(__pyx_v_full_start); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 343, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyLong_From_int(__pyx_v_full_start); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 366, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  __pyx_t_3 = __Pyx_PyLong_From_int(__pyx_v_full_end); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 343, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyLong_From_int(__pyx_v_full_end); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 366, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_4 = PyTuple_New(5); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 343, __pyx_L1_error)
+  __pyx_t_4 = PyTuple_New(5); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 366, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_GIVEREF(__pyx_t_1);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_4, 0, __pyx_t_1) != (0)) __PYX_ERR(0, 343, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_4, 0, __pyx_t_1) != (0)) __PYX_ERR(0, 366, __pyx_L1_error);
   __Pyx_GIVEREF(__pyx_t_6);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_4, 1, __pyx_t_6) != (0)) __PYX_ERR(0, 343, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_4, 1, __pyx_t_6) != (0)) __PYX_ERR(0, 366, __pyx_L1_error);
   __Pyx_GIVEREF(__pyx_t_5);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_4, 2, __pyx_t_5) != (0)) __PYX_ERR(0, 343, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_4, 2, __pyx_t_5) != (0)) __PYX_ERR(0, 366, __pyx_L1_error);
   __Pyx_GIVEREF(__pyx_t_2);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_4, 3, __pyx_t_2) != (0)) __PYX_ERR(0, 343, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_4, 3, __pyx_t_2) != (0)) __PYX_ERR(0, 366, __pyx_L1_error);
   __Pyx_GIVEREF(__pyx_t_3);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_4, 4, __pyx_t_3) != (0)) __PYX_ERR(0, 343, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_4, 4, __pyx_t_3) != (0)) __PYX_ERR(0, 366, __pyx_L1_error);
   __pyx_t_1 = 0;
   __pyx_t_6 = 0;
   __pyx_t_5 = 0;
@@ -21217,7 +21365,7 @@ static PyObject *__pyx_f_3src_13_accelerators__extend_rolling(__Pyx_memviewslice
   return __pyx_r;
 }
 
-/* "src/_accelerators.pyx":346
+/* "src/_accelerators.pyx":369
  * 
  * 
  * cpdef tuple extend_with_mismatches(const unsigned char[:] s_arr,             # <<<<<<<<<<<<<<
@@ -21279,7 +21427,7 @@ static PyObject *__pyx_f_3src_13_accelerators_extend_with_mismatches(__Pyx_memvi
   __pyx_pybuffernd_consensus_arr.data = NULL;
   __pyx_pybuffernd_consensus_arr.rcbuffer = &__pyx_pybuffer_consensus_arr;
 
-  /* "src/_accelerators.pyx":359
+  /* "src/_accelerators.pyx":382
  *     boundaries.
  *     """
  *     if period <= 0:             # <<<<<<<<<<<<<<
@@ -21289,7 +21437,7 @@ static PyObject *__pyx_f_3src_13_accelerators_extend_with_mismatches(__Pyx_memvi
   __pyx_t_1 = (__pyx_v_period <= 0);
   if (__pyx_t_1) {
 
-    /* "src/_accelerators.pyx":360
+    /* "src/_accelerators.pyx":383
  *     """
  *     if period <= 0:
  *         return None             # <<<<<<<<<<<<<<
@@ -21300,7 +21448,7 @@ static PyObject *__pyx_f_3src_13_accelerators_extend_with_mismatches(__Pyx_memvi
     __pyx_r = ((PyObject*)Py_None); __Pyx_INCREF(Py_None);
     goto __pyx_L0;
 
-    /* "src/_accelerators.pyx":359
+    /* "src/_accelerators.pyx":382
  *     boundaries.
  *     """
  *     if period <= 0:             # <<<<<<<<<<<<<<
@@ -21309,7 +21457,7 @@ static PyObject *__pyx_f_3src_13_accelerators_extend_with_mismatches(__Pyx_memvi
 */
   }
 
-  /* "src/_accelerators.pyx":362
+  /* "src/_accelerators.pyx":385
  *         return None
  * 
  *     cdef Py_ssize_t arr_len = s_arr.shape[0]             # <<<<<<<<<<<<<<
@@ -21318,7 +21466,7 @@ static PyObject *__pyx_f_3src_13_accelerators_extend_with_mismatches(__Pyx_memvi
 */
   __pyx_v_arr_len = (__pyx_v_s_arr.shape[0]);
 
-  /* "src/_accelerators.pyx":363
+  /* "src/_accelerators.pyx":386
  * 
  *     cdef Py_ssize_t arr_len = s_arr.shape[0]
  *     if n <= 0 or n > arr_len:             # <<<<<<<<<<<<<<
@@ -21336,7 +21484,7 @@ static PyObject *__pyx_f_3src_13_accelerators_extend_with_mismatches(__Pyx_memvi
   __pyx_L5_bool_binop_done:;
   if (__pyx_t_1) {
 
-    /* "src/_accelerators.pyx":364
+    /* "src/_accelerators.pyx":387
  *     cdef Py_ssize_t arr_len = s_arr.shape[0]
  *     if n <= 0 or n > arr_len:
  *         n = arr_len             # <<<<<<<<<<<<<<
@@ -21345,7 +21493,7 @@ static PyObject *__pyx_f_3src_13_accelerators_extend_with_mismatches(__Pyx_memvi
 */
     __pyx_v_n = __pyx_v_arr_len;
 
-    /* "src/_accelerators.pyx":363
+    /* "src/_accelerators.pyx":386
  * 
  *     cdef Py_ssize_t arr_len = s_arr.shape[0]
  *     if n <= 0 or n > arr_len:             # <<<<<<<<<<<<<<
@@ -21354,7 +21502,7 @@ static PyObject *__pyx_f_3src_13_accelerators_extend_with_mismatches(__Pyx_memvi
 */
   }
 
-  /* "src/_accelerators.pyx":366
+  /* "src/_accelerators.pyx":389
  *         n = arr_len
  * 
  *     if start_pos < 0 or start_pos + period > n:             # <<<<<<<<<<<<<<
@@ -21372,7 +21520,7 @@ static PyObject *__pyx_f_3src_13_accelerators_extend_with_mismatches(__Pyx_memvi
   __pyx_L8_bool_binop_done:;
   if (__pyx_t_1) {
 
-    /* "src/_accelerators.pyx":367
+    /* "src/_accelerators.pyx":390
  * 
  *     if start_pos < 0 or start_pos + period > n:
  *         return None             # <<<<<<<<<<<<<<
@@ -21383,7 +21531,7 @@ static PyObject *__pyx_f_3src_13_accelerators_extend_with_mismatches(__Pyx_memvi
     __pyx_r = ((PyObject*)Py_None); __Pyx_INCREF(Py_None);
     goto __pyx_L0;
 
-    /* "src/_accelerators.pyx":366
+    /* "src/_accelerators.pyx":389
  *         n = arr_len
  * 
  *     if start_pos < 0 or start_pos + period > n:             # <<<<<<<<<<<<<<
@@ -21392,7 +21540,7 @@ static PyObject *__pyx_f_3src_13_accelerators_extend_with_mismatches(__Pyx_memvi
 */
   }
 
-  /* "src/_accelerators.pyx":369
+  /* "src/_accelerators.pyx":392
  *         return None
  * 
  *     if _EXT_ROLLING:             # <<<<<<<<<<<<<<
@@ -21401,7 +21549,7 @@ static PyObject *__pyx_f_3src_13_accelerators_extend_with_mismatches(__Pyx_memvi
 */
   if (__pyx_v_3src_13_accelerators__EXT_ROLLING) {
 
-    /* "src/_accelerators.pyx":370
+    /* "src/_accelerators.pyx":393
  * 
  *     if _EXT_ROLLING:
  *         return _extend_rolling(s_arr, start_pos, period, n,             # <<<<<<<<<<<<<<
@@ -21410,20 +21558,20 @@ static PyObject *__pyx_f_3src_13_accelerators_extend_with_mismatches(__Pyx_memvi
 */
     __Pyx_XDECREF(__pyx_r);
 
-    /* "src/_accelerators.pyx":371
+    /* "src/_accelerators.pyx":394
  *     if _EXT_ROLLING:
  *         return _extend_rolling(s_arr, start_pos, period, n,
  *                                allowed_mismatch_rate, _EXT_BAD_RUN)             # <<<<<<<<<<<<<<
  * 
  *     cdef cnp.ndarray[UINT8, ndim=1] consensus_arr = np.array(
 */
-    __pyx_t_3 = __pyx_f_3src_13_accelerators__extend_rolling(__pyx_v_s_arr, __pyx_v_start_pos, __pyx_v_period, __pyx_v_n, __pyx_v_allowed_mismatch_rate, __pyx_v_3src_13_accelerators__EXT_BAD_RUN); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 370, __pyx_L1_error)
+    __pyx_t_3 = __pyx_f_3src_13_accelerators__extend_rolling(__pyx_v_s_arr, __pyx_v_start_pos, __pyx_v_period, __pyx_v_n, __pyx_v_allowed_mismatch_rate, __pyx_v_3src_13_accelerators__EXT_BAD_RUN); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 393, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_3);
     __pyx_r = ((PyObject*)__pyx_t_3);
     __pyx_t_3 = 0;
     goto __pyx_L0;
 
-    /* "src/_accelerators.pyx":369
+    /* "src/_accelerators.pyx":392
  *         return None
  * 
  *     if _EXT_ROLLING:             # <<<<<<<<<<<<<<
@@ -21432,7 +21580,7 @@ static PyObject *__pyx_f_3src_13_accelerators_extend_with_mismatches(__Pyx_memvi
 */
   }
 
-  /* "src/_accelerators.pyx":373
+  /* "src/_accelerators.pyx":396
  *                                allowed_mismatch_rate, _EXT_BAD_RUN)
  * 
  *     cdef cnp.ndarray[UINT8, ndim=1] consensus_arr = np.array(             # <<<<<<<<<<<<<<
@@ -21440,13 +21588,13 @@ static PyObject *__pyx_f_3src_13_accelerators_extend_with_mismatches(__Pyx_memvi
  *     )
 */
   __pyx_t_4 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 373, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 396, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_array); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 373, __pyx_L1_error)
+  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_array); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 396, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
 
-  /* "src/_accelerators.pyx":374
+  /* "src/_accelerators.pyx":397
  * 
  *     cdef cnp.ndarray[UINT8, ndim=1] consensus_arr = np.array(
  *         s_arr[start_pos:start_pos + period], copy=True             # <<<<<<<<<<<<<<
@@ -21471,10 +21619,10 @@ static PyObject *__pyx_f_3src_13_accelerators_extend_with_mismatches(__Pyx_memvi
     0,
     1) < 0))
 {
-    __PYX_ERR(0, 374, __pyx_L1_error)
+    __PYX_ERR(0, 397, __pyx_L1_error)
 }
 
-__pyx_t_5 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __pyx_memview_get_unsigned_char__const__, (int (*)(char *, PyObject *)) NULL, 0);; if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 374, __pyx_L1_error)
+__pyx_t_5 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __pyx_memview_get_unsigned_char__const__, (int (*)(char *, PyObject *)) NULL, 0);; if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 397, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
   __PYX_XCLEAR_MEMVIEW(&__pyx_t_7, 1);
   __pyx_t_7.memview = NULL; __pyx_t_7.data = NULL;
@@ -21492,50 +21640,50 @@ __pyx_t_5 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __p
   #endif
   {
     PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 1 : 0)] = {__pyx_t_4, __pyx_t_5};
-    __pyx_t_10 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 373, __pyx_L1_error)
+    __pyx_t_10 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 396, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_10);
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_copy, Py_True, __pyx_t_10, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 373, __pyx_L1_error)
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_copy, Py_True, __pyx_t_10, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 396, __pyx_L1_error)
     __pyx_t_3 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_6, __pyx_callargs+__pyx_t_9, (2-__pyx_t_9) | (__pyx_t_9*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_10);
     __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
     __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-    if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 373, __pyx_L1_error)
+    if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 396, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_3);
   }
 
-  /* "src/_accelerators.pyx":373
+  /* "src/_accelerators.pyx":396
  *                                allowed_mismatch_rate, _EXT_BAD_RUN)
  * 
  *     cdef cnp.ndarray[UINT8, ndim=1] consensus_arr = np.array(             # <<<<<<<<<<<<<<
  *         s_arr[start_pos:start_pos + period], copy=True
  *     )
 */
-  if (!(likely(((__pyx_t_3) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_3, __pyx_mstate_global->__pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 373, __pyx_L1_error)
+  if (!(likely(((__pyx_t_3) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_3, __pyx_mstate_global->__pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 396, __pyx_L1_error)
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
     if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_consensus_arr.rcbuffer->pybuffer, (PyObject*)((PyArrayObject *)__pyx_t_3), &__Pyx_TypeInfo_nn___pyx_t_3src_13_accelerators_UINT8, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) {
       __pyx_v_consensus_arr = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_consensus_arr.rcbuffer->pybuffer.buf = NULL;
-      __PYX_ERR(0, 373, __pyx_L1_error)
+      __PYX_ERR(0, 396, __pyx_L1_error)
     } else {__pyx_pybuffernd_consensus_arr.diminfo[0].strides = __pyx_pybuffernd_consensus_arr.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_consensus_arr.diminfo[0].shape = __pyx_pybuffernd_consensus_arr.rcbuffer->pybuffer.shape[0];
     }
   }
   __pyx_v_consensus_arr = ((PyArrayObject *)__pyx_t_3);
   __pyx_t_3 = 0;
 
-  /* "src/_accelerators.pyx":376
+  /* "src/_accelerators.pyx":399
  *         s_arr[start_pos:start_pos + period], copy=True
  *     )
  *     cdef const unsigned char[:] consensus = consensus_arr             # <<<<<<<<<<<<<<
  *     cdef const unsigned char[:] text_arr = s_arr
  * 
 */
-  __pyx_t_11 = __Pyx_PyObject_to_MemoryviewSlice_ds_unsigned_char__const__(((PyObject *)__pyx_v_consensus_arr), 0); if (unlikely(!__pyx_t_11.memview)) __PYX_ERR(0, 376, __pyx_L1_error)
+  __pyx_t_11 = __Pyx_PyObject_to_MemoryviewSlice_ds_unsigned_char__const__(((PyObject *)__pyx_v_consensus_arr), 0); if (unlikely(!__pyx_t_11.memview)) __PYX_ERR(0, 399, __pyx_L1_error)
   __pyx_v_consensus = __pyx_t_11;
   __pyx_t_11.memview = NULL;
   __pyx_t_11.data = NULL;
 
-  /* "src/_accelerators.pyx":377
+  /* "src/_accelerators.pyx":400
  *     )
  *     cdef const unsigned char[:] consensus = consensus_arr
  *     cdef const unsigned char[:] text_arr = s_arr             # <<<<<<<<<<<<<<
@@ -21545,7 +21693,7 @@ __pyx_t_5 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __p
   __PYX_INC_MEMVIEW(&__pyx_v_s_arr, 1);
   __pyx_v_text_arr = __pyx_v_s_arr;
 
-  /* "src/_accelerators.pyx":379
+  /* "src/_accelerators.pyx":402
  *     cdef const unsigned char[:] text_arr = s_arr
  * 
  *     cdef int start = start_pos             # <<<<<<<<<<<<<<
@@ -21554,7 +21702,7 @@ __pyx_t_5 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __p
 */
   __pyx_v_start = __pyx_v_start_pos;
 
-  /* "src/_accelerators.pyx":380
+  /* "src/_accelerators.pyx":403
  * 
  *     cdef int start = start_pos
  *     cdef int end = start_pos + period             # <<<<<<<<<<<<<<
@@ -21563,7 +21711,7 @@ __pyx_t_5 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __p
 */
   __pyx_v_end = (__pyx_v_start_pos + __pyx_v_period);
 
-  /* "src/_accelerators.pyx":381
+  /* "src/_accelerators.pyx":404
  *     cdef int start = start_pos
  *     cdef int end = start_pos + period
  *     cdef int copies = 1             # <<<<<<<<<<<<<<
@@ -21572,7 +21720,7 @@ __pyx_t_5 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __p
 */
   __pyx_v_copies = 1;
 
-  /* "src/_accelerators.pyx":389
+  /* "src/_accelerators.pyx":412
  * 
  *     # Extend right
  *     while end + period <= n:             # <<<<<<<<<<<<<<
@@ -21583,7 +21731,7 @@ __pyx_t_5 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __p
     __pyx_t_1 = ((__pyx_v_end + __pyx_v_period) <= __pyx_v_n);
     if (!__pyx_t_1) break;
 
-    /* "src/_accelerators.pyx":390
+    /* "src/_accelerators.pyx":413
  *     # Extend right
  *     while end + period <= n:
  *         temp_copies = copies + 1             # <<<<<<<<<<<<<<
@@ -21592,7 +21740,7 @@ __pyx_t_5 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __p
 */
     __pyx_v_temp_copies = (__pyx_v_copies + 1);
 
-    /* "src/_accelerators.pyx":391
+    /* "src/_accelerators.pyx":414
  *     while end + period <= n:
  *         temp_copies = copies + 1
  *         temp_end = end + period             # <<<<<<<<<<<<<<
@@ -21601,7 +21749,7 @@ __pyx_t_5 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __p
 */
     __pyx_v_temp_end = (__pyx_v_end + __pyx_v_period);
 
-    /* "src/_accelerators.pyx":392
+    /* "src/_accelerators.pyx":415
  *         temp_copies = copies + 1
  *         temp_end = end + period
  *         new_mm = _hamming_distance(text_arr[end:end + period], consensus, period)             # <<<<<<<<<<<<<<
@@ -21626,25 +21774,25 @@ __pyx_t_5 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __p
     0,
     1) < 0))
 {
-    __PYX_ERR(0, 392, __pyx_L1_error)
+    __PYX_ERR(0, 415, __pyx_L1_error)
 }
 
-__pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_consensus, __pyx_v_period); if (unlikely(__pyx_t_8 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 392, __pyx_L1_error)
+__pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_consensus, __pyx_v_period); if (unlikely(__pyx_t_8 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 415, __pyx_L1_error)
     __PYX_XCLEAR_MEMVIEW(&__pyx_t_12, 1);
     __pyx_t_12.memview = NULL; __pyx_t_12.data = NULL;
     __pyx_v_new_mm = __pyx_t_8;
 
-    /* "src/_accelerators.pyx":393
+    /* "src/_accelerators.pyx":416
  *         temp_end = end + period
  *         new_mm = _hamming_distance(text_arr[end:end + period], consensus, period)
  *         max_mm = _max_mismatch_threshold(period, temp_copies, allowed_mismatch_rate)             # <<<<<<<<<<<<<<
  * 
  *         if new_mm > 0:
 */
-    __pyx_t_8 = __pyx_f_3src_13_accelerators__max_mismatch_threshold(__pyx_v_period, __pyx_v_temp_copies, __pyx_v_allowed_mismatch_rate); if (unlikely(__pyx_t_8 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 393, __pyx_L1_error)
+    __pyx_t_8 = __pyx_f_3src_13_accelerators__max_mismatch_threshold(__pyx_v_period, __pyx_v_temp_copies, __pyx_v_allowed_mismatch_rate); if (unlikely(__pyx_t_8 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 416, __pyx_L1_error)
     __pyx_v_max_mm = __pyx_t_8;
 
-    /* "src/_accelerators.pyx":395
+    /* "src/_accelerators.pyx":418
  *         max_mm = _max_mismatch_threshold(period, temp_copies, allowed_mismatch_rate)
  * 
  *         if new_mm > 0:             # <<<<<<<<<<<<<<
@@ -21654,18 +21802,18 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
     __pyx_t_1 = (__pyx_v_new_mm > 0);
     if (__pyx_t_1) {
 
-      /* "src/_accelerators.pyx":396
+      /* "src/_accelerators.pyx":419
  * 
  *         if new_mm > 0:
  *             if _total_mismatches(text_arr, start, temp_end, consensus, period, n) > max_mm:             # <<<<<<<<<<<<<<
  *                 break
  * 
 */
-      __pyx_t_8 = __pyx_f_3src_13_accelerators__total_mismatches(__pyx_v_text_arr, __pyx_v_start, __pyx_v_temp_end, __pyx_v_consensus, __pyx_v_period, __pyx_v_n); if (unlikely(__pyx_t_8 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 396, __pyx_L1_error)
+      __pyx_t_8 = __pyx_f_3src_13_accelerators__total_mismatches(__pyx_v_text_arr, __pyx_v_start, __pyx_v_temp_end, __pyx_v_consensus, __pyx_v_period, __pyx_v_n); if (unlikely(__pyx_t_8 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 419, __pyx_L1_error)
       __pyx_t_1 = (__pyx_t_8 > __pyx_v_max_mm);
       if (__pyx_t_1) {
 
-        /* "src/_accelerators.pyx":397
+        /* "src/_accelerators.pyx":420
  *         if new_mm > 0:
  *             if _total_mismatches(text_arr, start, temp_end, consensus, period, n) > max_mm:
  *                 break             # <<<<<<<<<<<<<<
@@ -21674,7 +21822,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
 */
         goto __pyx_L12_break;
 
-        /* "src/_accelerators.pyx":396
+        /* "src/_accelerators.pyx":419
  * 
  *         if new_mm > 0:
  *             if _total_mismatches(text_arr, start, temp_end, consensus, period, n) > max_mm:             # <<<<<<<<<<<<<<
@@ -21683,7 +21831,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
 */
       }
 
-      /* "src/_accelerators.pyx":395
+      /* "src/_accelerators.pyx":418
  *         max_mm = _max_mismatch_threshold(period, temp_copies, allowed_mismatch_rate)
  * 
  *         if new_mm > 0:             # <<<<<<<<<<<<<<
@@ -21692,7 +21840,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
 */
     }
 
-    /* "src/_accelerators.pyx":399
+    /* "src/_accelerators.pyx":422
  *                 break
  * 
  *         copies = temp_copies             # <<<<<<<<<<<<<<
@@ -21701,7 +21849,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
 */
     __pyx_v_copies = __pyx_v_temp_copies;
 
-    /* "src/_accelerators.pyx":400
+    /* "src/_accelerators.pyx":423
  * 
  *         copies = temp_copies
  *         end = temp_end             # <<<<<<<<<<<<<<
@@ -21712,7 +21860,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
   }
   __pyx_L12_break:;
 
-  /* "src/_accelerators.pyx":403
+  /* "src/_accelerators.pyx":426
  * 
  *     # Extend left
  *     while start - period >= 0:             # <<<<<<<<<<<<<<
@@ -21723,7 +21871,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
     __pyx_t_1 = ((__pyx_v_start - __pyx_v_period) >= 0);
     if (!__pyx_t_1) break;
 
-    /* "src/_accelerators.pyx":404
+    /* "src/_accelerators.pyx":427
  *     # Extend left
  *     while start - period >= 0:
  *         temp_copies = copies + 1             # <<<<<<<<<<<<<<
@@ -21732,7 +21880,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
 */
     __pyx_v_temp_copies = (__pyx_v_copies + 1);
 
-    /* "src/_accelerators.pyx":405
+    /* "src/_accelerators.pyx":428
  *     while start - period >= 0:
  *         temp_copies = copies + 1
  *         temp_start = start - period             # <<<<<<<<<<<<<<
@@ -21741,7 +21889,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
 */
     __pyx_v_temp_start = (__pyx_v_start - __pyx_v_period);
 
-    /* "src/_accelerators.pyx":406
+    /* "src/_accelerators.pyx":429
  *         temp_copies = copies + 1
  *         temp_start = start - period
  *         new_mm = _hamming_distance(text_arr[temp_start:temp_start + period], consensus, period)             # <<<<<<<<<<<<<<
@@ -21766,25 +21914,25 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
     0,
     1) < 0))
 {
-    __PYX_ERR(0, 406, __pyx_L1_error)
+    __PYX_ERR(0, 429, __pyx_L1_error)
 }
 
-__pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_consensus, __pyx_v_period); if (unlikely(__pyx_t_8 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 406, __pyx_L1_error)
+__pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_consensus, __pyx_v_period); if (unlikely(__pyx_t_8 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 429, __pyx_L1_error)
     __PYX_XCLEAR_MEMVIEW(&__pyx_t_12, 1);
     __pyx_t_12.memview = NULL; __pyx_t_12.data = NULL;
     __pyx_v_new_mm = __pyx_t_8;
 
-    /* "src/_accelerators.pyx":407
+    /* "src/_accelerators.pyx":430
  *         temp_start = start - period
  *         new_mm = _hamming_distance(text_arr[temp_start:temp_start + period], consensus, period)
  *         max_mm = _max_mismatch_threshold(period, temp_copies, allowed_mismatch_rate)             # <<<<<<<<<<<<<<
  * 
  *         if new_mm > 0:
 */
-    __pyx_t_8 = __pyx_f_3src_13_accelerators__max_mismatch_threshold(__pyx_v_period, __pyx_v_temp_copies, __pyx_v_allowed_mismatch_rate); if (unlikely(__pyx_t_8 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 407, __pyx_L1_error)
+    __pyx_t_8 = __pyx_f_3src_13_accelerators__max_mismatch_threshold(__pyx_v_period, __pyx_v_temp_copies, __pyx_v_allowed_mismatch_rate); if (unlikely(__pyx_t_8 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 430, __pyx_L1_error)
     __pyx_v_max_mm = __pyx_t_8;
 
-    /* "src/_accelerators.pyx":409
+    /* "src/_accelerators.pyx":432
  *         max_mm = _max_mismatch_threshold(period, temp_copies, allowed_mismatch_rate)
  * 
  *         if new_mm > 0:             # <<<<<<<<<<<<<<
@@ -21794,18 +21942,18 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
     __pyx_t_1 = (__pyx_v_new_mm > 0);
     if (__pyx_t_1) {
 
-      /* "src/_accelerators.pyx":410
+      /* "src/_accelerators.pyx":433
  * 
  *         if new_mm > 0:
  *             if _total_mismatches(text_arr, temp_start, end, consensus, period, n) > max_mm:             # <<<<<<<<<<<<<<
  *                 break
  * 
 */
-      __pyx_t_8 = __pyx_f_3src_13_accelerators__total_mismatches(__pyx_v_text_arr, __pyx_v_temp_start, __pyx_v_end, __pyx_v_consensus, __pyx_v_period, __pyx_v_n); if (unlikely(__pyx_t_8 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 410, __pyx_L1_error)
+      __pyx_t_8 = __pyx_f_3src_13_accelerators__total_mismatches(__pyx_v_text_arr, __pyx_v_temp_start, __pyx_v_end, __pyx_v_consensus, __pyx_v_period, __pyx_v_n); if (unlikely(__pyx_t_8 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 433, __pyx_L1_error)
       __pyx_t_1 = (__pyx_t_8 > __pyx_v_max_mm);
       if (__pyx_t_1) {
 
-        /* "src/_accelerators.pyx":411
+        /* "src/_accelerators.pyx":434
  *         if new_mm > 0:
  *             if _total_mismatches(text_arr, temp_start, end, consensus, period, n) > max_mm:
  *                 break             # <<<<<<<<<<<<<<
@@ -21814,7 +21962,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
 */
         goto __pyx_L16_break;
 
-        /* "src/_accelerators.pyx":410
+        /* "src/_accelerators.pyx":433
  * 
  *         if new_mm > 0:
  *             if _total_mismatches(text_arr, temp_start, end, consensus, period, n) > max_mm:             # <<<<<<<<<<<<<<
@@ -21823,7 +21971,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
 */
       }
 
-      /* "src/_accelerators.pyx":409
+      /* "src/_accelerators.pyx":432
  *         max_mm = _max_mismatch_threshold(period, temp_copies, allowed_mismatch_rate)
  * 
  *         if new_mm > 0:             # <<<<<<<<<<<<<<
@@ -21832,7 +21980,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
 */
     }
 
-    /* "src/_accelerators.pyx":413
+    /* "src/_accelerators.pyx":436
  *                 break
  * 
  *         copies = temp_copies             # <<<<<<<<<<<<<<
@@ -21841,7 +21989,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
 */
     __pyx_v_copies = __pyx_v_temp_copies;
 
-    /* "src/_accelerators.pyx":414
+    /* "src/_accelerators.pyx":437
  * 
  *         copies = temp_copies
  *         start = temp_start             # <<<<<<<<<<<<<<
@@ -21852,7 +22000,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
   }
   __pyx_L16_break:;
 
-  /* "src/_accelerators.pyx":416
+  /* "src/_accelerators.pyx":439
  *         start = temp_start
  * 
  *     full_start = start             # <<<<<<<<<<<<<<
@@ -21861,7 +22009,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
 */
   __pyx_v_full_start = __pyx_v_start;
 
-  /* "src/_accelerators.pyx":417
+  /* "src/_accelerators.pyx":440
  * 
  *     full_start = start
  *     full_end = end             # <<<<<<<<<<<<<<
@@ -21870,7 +22018,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
 */
   __pyx_v_full_end = __pyx_v_end;
 
-  /* "src/_accelerators.pyx":420
+  /* "src/_accelerators.pyx":443
  * 
  *     # Partial right extension (exact matching)
  *     partial_right = 0             # <<<<<<<<<<<<<<
@@ -21879,7 +22027,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
 */
   __pyx_v_partial_right = 0;
 
-  /* "src/_accelerators.pyx":421
+  /* "src/_accelerators.pyx":444
  *     # Partial right extension (exact matching)
  *     partial_right = 0
  *     while partial_right < period and full_end + partial_right < n:             # <<<<<<<<<<<<<<
@@ -21898,7 +22046,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
     __pyx_L21_bool_binop_done:;
     if (!__pyx_t_1) break;
 
-    /* "src/_accelerators.pyx":422
+    /* "src/_accelerators.pyx":445
  *     partial_right = 0
  *     while partial_right < period and full_end + partial_right < n:
  *         if text_arr[full_end + partial_right] != consensus[partial_right]:             # <<<<<<<<<<<<<<
@@ -21910,7 +22058,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
     __pyx_t_1 = ((*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_text_arr.data + __pyx_t_13 * __pyx_v_text_arr.strides[0]) ))) != (*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_consensus.data + __pyx_t_14 * __pyx_v_consensus.strides[0]) ))));
     if (__pyx_t_1) {
 
-      /* "src/_accelerators.pyx":423
+      /* "src/_accelerators.pyx":446
  *     while partial_right < period and full_end + partial_right < n:
  *         if text_arr[full_end + partial_right] != consensus[partial_right]:
  *             break             # <<<<<<<<<<<<<<
@@ -21919,7 +22067,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
 */
       goto __pyx_L20_break;
 
-      /* "src/_accelerators.pyx":422
+      /* "src/_accelerators.pyx":445
  *     partial_right = 0
  *     while partial_right < period and full_end + partial_right < n:
  *         if text_arr[full_end + partial_right] != consensus[partial_right]:             # <<<<<<<<<<<<<<
@@ -21928,7 +22076,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
 */
     }
 
-    /* "src/_accelerators.pyx":424
+    /* "src/_accelerators.pyx":447
  *         if text_arr[full_end + partial_right] != consensus[partial_right]:
  *             break
  *         partial_right += 1             # <<<<<<<<<<<<<<
@@ -21939,7 +22087,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
   }
   __pyx_L20_break:;
 
-  /* "src/_accelerators.pyx":425
+  /* "src/_accelerators.pyx":448
  *             break
  *         partial_right += 1
  *     array_end = full_end + partial_right             # <<<<<<<<<<<<<<
@@ -21948,7 +22096,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
 */
   __pyx_v_array_end = (__pyx_v_full_end + __pyx_v_partial_right);
 
-  /* "src/_accelerators.pyx":428
+  /* "src/_accelerators.pyx":451
  * 
  *     # Partial left extension (exact matching)
  *     partial_left = 0             # <<<<<<<<<<<<<<
@@ -21957,7 +22105,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
 */
   __pyx_v_partial_left = 0;
 
-  /* "src/_accelerators.pyx":429
+  /* "src/_accelerators.pyx":452
  *     # Partial left extension (exact matching)
  *     partial_left = 0
  *     while partial_left < period and full_start - partial_left - 1 >= 0:             # <<<<<<<<<<<<<<
@@ -21976,7 +22124,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
     __pyx_L26_bool_binop_done:;
     if (!__pyx_t_1) break;
 
-    /* "src/_accelerators.pyx":430
+    /* "src/_accelerators.pyx":453
  *     partial_left = 0
  *     while partial_left < period and full_start - partial_left - 1 >= 0:
  *         if text_arr[full_start - partial_left - 1] != consensus[period - 1 - partial_left]:             # <<<<<<<<<<<<<<
@@ -21988,7 +22136,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
     __pyx_t_1 = ((*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_text_arr.data + __pyx_t_14 * __pyx_v_text_arr.strides[0]) ))) != (*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_consensus.data + __pyx_t_13 * __pyx_v_consensus.strides[0]) ))));
     if (__pyx_t_1) {
 
-      /* "src/_accelerators.pyx":431
+      /* "src/_accelerators.pyx":454
  *     while partial_left < period and full_start - partial_left - 1 >= 0:
  *         if text_arr[full_start - partial_left - 1] != consensus[period - 1 - partial_left]:
  *             break             # <<<<<<<<<<<<<<
@@ -21997,7 +22145,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
 */
       goto __pyx_L25_break;
 
-      /* "src/_accelerators.pyx":430
+      /* "src/_accelerators.pyx":453
  *     partial_left = 0
  *     while partial_left < period and full_start - partial_left - 1 >= 0:
  *         if text_arr[full_start - partial_left - 1] != consensus[period - 1 - partial_left]:             # <<<<<<<<<<<<<<
@@ -22006,7 +22154,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
 */
     }
 
-    /* "src/_accelerators.pyx":432
+    /* "src/_accelerators.pyx":455
  *         if text_arr[full_start - partial_left - 1] != consensus[period - 1 - partial_left]:
  *             break
  *         partial_left += 1             # <<<<<<<<<<<<<<
@@ -22017,7 +22165,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
   }
   __pyx_L25_break:;
 
-  /* "src/_accelerators.pyx":433
+  /* "src/_accelerators.pyx":456
  *             break
  *         partial_left += 1
  *     array_start = full_start - partial_left             # <<<<<<<<<<<<<<
@@ -22026,7 +22174,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
 */
   __pyx_v_array_start = (__pyx_v_full_start - __pyx_v_partial_left);
 
-  /* "src/_accelerators.pyx":435
+  /* "src/_accelerators.pyx":458
  *     array_start = full_start - partial_left
  * 
  *     return array_start, array_end, copies, full_start, full_end             # <<<<<<<<<<<<<<
@@ -22034,28 +22182,28 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
  * cpdef list scan_unit_repeats(const unsigned char[:] text_arr, int n, int unit_len, int min_copies, int max_mismatch, const unsigned char[:] packed_arr=None):
 */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_3 = __Pyx_PyLong_From_int(__pyx_v_array_start); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 435, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyLong_From_int(__pyx_v_array_start); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 458, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_6 = __Pyx_PyLong_From_int(__pyx_v_array_end); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 435, __pyx_L1_error)
+  __pyx_t_6 = __Pyx_PyLong_From_int(__pyx_v_array_end); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 458, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
-  __pyx_t_10 = __Pyx_PyLong_From_int(__pyx_v_copies); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 435, __pyx_L1_error)
+  __pyx_t_10 = __Pyx_PyLong_From_int(__pyx_v_copies); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 458, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_10);
-  __pyx_t_5 = __Pyx_PyLong_From_int(__pyx_v_full_start); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 435, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyLong_From_int(__pyx_v_full_start); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 458, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_4 = __Pyx_PyLong_From_int(__pyx_v_full_end); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 435, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyLong_From_int(__pyx_v_full_end); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 458, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
-  __pyx_t_15 = PyTuple_New(5); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 435, __pyx_L1_error)
+  __pyx_t_15 = PyTuple_New(5); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 458, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_15);
   __Pyx_GIVEREF(__pyx_t_3);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 0, __pyx_t_3) != (0)) __PYX_ERR(0, 435, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 0, __pyx_t_3) != (0)) __PYX_ERR(0, 458, __pyx_L1_error);
   __Pyx_GIVEREF(__pyx_t_6);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 1, __pyx_t_6) != (0)) __PYX_ERR(0, 435, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 1, __pyx_t_6) != (0)) __PYX_ERR(0, 458, __pyx_L1_error);
   __Pyx_GIVEREF(__pyx_t_10);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 2, __pyx_t_10) != (0)) __PYX_ERR(0, 435, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 2, __pyx_t_10) != (0)) __PYX_ERR(0, 458, __pyx_L1_error);
   __Pyx_GIVEREF(__pyx_t_5);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 3, __pyx_t_5) != (0)) __PYX_ERR(0, 435, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 3, __pyx_t_5) != (0)) __PYX_ERR(0, 458, __pyx_L1_error);
   __Pyx_GIVEREF(__pyx_t_4);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 4, __pyx_t_4) != (0)) __PYX_ERR(0, 435, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 4, __pyx_t_4) != (0)) __PYX_ERR(0, 458, __pyx_L1_error);
   __pyx_t_3 = 0;
   __pyx_t_6 = 0;
   __pyx_t_10 = 0;
@@ -22065,7 +22213,7 @@ __pyx_t_8 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_12, __pyx_v_c
   __pyx_t_15 = 0;
   goto __pyx_L0;
 
-  /* "src/_accelerators.pyx":346
+  /* "src/_accelerators.pyx":369
  * 
  * 
  * cpdef tuple extend_with_mismatches(const unsigned char[:] s_arr,             # <<<<<<<<<<<<<<
@@ -22148,60 +22296,60 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_s_arr,&__pyx_mstate_global->__pyx_n_u_start_pos,&__pyx_mstate_global->__pyx_n_u_period,&__pyx_mstate_global->__pyx_n_u_n,&__pyx_mstate_global->__pyx_n_u_allowed_mismatch_rate,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 346, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 369, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  5:
         values[4] = __Pyx_ArgRef_FASTCALL(__pyx_args, 4);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 346, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 369, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  4:
         values[3] = __Pyx_ArgRef_FASTCALL(__pyx_args, 3);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 346, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 369, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  3:
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 346, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 369, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 346, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 369, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 346, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 369, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "extend_with_mismatches", 0) < (0)) __PYX_ERR(0, 346, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "extend_with_mismatches", 0) < (0)) __PYX_ERR(0, 369, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 5; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("extend_with_mismatches", 1, 5, 5, i); __PYX_ERR(0, 346, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("extend_with_mismatches", 1, 5, 5, i); __PYX_ERR(0, 369, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 5)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 346, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 369, __pyx_L3_error)
       values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 346, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 369, __pyx_L3_error)
       values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 346, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 369, __pyx_L3_error)
       values[3] = __Pyx_ArgRef_FASTCALL(__pyx_args, 3);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 346, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 369, __pyx_L3_error)
       values[4] = __Pyx_ArgRef_FASTCALL(__pyx_args, 4);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 346, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 369, __pyx_L3_error)
     }
-    __pyx_v_s_arr = __Pyx_PyObject_to_MemoryviewSlice_ds_unsigned_char__const__(values[0], 0); if (unlikely(!__pyx_v_s_arr.memview)) __PYX_ERR(0, 346, __pyx_L3_error)
-    __pyx_v_start_pos = __Pyx_PyLong_As_int(values[1]); if (unlikely((__pyx_v_start_pos == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 347, __pyx_L3_error)
-    __pyx_v_period = __Pyx_PyLong_As_int(values[2]); if (unlikely((__pyx_v_period == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 347, __pyx_L3_error)
-    __pyx_v_n = __Pyx_PyLong_As_int(values[3]); if (unlikely((__pyx_v_n == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 347, __pyx_L3_error)
-    __pyx_v_allowed_mismatch_rate = __Pyx_PyFloat_AsDouble(values[4]); if (unlikely((__pyx_v_allowed_mismatch_rate == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 348, __pyx_L3_error)
+    __pyx_v_s_arr = __Pyx_PyObject_to_MemoryviewSlice_ds_unsigned_char__const__(values[0], 0); if (unlikely(!__pyx_v_s_arr.memview)) __PYX_ERR(0, 369, __pyx_L3_error)
+    __pyx_v_start_pos = __Pyx_PyLong_As_int(values[1]); if (unlikely((__pyx_v_start_pos == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 370, __pyx_L3_error)
+    __pyx_v_period = __Pyx_PyLong_As_int(values[2]); if (unlikely((__pyx_v_period == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 370, __pyx_L3_error)
+    __pyx_v_n = __Pyx_PyLong_As_int(values[3]); if (unlikely((__pyx_v_n == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 370, __pyx_L3_error)
+    __pyx_v_allowed_mismatch_rate = __Pyx_PyFloat_AsDouble(values[4]); if (unlikely((__pyx_v_allowed_mismatch_rate == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 371, __pyx_L3_error)
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("extend_with_mismatches", 1, 5, 5, __pyx_nargs); __PYX_ERR(0, 346, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("extend_with_mismatches", 1, 5, 5, __pyx_nargs); __PYX_ERR(0, 369, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -22233,7 +22381,7 @@ static PyObject *__pyx_pf_3src_13_accelerators_4extend_with_mismatches(CYTHON_UN
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("extend_with_mismatches", 0);
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __pyx_f_3src_13_accelerators_extend_with_mismatches(__pyx_v_s_arr, __pyx_v_start_pos, __pyx_v_period, __pyx_v_n, __pyx_v_allowed_mismatch_rate, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 346, __pyx_L1_error)
+  __pyx_t_1 = __pyx_f_3src_13_accelerators_extend_with_mismatches(__pyx_v_s_arr, __pyx_v_start_pos, __pyx_v_period, __pyx_v_n, __pyx_v_allowed_mismatch_rate, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 369, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
@@ -22250,7 +22398,7 @@ static PyObject *__pyx_pf_3src_13_accelerators_4extend_with_mismatches(CYTHON_UN
   return __pyx_r;
 }
 
-/* "src/_accelerators.pyx":437
+/* "src/_accelerators.pyx":460
  *     return array_start, array_end, copies, full_start, full_end
  * 
  * cpdef list scan_unit_repeats(const unsigned char[:] text_arr, int n, int unit_len, int min_copies, int max_mismatch, const unsigned char[:] packed_arr=None):             # <<<<<<<<<<<<<<
@@ -22302,7 +22450,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_unit_repeats(__Pyx_memviewsli
     }
   }
 
-  /* "src/_accelerators.pyx":439
+  /* "src/_accelerators.pyx":462
  * cpdef list scan_unit_repeats(const unsigned char[:] text_arr, int n, int unit_len, int min_copies, int max_mismatch, const unsigned char[:] packed_arr=None):
  *     """Scan for repeats of a specific unit length."""
  *     cdef int i = 0             # <<<<<<<<<<<<<<
@@ -22311,19 +22459,19 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_unit_repeats(__Pyx_memviewsli
 */
   __pyx_v_i = 0;
 
-  /* "src/_accelerators.pyx":440
+  /* "src/_accelerators.pyx":463
  *     """Scan for repeats of a specific unit length."""
  *     cdef int i = 0
  *     cdef list results = []             # <<<<<<<<<<<<<<
  *     cdef int count, start_pos, end_pos
  *     cdef int a_start, a_end, b_start, b_end
 */
-  __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 440, __pyx_L1_error)
+  __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 463, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_v_results = ((PyObject*)__pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "src/_accelerators.pyx":446
+  /* "src/_accelerators.pyx":469
  *     cdef int dist
  *     cdef bint found_indel
  *     cdef bint use_packed = (packed_arr is not None)             # <<<<<<<<<<<<<<
@@ -22332,7 +22480,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_unit_repeats(__Pyx_memviewsli
 */
   __pyx_v_use_packed = (((PyObject *) __pyx_v_packed_arr.memview) != Py_None);
 
-  /* "src/_accelerators.pyx":449
+  /* "src/_accelerators.pyx":472
  * 
  *     # Calculate dynamic error threshold (15% of unit length or max_mismatch, whichever is higher)
  *     allowed_errors = max_mismatch             # <<<<<<<<<<<<<<
@@ -22341,7 +22489,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_unit_repeats(__Pyx_memviewsli
 */
   __pyx_v_allowed_errors = __pyx_v_max_mismatch;
 
-  /* "src/_accelerators.pyx":450
+  /* "src/_accelerators.pyx":473
  *     # Calculate dynamic error threshold (15% of unit length or max_mismatch, whichever is higher)
  *     allowed_errors = max_mismatch
  *     cdef int dynamic_errors = <int>(unit_len * 0.15)             # <<<<<<<<<<<<<<
@@ -22350,7 +22498,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_unit_repeats(__Pyx_memviewsli
 */
   __pyx_v_dynamic_errors = ((int)(__pyx_v_unit_len * 0.15));
 
-  /* "src/_accelerators.pyx":451
+  /* "src/_accelerators.pyx":474
  *     allowed_errors = max_mismatch
  *     cdef int dynamic_errors = <int>(unit_len * 0.15)
  *     if dynamic_errors > allowed_errors:             # <<<<<<<<<<<<<<
@@ -22360,7 +22508,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_unit_repeats(__Pyx_memviewsli
   __pyx_t_2 = (__pyx_v_dynamic_errors > __pyx_v_allowed_errors);
   if (__pyx_t_2) {
 
-    /* "src/_accelerators.pyx":452
+    /* "src/_accelerators.pyx":475
  *     cdef int dynamic_errors = <int>(unit_len * 0.15)
  *     if dynamic_errors > allowed_errors:
  *         allowed_errors = dynamic_errors             # <<<<<<<<<<<<<<
@@ -22369,7 +22517,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_unit_repeats(__Pyx_memviewsli
 */
     __pyx_v_allowed_errors = __pyx_v_dynamic_errors;
 
-    /* "src/_accelerators.pyx":451
+    /* "src/_accelerators.pyx":474
  *     allowed_errors = max_mismatch
  *     cdef int dynamic_errors = <int>(unit_len * 0.15)
  *     if dynamic_errors > allowed_errors:             # <<<<<<<<<<<<<<
@@ -22378,7 +22526,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_unit_repeats(__Pyx_memviewsli
 */
   }
 
-  /* "src/_accelerators.pyx":454
+  /* "src/_accelerators.pyx":477
  *         allowed_errors = dynamic_errors
  * 
  *     while i + unit_len * min_copies <= n:             # <<<<<<<<<<<<<<
@@ -22389,7 +22537,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_unit_repeats(__Pyx_memviewsli
     __pyx_t_2 = ((__pyx_v_i + (__pyx_v_unit_len * __pyx_v_min_copies)) <= __pyx_v_n);
     if (!__pyx_t_2) break;
 
-    /* "src/_accelerators.pyx":455
+    /* "src/_accelerators.pyx":478
  * 
  *     while i + unit_len * min_copies <= n:
  *         count = 1             # <<<<<<<<<<<<<<
@@ -22398,7 +22546,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_unit_repeats(__Pyx_memviewsli
 */
     __pyx_v_count = 1;
 
-    /* "src/_accelerators.pyx":456
+    /* "src/_accelerators.pyx":479
  *     while i + unit_len * min_copies <= n:
  *         count = 1
  *         start_pos = i             # <<<<<<<<<<<<<<
@@ -22407,7 +22555,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_unit_repeats(__Pyx_memviewsli
 */
     __pyx_v_start_pos = __pyx_v_i;
 
-    /* "src/_accelerators.pyx":459
+    /* "src/_accelerators.pyx":482
  * 
  *         # Extend right while adjacency holds
  *         while True:             # <<<<<<<<<<<<<<
@@ -22416,7 +22564,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_unit_repeats(__Pyx_memviewsli
 */
     while (1) {
 
-      /* "src/_accelerators.pyx":460
+      /* "src/_accelerators.pyx":483
  *         # Extend right while adjacency holds
  *         while True:
  *             a_start = i + (count - 1) * unit_len             # <<<<<<<<<<<<<<
@@ -22425,7 +22573,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_unit_repeats(__Pyx_memviewsli
 */
       __pyx_v_a_start = (__pyx_v_i + ((__pyx_v_count - 1) * __pyx_v_unit_len));
 
-      /* "src/_accelerators.pyx":461
+      /* "src/_accelerators.pyx":484
  *         while True:
  *             a_start = i + (count - 1) * unit_len
  *             a_end = i + count * unit_len             # <<<<<<<<<<<<<<
@@ -22434,7 +22582,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_unit_repeats(__Pyx_memviewsli
 */
       __pyx_v_a_end = (__pyx_v_i + (__pyx_v_count * __pyx_v_unit_len));
 
-      /* "src/_accelerators.pyx":462
+      /* "src/_accelerators.pyx":485
  *             a_start = i + (count - 1) * unit_len
  *             a_end = i + count * unit_len
  *             b_start = i + count * unit_len             # <<<<<<<<<<<<<<
@@ -22443,7 +22591,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_unit_repeats(__Pyx_memviewsli
 */
       __pyx_v_b_start = (__pyx_v_i + (__pyx_v_count * __pyx_v_unit_len));
 
-      /* "src/_accelerators.pyx":463
+      /* "src/_accelerators.pyx":486
  *             a_end = i + count * unit_len
  *             b_start = i + count * unit_len
  *             b_end = b_start + unit_len             # <<<<<<<<<<<<<<
@@ -22452,7 +22600,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_unit_repeats(__Pyx_memviewsli
 */
       __pyx_v_b_end = (__pyx_v_b_start + __pyx_v_unit_len);
 
-      /* "src/_accelerators.pyx":465
+      /* "src/_accelerators.pyx":488
  *             b_end = b_start + unit_len
  * 
  *             if b_end > n:             # <<<<<<<<<<<<<<
@@ -22462,7 +22610,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_unit_repeats(__Pyx_memviewsli
       __pyx_t_2 = (__pyx_v_b_end > __pyx_v_n);
       if (__pyx_t_2) {
 
-        /* "src/_accelerators.pyx":466
+        /* "src/_accelerators.pyx":489
  * 
  *             if b_end > n:
  *                 break             # <<<<<<<<<<<<<<
@@ -22471,7 +22619,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_unit_repeats(__Pyx_memviewsli
 */
         goto __pyx_L7_break;
 
-        /* "src/_accelerators.pyx":465
+        /* "src/_accelerators.pyx":488
  *             b_end = b_start + unit_len
  * 
  *             if b_end > n:             # <<<<<<<<<<<<<<
@@ -22480,7 +22628,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_unit_repeats(__Pyx_memviewsli
 */
       }
 
-      /* "src/_accelerators.pyx":469
+      /* "src/_accelerators.pyx":492
  * 
  *             # 1. Check direct Hamming distance
  *             if use_packed:             # <<<<<<<<<<<<<<
@@ -22489,17 +22637,17 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_unit_repeats(__Pyx_memviewsli
 */
       if (__pyx_v_use_packed) {
 
-        /* "src/_accelerators.pyx":470
+        /* "src/_accelerators.pyx":493
  *             # 1. Check direct Hamming distance
  *             if use_packed:
  *                 dist = _hamming_distance_2bit(packed_arr, a_start, b_start, unit_len)             # <<<<<<<<<<<<<<
  *             else:
  *                 dist = _hamming_distance(text_arr[a_start:a_end], text_arr[b_start:b_end], unit_len)
 */
-        __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance_2bit(__pyx_v_packed_arr, __pyx_v_a_start, __pyx_v_b_start, __pyx_v_unit_len); if (unlikely(__pyx_t_3 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 470, __pyx_L1_error)
+        __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance_2bit(__pyx_v_packed_arr, __pyx_v_a_start, __pyx_v_b_start, __pyx_v_unit_len); if (unlikely(__pyx_t_3 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 493, __pyx_L1_error)
         __pyx_v_dist = __pyx_t_3;
 
-        /* "src/_accelerators.pyx":469
+        /* "src/_accelerators.pyx":492
  * 
  *             # 1. Check direct Hamming distance
  *             if use_packed:             # <<<<<<<<<<<<<<
@@ -22509,7 +22657,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_unit_repeats(__Pyx_memviewsli
         goto __pyx_L9;
       }
 
-      /* "src/_accelerators.pyx":472
+      /* "src/_accelerators.pyx":495
  *                 dist = _hamming_distance_2bit(packed_arr, a_start, b_start, unit_len)
  *             else:
  *                 dist = _hamming_distance(text_arr[a_start:a_end], text_arr[b_start:b_end], unit_len)             # <<<<<<<<<<<<<<
@@ -22535,7 +22683,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_unit_repeats(__Pyx_memviewsli
     0,
     1) < 0))
 {
-    __PYX_ERR(0, 472, __pyx_L1_error)
+    __PYX_ERR(0, 495, __pyx_L1_error)
 }
 
 __pyx_t_5.data = __pyx_v_text_arr.data;
@@ -22556,10 +22704,10 @@ __pyx_t_5.data = __pyx_v_text_arr.data;
     0,
     1) < 0))
 {
-    __PYX_ERR(0, 472, __pyx_L1_error)
+    __PYX_ERR(0, 495, __pyx_L1_error)
 }
 
-__pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5, __pyx_v_unit_len); if (unlikely(__pyx_t_3 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 472, __pyx_L1_error)
+__pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5, __pyx_v_unit_len); if (unlikely(__pyx_t_3 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 495, __pyx_L1_error)
         __PYX_XCLEAR_MEMVIEW(&__pyx_t_4, 1);
         __pyx_t_4.memview = NULL; __pyx_t_4.data = NULL;
         __PYX_XCLEAR_MEMVIEW(&__pyx_t_5, 1);
@@ -22568,7 +22716,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
       }
       __pyx_L9:;
 
-      /* "src/_accelerators.pyx":474
+      /* "src/_accelerators.pyx":497
  *                 dist = _hamming_distance(text_arr[a_start:a_end], text_arr[b_start:b_end], unit_len)
  * 
  *             if dist <= allowed_errors:             # <<<<<<<<<<<<<<
@@ -22578,7 +22726,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
       __pyx_t_2 = (__pyx_v_dist <= __pyx_v_allowed_errors);
       if (__pyx_t_2) {
 
-        /* "src/_accelerators.pyx":475
+        /* "src/_accelerators.pyx":498
  * 
  *             if dist <= allowed_errors:
  *                 count += 1             # <<<<<<<<<<<<<<
@@ -22587,7 +22735,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
 */
         __pyx_v_count = (__pyx_v_count + 1);
 
-        /* "src/_accelerators.pyx":476
+        /* "src/_accelerators.pyx":499
  *             if dist <= allowed_errors:
  *                 count += 1
  *                 continue             # <<<<<<<<<<<<<<
@@ -22596,7 +22744,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
 */
         goto __pyx_L6_continue;
 
-        /* "src/_accelerators.pyx":474
+        /* "src/_accelerators.pyx":497
  *                 dist = _hamming_distance(text_arr[a_start:a_end], text_arr[b_start:b_end], unit_len)
  * 
  *             if dist <= allowed_errors:             # <<<<<<<<<<<<<<
@@ -22605,7 +22753,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
 */
       }
 
-      /* "src/_accelerators.pyx":479
+      /* "src/_accelerators.pyx":502
  * 
  *             # 2. Check for 1bp Indels
  *             found_indel = False             # <<<<<<<<<<<<<<
@@ -22614,7 +22762,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
 */
       __pyx_v_found_indel = 0;
 
-      /* "src/_accelerators.pyx":482
+      /* "src/_accelerators.pyx":505
  * 
  *             # Check shift -1
  *             if b_start > 0:             # <<<<<<<<<<<<<<
@@ -22624,7 +22772,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
       __pyx_t_2 = (__pyx_v_b_start > 0);
       if (__pyx_t_2) {
 
-        /* "src/_accelerators.pyx":483
+        /* "src/_accelerators.pyx":506
  *             # Check shift -1
  *             if b_start > 0:
  *                 if use_packed:             # <<<<<<<<<<<<<<
@@ -22633,17 +22781,17 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
 */
         if (__pyx_v_use_packed) {
 
-          /* "src/_accelerators.pyx":484
+          /* "src/_accelerators.pyx":507
  *             if b_start > 0:
  *                 if use_packed:
  *                     dist = _hamming_distance_2bit(packed_arr, a_start, b_start-1, unit_len)             # <<<<<<<<<<<<<<
  *                 else:
  *                     dist = _hamming_distance(text_arr[a_start:a_end], text_arr[b_start-1:b_end-1], unit_len)
 */
-          __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance_2bit(__pyx_v_packed_arr, __pyx_v_a_start, (__pyx_v_b_start - 1), __pyx_v_unit_len); if (unlikely(__pyx_t_3 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 484, __pyx_L1_error)
+          __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance_2bit(__pyx_v_packed_arr, __pyx_v_a_start, (__pyx_v_b_start - 1), __pyx_v_unit_len); if (unlikely(__pyx_t_3 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 507, __pyx_L1_error)
           __pyx_v_dist = __pyx_t_3;
 
-          /* "src/_accelerators.pyx":483
+          /* "src/_accelerators.pyx":506
  *             # Check shift -1
  *             if b_start > 0:
  *                 if use_packed:             # <<<<<<<<<<<<<<
@@ -22653,7 +22801,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
           goto __pyx_L12;
         }
 
-        /* "src/_accelerators.pyx":486
+        /* "src/_accelerators.pyx":509
  *                     dist = _hamming_distance_2bit(packed_arr, a_start, b_start-1, unit_len)
  *                 else:
  *                     dist = _hamming_distance(text_arr[a_start:a_end], text_arr[b_start-1:b_end-1], unit_len)             # <<<<<<<<<<<<<<
@@ -22679,7 +22827,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
     0,
     1) < 0))
 {
-    __PYX_ERR(0, 486, __pyx_L1_error)
+    __PYX_ERR(0, 509, __pyx_L1_error)
 }
 
 __pyx_t_4.data = __pyx_v_text_arr.data;
@@ -22700,10 +22848,10 @@ __pyx_t_4.data = __pyx_v_text_arr.data;
     0,
     1) < 0))
 {
-    __PYX_ERR(0, 486, __pyx_L1_error)
+    __PYX_ERR(0, 509, __pyx_L1_error)
 }
 
-__pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_5, __pyx_t_4, __pyx_v_unit_len); if (unlikely(__pyx_t_3 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 486, __pyx_L1_error)
+__pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_5, __pyx_t_4, __pyx_v_unit_len); if (unlikely(__pyx_t_3 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 509, __pyx_L1_error)
           __PYX_XCLEAR_MEMVIEW(&__pyx_t_5, 1);
           __pyx_t_5.memview = NULL; __pyx_t_5.data = NULL;
           __PYX_XCLEAR_MEMVIEW(&__pyx_t_4, 1);
@@ -22712,7 +22860,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_5, __pyx_t_4,
         }
         __pyx_L12:;
 
-        /* "src/_accelerators.pyx":488
+        /* "src/_accelerators.pyx":511
  *                     dist = _hamming_distance(text_arr[a_start:a_end], text_arr[b_start-1:b_end-1], unit_len)
  * 
  *                 if dist <= allowed_errors:             # <<<<<<<<<<<<<<
@@ -22722,7 +22870,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_5, __pyx_t_4,
         __pyx_t_2 = (__pyx_v_dist <= __pyx_v_allowed_errors);
         if (__pyx_t_2) {
 
-          /* "src/_accelerators.pyx":489
+          /* "src/_accelerators.pyx":512
  * 
  *                 if dist <= allowed_errors:
  *                     count += 1             # <<<<<<<<<<<<<<
@@ -22731,7 +22879,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_5, __pyx_t_4,
 */
           __pyx_v_count = (__pyx_v_count + 1);
 
-          /* "src/_accelerators.pyx":490
+          /* "src/_accelerators.pyx":513
  *                 if dist <= allowed_errors:
  *                     count += 1
  *                     found_indel = True             # <<<<<<<<<<<<<<
@@ -22740,7 +22888,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_5, __pyx_t_4,
 */
           __pyx_v_found_indel = 1;
 
-          /* "src/_accelerators.pyx":488
+          /* "src/_accelerators.pyx":511
  *                     dist = _hamming_distance(text_arr[a_start:a_end], text_arr[b_start-1:b_end-1], unit_len)
  * 
  *                 if dist <= allowed_errors:             # <<<<<<<<<<<<<<
@@ -22749,7 +22897,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_5, __pyx_t_4,
 */
         }
 
-        /* "src/_accelerators.pyx":482
+        /* "src/_accelerators.pyx":505
  * 
  *             # Check shift -1
  *             if b_start > 0:             # <<<<<<<<<<<<<<
@@ -22758,7 +22906,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_5, __pyx_t_4,
 */
       }
 
-      /* "src/_accelerators.pyx":492
+      /* "src/_accelerators.pyx":515
  *                     found_indel = True
  * 
  *             if not found_indel and b_end + 1 <= n:             # <<<<<<<<<<<<<<
@@ -22776,7 +22924,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_5, __pyx_t_4,
       __pyx_L15_bool_binop_done:;
       if (__pyx_t_2) {
 
-        /* "src/_accelerators.pyx":494
+        /* "src/_accelerators.pyx":517
  *             if not found_indel and b_end + 1 <= n:
  *                 # Check shift +1
  *                 if use_packed:             # <<<<<<<<<<<<<<
@@ -22785,17 +22933,17 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_5, __pyx_t_4,
 */
         if (__pyx_v_use_packed) {
 
-          /* "src/_accelerators.pyx":495
+          /* "src/_accelerators.pyx":518
  *                 # Check shift +1
  *                 if use_packed:
  *                     dist = _hamming_distance_2bit(packed_arr, a_start, b_start+1, unit_len)             # <<<<<<<<<<<<<<
  *                 else:
  *                     dist = _hamming_distance(text_arr[a_start:a_end], text_arr[b_start+1:b_end+1], unit_len)
 */
-          __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance_2bit(__pyx_v_packed_arr, __pyx_v_a_start, (__pyx_v_b_start + 1), __pyx_v_unit_len); if (unlikely(__pyx_t_3 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 495, __pyx_L1_error)
+          __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance_2bit(__pyx_v_packed_arr, __pyx_v_a_start, (__pyx_v_b_start + 1), __pyx_v_unit_len); if (unlikely(__pyx_t_3 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 518, __pyx_L1_error)
           __pyx_v_dist = __pyx_t_3;
 
-          /* "src/_accelerators.pyx":494
+          /* "src/_accelerators.pyx":517
  *             if not found_indel and b_end + 1 <= n:
  *                 # Check shift +1
  *                 if use_packed:             # <<<<<<<<<<<<<<
@@ -22805,7 +22953,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_5, __pyx_t_4,
           goto __pyx_L17;
         }
 
-        /* "src/_accelerators.pyx":497
+        /* "src/_accelerators.pyx":520
  *                     dist = _hamming_distance_2bit(packed_arr, a_start, b_start+1, unit_len)
  *                 else:
  *                     dist = _hamming_distance(text_arr[a_start:a_end], text_arr[b_start+1:b_end+1], unit_len)             # <<<<<<<<<<<<<<
@@ -22831,7 +22979,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_5, __pyx_t_4,
     0,
     1) < 0))
 {
-    __PYX_ERR(0, 497, __pyx_L1_error)
+    __PYX_ERR(0, 520, __pyx_L1_error)
 }
 
 __pyx_t_5.data = __pyx_v_text_arr.data;
@@ -22852,10 +23000,10 @@ __pyx_t_5.data = __pyx_v_text_arr.data;
     0,
     1) < 0))
 {
-    __PYX_ERR(0, 497, __pyx_L1_error)
+    __PYX_ERR(0, 520, __pyx_L1_error)
 }
 
-__pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5, __pyx_v_unit_len); if (unlikely(__pyx_t_3 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 497, __pyx_L1_error)
+__pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5, __pyx_v_unit_len); if (unlikely(__pyx_t_3 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 520, __pyx_L1_error)
           __PYX_XCLEAR_MEMVIEW(&__pyx_t_4, 1);
           __pyx_t_4.memview = NULL; __pyx_t_4.data = NULL;
           __PYX_XCLEAR_MEMVIEW(&__pyx_t_5, 1);
@@ -22864,7 +23012,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
         }
         __pyx_L17:;
 
-        /* "src/_accelerators.pyx":499
+        /* "src/_accelerators.pyx":522
  *                     dist = _hamming_distance(text_arr[a_start:a_end], text_arr[b_start+1:b_end+1], unit_len)
  * 
  *                 if dist <= allowed_errors:             # <<<<<<<<<<<<<<
@@ -22874,7 +23022,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
         __pyx_t_2 = (__pyx_v_dist <= __pyx_v_allowed_errors);
         if (__pyx_t_2) {
 
-          /* "src/_accelerators.pyx":500
+          /* "src/_accelerators.pyx":523
  * 
  *                 if dist <= allowed_errors:
  *                     count += 1             # <<<<<<<<<<<<<<
@@ -22883,7 +23031,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
 */
           __pyx_v_count = (__pyx_v_count + 1);
 
-          /* "src/_accelerators.pyx":501
+          /* "src/_accelerators.pyx":524
  *                 if dist <= allowed_errors:
  *                     count += 1
  *                     found_indel = True             # <<<<<<<<<<<<<<
@@ -22892,7 +23040,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
 */
           __pyx_v_found_indel = 1;
 
-          /* "src/_accelerators.pyx":499
+          /* "src/_accelerators.pyx":522
  *                     dist = _hamming_distance(text_arr[a_start:a_end], text_arr[b_start+1:b_end+1], unit_len)
  * 
  *                 if dist <= allowed_errors:             # <<<<<<<<<<<<<<
@@ -22901,7 +23049,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
 */
         }
 
-        /* "src/_accelerators.pyx":492
+        /* "src/_accelerators.pyx":515
  *                     found_indel = True
  * 
  *             if not found_indel and b_end + 1 <= n:             # <<<<<<<<<<<<<<
@@ -22910,7 +23058,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
 */
       }
 
-      /* "src/_accelerators.pyx":503
+      /* "src/_accelerators.pyx":526
  *                     found_indel = True
  * 
  *             if not found_indel:             # <<<<<<<<<<<<<<
@@ -22920,7 +23068,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
       __pyx_t_2 = (!__pyx_v_found_indel);
       if (__pyx_t_2) {
 
-        /* "src/_accelerators.pyx":504
+        /* "src/_accelerators.pyx":527
  * 
  *             if not found_indel:
  *                 break             # <<<<<<<<<<<<<<
@@ -22929,7 +23077,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
 */
         goto __pyx_L7_break;
 
-        /* "src/_accelerators.pyx":503
+        /* "src/_accelerators.pyx":526
  *                     found_indel = True
  * 
  *             if not found_indel:             # <<<<<<<<<<<<<<
@@ -22941,7 +23089,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
     }
     __pyx_L7_break:;
 
-    /* "src/_accelerators.pyx":506
+    /* "src/_accelerators.pyx":529
  *                 break
  * 
  *         if count >= min_copies:             # <<<<<<<<<<<<<<
@@ -22951,7 +23099,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
     __pyx_t_2 = (__pyx_v_count >= __pyx_v_min_copies);
     if (__pyx_t_2) {
 
-      /* "src/_accelerators.pyx":507
+      /* "src/_accelerators.pyx":530
  * 
  *         if count >= min_copies:
  *             end_pos = i + count * unit_len             # <<<<<<<<<<<<<<
@@ -22960,29 +23108,29 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
 */
       __pyx_v_end_pos = (__pyx_v_i + (__pyx_v_count * __pyx_v_unit_len));
 
-      /* "src/_accelerators.pyx":508
+      /* "src/_accelerators.pyx":531
  *         if count >= min_copies:
  *             end_pos = i + count * unit_len
  *             results.append((i, end_pos))             # <<<<<<<<<<<<<<
  *             i = end_pos
  *         else:
 */
-      __pyx_t_1 = __Pyx_PyLong_From_int(__pyx_v_i); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 508, __pyx_L1_error)
+      __pyx_t_1 = __Pyx_PyLong_From_int(__pyx_v_i); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 531, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_1);
-      __pyx_t_7 = __Pyx_PyLong_From_int(__pyx_v_end_pos); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 508, __pyx_L1_error)
+      __pyx_t_7 = __Pyx_PyLong_From_int(__pyx_v_end_pos); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 531, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_7);
-      __pyx_t_8 = PyTuple_New(2); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 508, __pyx_L1_error)
+      __pyx_t_8 = PyTuple_New(2); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 531, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_8);
       __Pyx_GIVEREF(__pyx_t_1);
-      if (__Pyx_PyTuple_SET_ITEM(__pyx_t_8, 0, __pyx_t_1) != (0)) __PYX_ERR(0, 508, __pyx_L1_error);
+      if (__Pyx_PyTuple_SET_ITEM(__pyx_t_8, 0, __pyx_t_1) != (0)) __PYX_ERR(0, 531, __pyx_L1_error);
       __Pyx_GIVEREF(__pyx_t_7);
-      if (__Pyx_PyTuple_SET_ITEM(__pyx_t_8, 1, __pyx_t_7) != (0)) __PYX_ERR(0, 508, __pyx_L1_error);
+      if (__Pyx_PyTuple_SET_ITEM(__pyx_t_8, 1, __pyx_t_7) != (0)) __PYX_ERR(0, 531, __pyx_L1_error);
       __pyx_t_1 = 0;
       __pyx_t_7 = 0;
-      __pyx_t_9 = __Pyx_PyList_Append(__pyx_v_results, __pyx_t_8); if (unlikely(__pyx_t_9 == ((int)-1))) __PYX_ERR(0, 508, __pyx_L1_error)
+      __pyx_t_9 = __Pyx_PyList_Append(__pyx_v_results, __pyx_t_8); if (unlikely(__pyx_t_9 == ((int)-1))) __PYX_ERR(0, 531, __pyx_L1_error)
       __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
 
-      /* "src/_accelerators.pyx":509
+      /* "src/_accelerators.pyx":532
  *             end_pos = i + count * unit_len
  *             results.append((i, end_pos))
  *             i = end_pos             # <<<<<<<<<<<<<<
@@ -22991,7 +23139,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
 */
       __pyx_v_i = __pyx_v_end_pos;
 
-      /* "src/_accelerators.pyx":506
+      /* "src/_accelerators.pyx":529
  *                 break
  * 
  *         if count >= min_copies:             # <<<<<<<<<<<<<<
@@ -23001,7 +23149,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
       goto __pyx_L20;
     }
 
-    /* "src/_accelerators.pyx":511
+    /* "src/_accelerators.pyx":534
  *             i = end_pos
  *         else:
  *             i += 1             # <<<<<<<<<<<<<<
@@ -23014,7 +23162,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
     __pyx_L20:;
   }
 
-  /* "src/_accelerators.pyx":513
+  /* "src/_accelerators.pyx":536
  *             i += 1
  * 
  *     return results             # <<<<<<<<<<<<<<
@@ -23026,7 +23174,7 @@ __pyx_t_3 = __pyx_f_3src_13_accelerators__hamming_distance(__pyx_t_4, __pyx_t_5,
   __pyx_r = __pyx_v_results;
   goto __pyx_L0;
 
-  /* "src/_accelerators.pyx":437
+  /* "src/_accelerators.pyx":460
  *     return array_start, array_end, copies, full_start, full_end
  * 
  * cpdef list scan_unit_repeats(const unsigned char[:] text_arr, int n, int unit_len, int min_copies, int max_mismatch, const unsigned char[:] packed_arr=None):             # <<<<<<<<<<<<<<
@@ -23095,69 +23243,69 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_text_arr,&__pyx_mstate_global->__pyx_n_u_n,&__pyx_mstate_global->__pyx_n_u_unit_len,&__pyx_mstate_global->__pyx_n_u_min_copies,&__pyx_mstate_global->__pyx_n_u_max_mismatch,&__pyx_mstate_global->__pyx_n_u_packed_arr,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 437, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 460, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  6:
         values[5] = __Pyx_ArgRef_FASTCALL(__pyx_args, 5);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 437, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 460, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  5:
         values[4] = __Pyx_ArgRef_FASTCALL(__pyx_args, 4);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 437, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 460, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  4:
         values[3] = __Pyx_ArgRef_FASTCALL(__pyx_args, 3);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 437, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 460, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  3:
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 437, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 460, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 437, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 460, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 437, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 460, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "scan_unit_repeats", 0) < (0)) __PYX_ERR(0, 437, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "scan_unit_repeats", 0) < (0)) __PYX_ERR(0, 460, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 5; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("scan_unit_repeats", 0, 5, 6, i); __PYX_ERR(0, 437, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("scan_unit_repeats", 0, 5, 6, i); __PYX_ERR(0, 460, __pyx_L3_error) }
       }
     } else {
       switch (__pyx_nargs) {
         case  6:
         values[5] = __Pyx_ArgRef_FASTCALL(__pyx_args, 5);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 437, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 460, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  5:
         values[4] = __Pyx_ArgRef_FASTCALL(__pyx_args, 4);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 437, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 460, __pyx_L3_error)
         values[3] = __Pyx_ArgRef_FASTCALL(__pyx_args, 3);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 437, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 460, __pyx_L3_error)
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 437, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 460, __pyx_L3_error)
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 437, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 460, __pyx_L3_error)
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 437, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 460, __pyx_L3_error)
         break;
         default: goto __pyx_L5_argtuple_error;
       }
     }
-    __pyx_v_text_arr = __Pyx_PyObject_to_MemoryviewSlice_ds_unsigned_char__const__(values[0], 0); if (unlikely(!__pyx_v_text_arr.memview)) __PYX_ERR(0, 437, __pyx_L3_error)
-    __pyx_v_n = __Pyx_PyLong_As_int(values[1]); if (unlikely((__pyx_v_n == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 437, __pyx_L3_error)
-    __pyx_v_unit_len = __Pyx_PyLong_As_int(values[2]); if (unlikely((__pyx_v_unit_len == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 437, __pyx_L3_error)
-    __pyx_v_min_copies = __Pyx_PyLong_As_int(values[3]); if (unlikely((__pyx_v_min_copies == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 437, __pyx_L3_error)
-    __pyx_v_max_mismatch = __Pyx_PyLong_As_int(values[4]); if (unlikely((__pyx_v_max_mismatch == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 437, __pyx_L3_error)
+    __pyx_v_text_arr = __Pyx_PyObject_to_MemoryviewSlice_ds_unsigned_char__const__(values[0], 0); if (unlikely(!__pyx_v_text_arr.memview)) __PYX_ERR(0, 460, __pyx_L3_error)
+    __pyx_v_n = __Pyx_PyLong_As_int(values[1]); if (unlikely((__pyx_v_n == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 460, __pyx_L3_error)
+    __pyx_v_unit_len = __Pyx_PyLong_As_int(values[2]); if (unlikely((__pyx_v_unit_len == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 460, __pyx_L3_error)
+    __pyx_v_min_copies = __Pyx_PyLong_As_int(values[3]); if (unlikely((__pyx_v_min_copies == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 460, __pyx_L3_error)
+    __pyx_v_max_mismatch = __Pyx_PyLong_As_int(values[4]); if (unlikely((__pyx_v_max_mismatch == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 460, __pyx_L3_error)
     if (values[5]) {
-      __pyx_v_packed_arr = __Pyx_PyObject_to_MemoryviewSlice_ds_unsigned_char__const__(values[5], 0); if (unlikely(!__pyx_v_packed_arr.memview)) __PYX_ERR(0, 437, __pyx_L3_error)
+      __pyx_v_packed_arr = __Pyx_PyObject_to_MemoryviewSlice_ds_unsigned_char__const__(values[5], 0); if (unlikely(!__pyx_v_packed_arr.memview)) __PYX_ERR(0, 460, __pyx_L3_error)
     } else {
       __pyx_v_packed_arr = __pyx_mstate_global->__pyx_k__6;
       __PYX_INC_MEMVIEW(&__pyx_v_packed_arr, 1);
@@ -23165,7 +23313,7 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("scan_unit_repeats", 0, 5, 6, __pyx_nargs); __PYX_ERR(0, 437, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("scan_unit_repeats", 0, 5, 6, __pyx_nargs); __PYX_ERR(0, 460, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -23202,7 +23350,7 @@ static PyObject *__pyx_pf_3src_13_accelerators_6scan_unit_repeats(CYTHON_UNUSED 
   __Pyx_XDECREF(__pyx_r);
   __pyx_t_2.__pyx_n = 1;
   __pyx_t_2.packed_arr = __pyx_v_packed_arr;
-  __pyx_t_1 = __pyx_f_3src_13_accelerators_scan_unit_repeats(__pyx_v_text_arr, __pyx_v_n, __pyx_v_unit_len, __pyx_v_min_copies, __pyx_v_max_mismatch, 1, &__pyx_t_2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 437, __pyx_L1_error)
+  __pyx_t_1 = __pyx_f_3src_13_accelerators_scan_unit_repeats(__pyx_v_text_arr, __pyx_v_n, __pyx_v_unit_len, __pyx_v_min_copies, __pyx_v_max_mismatch, 1, &__pyx_t_2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 460, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
@@ -23219,7 +23367,7 @@ static PyObject *__pyx_pf_3src_13_accelerators_6scan_unit_repeats(CYTHON_UNUSED 
   return __pyx_r;
 }
 
-/* "src/_accelerators.pyx":515
+/* "src/_accelerators.pyx":538
  *     return results
  * 
  * cpdef list scan_simple_repeats(             # <<<<<<<<<<<<<<
@@ -23272,19 +23420,19 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("scan_simple_repeats", 0);
 
-  /* "src/_accelerators.pyx":530
+  /* "src/_accelerators.pyx":553
  *     cdef int start_pos, end_pos, copies, full_start, full_end
  *     cdef int array_start, array_end
  *     cdef list results = []             # <<<<<<<<<<<<<<
  *     cdef int j
  *     cdef bint match
 */
-  __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 530, __pyx_L1_error)
+  __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 553, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_v_results = ((PyObject*)__pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "src/_accelerators.pyx":535
+  /* "src/_accelerators.pyx":558
  * 
  *     # Iterate periods
  *     for p in range(min_p, max_p + 1, period_step):             # <<<<<<<<<<<<<<
@@ -23292,11 +23440,11 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
  *         check_len = 4
 */
   __pyx_t_2 = NULL;
-  __pyx_t_3 = __Pyx_PyLong_From_int(__pyx_v_min_p); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 535, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyLong_From_int(__pyx_v_min_p); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 558, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_4 = __Pyx_PyLong_From_long((__pyx_v_max_p + 1)); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 535, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyLong_From_long((__pyx_v_max_p + 1)); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 558, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
-  __pyx_t_5 = __Pyx_PyLong_From_int(__pyx_v_period_step); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 535, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyLong_From_int(__pyx_v_period_step); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 558, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
   __pyx_t_6 = 1;
   {
@@ -23306,12 +23454,12 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 535, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 558, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
-  __pyx_t_5 = PyObject_GetIter(__pyx_t_1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 535, __pyx_L1_error)
+  __pyx_t_5 = PyObject_GetIter(__pyx_t_1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 558, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_7 = (CYTHON_COMPILING_IN_LIMITED_API) ? PyIter_Next : __Pyx_PyObject_GetIterNextFunc(__pyx_t_5); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 535, __pyx_L1_error)
+  __pyx_t_7 = (CYTHON_COMPILING_IN_LIMITED_API) ? PyIter_Next : __Pyx_PyObject_GetIterNextFunc(__pyx_t_5); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 558, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   for (;;) {
     {
@@ -23319,18 +23467,18 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
       if (unlikely(!__pyx_t_1)) {
         PyObject* exc_type = PyErr_Occurred();
         if (exc_type) {
-          if (unlikely(!__Pyx_PyErr_GivenExceptionMatches(exc_type, PyExc_StopIteration))) __PYX_ERR(0, 535, __pyx_L1_error)
+          if (unlikely(!__Pyx_PyErr_GivenExceptionMatches(exc_type, PyExc_StopIteration))) __PYX_ERR(0, 558, __pyx_L1_error)
           PyErr_Clear();
         }
         break;
       }
     }
     __Pyx_GOTREF(__pyx_t_1);
-    __pyx_t_8 = __Pyx_PyLong_As_int(__pyx_t_1); if (unlikely((__pyx_t_8 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 535, __pyx_L1_error)
+    __pyx_t_8 = __Pyx_PyLong_As_int(__pyx_t_1); if (unlikely((__pyx_t_8 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 558, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
     __pyx_v_p = __pyx_t_8;
 
-    /* "src/_accelerators.pyx":536
+    /* "src/_accelerators.pyx":559
  *     # Iterate periods
  *     for p in range(min_p, max_p + 1, period_step):
  *         i = 0             # <<<<<<<<<<<<<<
@@ -23339,7 +23487,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
 */
     __pyx_v_i = 0;
 
-    /* "src/_accelerators.pyx":537
+    /* "src/_accelerators.pyx":560
  *     for p in range(min_p, max_p + 1, period_step):
  *         i = 0
  *         check_len = 4             # <<<<<<<<<<<<<<
@@ -23348,7 +23496,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
 */
     __pyx_v_check_len = 4;
 
-    /* "src/_accelerators.pyx":538
+    /* "src/_accelerators.pyx":561
  *         i = 0
  *         check_len = 4
  *         if p < 4:             # <<<<<<<<<<<<<<
@@ -23358,7 +23506,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
     __pyx_t_9 = (__pyx_v_p < 4);
     if (__pyx_t_9) {
 
-      /* "src/_accelerators.pyx":539
+      /* "src/_accelerators.pyx":562
  *         check_len = 4
  *         if p < 4:
  *             check_len = p             # <<<<<<<<<<<<<<
@@ -23367,7 +23515,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
 */
       __pyx_v_check_len = __pyx_v_p;
 
-      /* "src/_accelerators.pyx":538
+      /* "src/_accelerators.pyx":561
  *         i = 0
  *         check_len = 4
  *         if p < 4:             # <<<<<<<<<<<<<<
@@ -23376,7 +23524,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
 */
     }
 
-    /* "src/_accelerators.pyx":541
+    /* "src/_accelerators.pyx":564
  *             check_len = p
  * 
  *         while i < n - p:             # <<<<<<<<<<<<<<
@@ -23387,7 +23535,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
       __pyx_t_9 = (__pyx_v_i < (__pyx_v_n - __pyx_v_p));
       if (!__pyx_t_9) break;
 
-      /* "src/_accelerators.pyx":543
+      /* "src/_accelerators.pyx":566
  *         while i < n - p:
  *             # Skip if masked
  *             if tier1_mask[i]:             # <<<<<<<<<<<<<<
@@ -23398,7 +23546,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
       __pyx_t_9 = ((*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_tier1_mask.data + __pyx_t_10 * __pyx_v_tier1_mask.strides[0]) ))) != 0);
       if (__pyx_t_9) {
 
-        /* "src/_accelerators.pyx":544
+        /* "src/_accelerators.pyx":567
  *             # Skip if masked
  *             if tier1_mask[i]:
  *                 i += position_step             # <<<<<<<<<<<<<<
@@ -23407,7 +23555,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
 */
         __pyx_v_i = (__pyx_v_i + __pyx_v_position_step);
 
-        /* "src/_accelerators.pyx":545
+        /* "src/_accelerators.pyx":568
  *             if tier1_mask[i]:
  *                 i += position_step
  *                 continue             # <<<<<<<<<<<<<<
@@ -23416,7 +23564,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
 */
         goto __pyx_L6_continue;
 
-        /* "src/_accelerators.pyx":543
+        /* "src/_accelerators.pyx":566
  *         while i < n - p:
  *             # Skip if masked
  *             if tier1_mask[i]:             # <<<<<<<<<<<<<<
@@ -23425,7 +23573,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
 */
       }
 
-      /* "src/_accelerators.pyx":548
+      /* "src/_accelerators.pyx":571
  * 
  *             # Quick check for periodicity (array_equal replacement)
  *             if i + p + check_len <= n:             # <<<<<<<<<<<<<<
@@ -23435,7 +23583,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
       __pyx_t_9 = (((__pyx_v_i + __pyx_v_p) + __pyx_v_check_len) <= __pyx_v_n);
       if (__pyx_t_9) {
 
-        /* "src/_accelerators.pyx":549
+        /* "src/_accelerators.pyx":572
  *             # Quick check for periodicity (array_equal replacement)
  *             if i + p + check_len <= n:
  *                 match = True             # <<<<<<<<<<<<<<
@@ -23444,7 +23592,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
 */
         __pyx_v_match = 1;
 
-        /* "src/_accelerators.pyx":550
+        /* "src/_accelerators.pyx":573
  *             if i + p + check_len <= n:
  *                 match = True
  *                 for j in range(check_len):             # <<<<<<<<<<<<<<
@@ -23456,7 +23604,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
         for (__pyx_t_12 = 0; __pyx_t_12 < __pyx_t_11; __pyx_t_12+=1) {
           __pyx_v_j = __pyx_t_12;
 
-          /* "src/_accelerators.pyx":551
+          /* "src/_accelerators.pyx":574
  *                 match = True
  *                 for j in range(check_len):
  *                     if text_arr[i + j] != text_arr[i + p + j]:             # <<<<<<<<<<<<<<
@@ -23468,7 +23616,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
           __pyx_t_9 = ((*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_text_arr.data + __pyx_t_10 * __pyx_v_text_arr.strides[0]) ))) != (*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_text_arr.data + __pyx_t_13 * __pyx_v_text_arr.strides[0]) ))));
           if (__pyx_t_9) {
 
-            /* "src/_accelerators.pyx":552
+            /* "src/_accelerators.pyx":575
  *                 for j in range(check_len):
  *                     if text_arr[i + j] != text_arr[i + p + j]:
  *                         match = False             # <<<<<<<<<<<<<<
@@ -23477,7 +23625,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
 */
             __pyx_v_match = 0;
 
-            /* "src/_accelerators.pyx":553
+            /* "src/_accelerators.pyx":576
  *                     if text_arr[i + j] != text_arr[i + p + j]:
  *                         match = False
  *                         break             # <<<<<<<<<<<<<<
@@ -23486,7 +23634,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
 */
             goto __pyx_L11_break;
 
-            /* "src/_accelerators.pyx":551
+            /* "src/_accelerators.pyx":574
  *                 match = True
  *                 for j in range(check_len):
  *                     if text_arr[i + j] != text_arr[i + p + j]:             # <<<<<<<<<<<<<<
@@ -23497,7 +23645,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
         }
         __pyx_L11_break:;
 
-        /* "src/_accelerators.pyx":555
+        /* "src/_accelerators.pyx":578
  *                         break
  * 
  *                 if match:             # <<<<<<<<<<<<<<
@@ -23506,19 +23654,19 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
 */
         if (__pyx_v_match) {
 
-          /* "src/_accelerators.pyx":567
+          /* "src/_accelerators.pyx":590
  *                     # But for now, let's just call it. The extension happens rarely compared to the scan.
  * 
  *                     res = extend_with_mismatches(text_arr, i, p, n, allowed_mismatch_rate)             # <<<<<<<<<<<<<<
  *                     if res is not None:
  *                         array_start, array_end, copies, full_start, full_end = res
 */
-          __pyx_t_1 = __pyx_f_3src_13_accelerators_extend_with_mismatches(__pyx_v_text_arr, __pyx_v_i, __pyx_v_p, __pyx_v_n, __pyx_v_allowed_mismatch_rate, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 567, __pyx_L1_error)
+          __pyx_t_1 = __pyx_f_3src_13_accelerators_extend_with_mismatches(__pyx_v_text_arr, __pyx_v_i, __pyx_v_p, __pyx_v_n, __pyx_v_allowed_mismatch_rate, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 590, __pyx_L1_error)
           __Pyx_GOTREF(__pyx_t_1);
           __Pyx_XDECREF_SET(__pyx_v_res, ((PyObject*)__pyx_t_1));
           __pyx_t_1 = 0;
 
-          /* "src/_accelerators.pyx":568
+          /* "src/_accelerators.pyx":591
  * 
  *                     res = extend_with_mismatches(text_arr, i, p, n, allowed_mismatch_rate)
  *                     if res is not None:             # <<<<<<<<<<<<<<
@@ -23528,7 +23676,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
           __pyx_t_9 = (__pyx_v_res != ((PyObject*)Py_None));
           if (__pyx_t_9) {
 
-            /* "src/_accelerators.pyx":569
+            /* "src/_accelerators.pyx":592
  *                     res = extend_with_mismatches(text_arr, i, p, n, allowed_mismatch_rate)
  *                     if res is not None:
  *                         array_start, array_end, copies, full_start, full_end = res             # <<<<<<<<<<<<<<
@@ -23541,7 +23689,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
               if (unlikely(size != 5)) {
                 if (size > 5) __Pyx_RaiseTooManyValuesError(5);
                 else if (size >= 0) __Pyx_RaiseNeedMoreValuesError(size);
-                __PYX_ERR(0, 569, __pyx_L1_error)
+                __PYX_ERR(0, 592, __pyx_L1_error)
               }
               #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
               __pyx_t_1 = PyTuple_GET_ITEM(sequence, 0);
@@ -23559,24 +23707,24 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
                 Py_ssize_t i;
                 PyObject** temps[5] = {&__pyx_t_1,&__pyx_t_4,&__pyx_t_3,&__pyx_t_2,&__pyx_t_14};
                 for (i=0; i < 5; i++) {
-                  PyObject* item = __Pyx_PySequence_ITEM(sequence, i); if (unlikely(!item)) __PYX_ERR(0, 569, __pyx_L1_error)
+                  PyObject* item = __Pyx_PySequence_ITEM(sequence, i); if (unlikely(!item)) __PYX_ERR(0, 592, __pyx_L1_error)
                   __Pyx_GOTREF(item);
                   *(temps[i]) = item;
                 }
               }
               #endif
             } else {
-              __Pyx_RaiseNoneNotIterableError(); __PYX_ERR(0, 569, __pyx_L1_error)
+              __Pyx_RaiseNoneNotIterableError(); __PYX_ERR(0, 592, __pyx_L1_error)
             }
-            __pyx_t_8 = __Pyx_PyLong_As_int(__pyx_t_1); if (unlikely((__pyx_t_8 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 569, __pyx_L1_error)
+            __pyx_t_8 = __Pyx_PyLong_As_int(__pyx_t_1); if (unlikely((__pyx_t_8 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 592, __pyx_L1_error)
             __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-            __pyx_t_11 = __Pyx_PyLong_As_int(__pyx_t_4); if (unlikely((__pyx_t_11 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 569, __pyx_L1_error)
+            __pyx_t_11 = __Pyx_PyLong_As_int(__pyx_t_4); if (unlikely((__pyx_t_11 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 592, __pyx_L1_error)
             __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-            __pyx_t_12 = __Pyx_PyLong_As_int(__pyx_t_3); if (unlikely((__pyx_t_12 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 569, __pyx_L1_error)
+            __pyx_t_12 = __Pyx_PyLong_As_int(__pyx_t_3); if (unlikely((__pyx_t_12 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 592, __pyx_L1_error)
             __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-            __pyx_t_15 = __Pyx_PyLong_As_int(__pyx_t_2); if (unlikely((__pyx_t_15 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 569, __pyx_L1_error)
+            __pyx_t_15 = __Pyx_PyLong_As_int(__pyx_t_2); if (unlikely((__pyx_t_15 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 592, __pyx_L1_error)
             __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-            __pyx_t_16 = __Pyx_PyLong_As_int(__pyx_t_14); if (unlikely((__pyx_t_16 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 569, __pyx_L1_error)
+            __pyx_t_16 = __Pyx_PyLong_As_int(__pyx_t_14); if (unlikely((__pyx_t_16 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 592, __pyx_L1_error)
             __Pyx_DECREF(__pyx_t_14); __pyx_t_14 = 0;
             __pyx_v_array_start = __pyx_t_8;
             __pyx_v_array_end = __pyx_t_11;
@@ -23584,7 +23732,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
             __pyx_v_full_start = __pyx_t_15;
             __pyx_v_full_end = __pyx_t_16;
 
-            /* "src/_accelerators.pyx":572
+            /* "src/_accelerators.pyx":595
  * 
  *                         # Dynamic copy threshold
  *                         if (p >= 20 and copies >= 2) or copies >= 3:             # <<<<<<<<<<<<<<
@@ -23608,34 +23756,34 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
             __pyx_L16_bool_binop_done:;
             if (__pyx_t_9) {
 
-              /* "src/_accelerators.pyx":573
+              /* "src/_accelerators.pyx":596
  *                         # Dynamic copy threshold
  *                         if (p >= 20 and copies >= 2) or copies >= 3:
  *                             results.append((full_start, full_end, p))             # <<<<<<<<<<<<<<
  * 
  *                             # Skip past this repeat
 */
-              __pyx_t_14 = __Pyx_PyLong_From_int(__pyx_v_full_start); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 573, __pyx_L1_error)
+              __pyx_t_14 = __Pyx_PyLong_From_int(__pyx_v_full_start); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 596, __pyx_L1_error)
               __Pyx_GOTREF(__pyx_t_14);
-              __pyx_t_2 = __Pyx_PyLong_From_int(__pyx_v_full_end); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 573, __pyx_L1_error)
+              __pyx_t_2 = __Pyx_PyLong_From_int(__pyx_v_full_end); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 596, __pyx_L1_error)
               __Pyx_GOTREF(__pyx_t_2);
-              __pyx_t_3 = __Pyx_PyLong_From_int(__pyx_v_p); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 573, __pyx_L1_error)
+              __pyx_t_3 = __Pyx_PyLong_From_int(__pyx_v_p); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 596, __pyx_L1_error)
               __Pyx_GOTREF(__pyx_t_3);
-              __pyx_t_4 = PyTuple_New(3); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 573, __pyx_L1_error)
+              __pyx_t_4 = PyTuple_New(3); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 596, __pyx_L1_error)
               __Pyx_GOTREF(__pyx_t_4);
               __Pyx_GIVEREF(__pyx_t_14);
-              if (__Pyx_PyTuple_SET_ITEM(__pyx_t_4, 0, __pyx_t_14) != (0)) __PYX_ERR(0, 573, __pyx_L1_error);
+              if (__Pyx_PyTuple_SET_ITEM(__pyx_t_4, 0, __pyx_t_14) != (0)) __PYX_ERR(0, 596, __pyx_L1_error);
               __Pyx_GIVEREF(__pyx_t_2);
-              if (__Pyx_PyTuple_SET_ITEM(__pyx_t_4, 1, __pyx_t_2) != (0)) __PYX_ERR(0, 573, __pyx_L1_error);
+              if (__Pyx_PyTuple_SET_ITEM(__pyx_t_4, 1, __pyx_t_2) != (0)) __PYX_ERR(0, 596, __pyx_L1_error);
               __Pyx_GIVEREF(__pyx_t_3);
-              if (__Pyx_PyTuple_SET_ITEM(__pyx_t_4, 2, __pyx_t_3) != (0)) __PYX_ERR(0, 573, __pyx_L1_error);
+              if (__Pyx_PyTuple_SET_ITEM(__pyx_t_4, 2, __pyx_t_3) != (0)) __PYX_ERR(0, 596, __pyx_L1_error);
               __pyx_t_14 = 0;
               __pyx_t_2 = 0;
               __pyx_t_3 = 0;
-              __pyx_t_18 = __Pyx_PyList_Append(__pyx_v_results, __pyx_t_4); if (unlikely(__pyx_t_18 == ((int)-1))) __PYX_ERR(0, 573, __pyx_L1_error)
+              __pyx_t_18 = __Pyx_PyList_Append(__pyx_v_results, __pyx_t_4); if (unlikely(__pyx_t_18 == ((int)-1))) __PYX_ERR(0, 596, __pyx_L1_error)
               __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-              /* "src/_accelerators.pyx":576
+              /* "src/_accelerators.pyx":599
  * 
  *                             # Skip past this repeat
  *                             i = full_end             # <<<<<<<<<<<<<<
@@ -23644,7 +23792,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
 */
               __pyx_v_i = __pyx_v_full_end;
 
-              /* "src/_accelerators.pyx":577
+              /* "src/_accelerators.pyx":600
  *                             # Skip past this repeat
  *                             i = full_end
  *                             continue             # <<<<<<<<<<<<<<
@@ -23653,7 +23801,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
 */
               goto __pyx_L6_continue;
 
-              /* "src/_accelerators.pyx":572
+              /* "src/_accelerators.pyx":595
  * 
  *                         # Dynamic copy threshold
  *                         if (p >= 20 and copies >= 2) or copies >= 3:             # <<<<<<<<<<<<<<
@@ -23662,7 +23810,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
 */
             }
 
-            /* "src/_accelerators.pyx":568
+            /* "src/_accelerators.pyx":591
  * 
  *                     res = extend_with_mismatches(text_arr, i, p, n, allowed_mismatch_rate)
  *                     if res is not None:             # <<<<<<<<<<<<<<
@@ -23671,7 +23819,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
 */
           }
 
-          /* "src/_accelerators.pyx":555
+          /* "src/_accelerators.pyx":578
  *                         break
  * 
  *                 if match:             # <<<<<<<<<<<<<<
@@ -23680,7 +23828,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
 */
         }
 
-        /* "src/_accelerators.pyx":548
+        /* "src/_accelerators.pyx":571
  * 
  *             # Quick check for periodicity (array_equal replacement)
  *             if i + p + check_len <= n:             # <<<<<<<<<<<<<<
@@ -23689,7 +23837,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
 */
       }
 
-      /* "src/_accelerators.pyx":579
+      /* "src/_accelerators.pyx":602
  *                             continue
  * 
  *             i += position_step             # <<<<<<<<<<<<<<
@@ -23700,7 +23848,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
       __pyx_L6_continue:;
     }
 
-    /* "src/_accelerators.pyx":535
+    /* "src/_accelerators.pyx":558
  * 
  *     # Iterate periods
  *     for p in range(min_p, max_p + 1, period_step):             # <<<<<<<<<<<<<<
@@ -23710,7 +23858,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
   }
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
 
-  /* "src/_accelerators.pyx":581
+  /* "src/_accelerators.pyx":604
  *             i += position_step
  * 
  *     return results             # <<<<<<<<<<<<<<
@@ -23722,7 +23870,7 @@ static PyObject *__pyx_f_3src_13_accelerators_scan_simple_repeats(__Pyx_memviews
   __pyx_r = __pyx_v_results;
   goto __pyx_L0;
 
-  /* "src/_accelerators.pyx":515
+  /* "src/_accelerators.pyx":538
  *     return results
  * 
  * cpdef list scan_simple_repeats(             # <<<<<<<<<<<<<<
@@ -23795,81 +23943,81 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_text_arr,&__pyx_mstate_global->__pyx_n_u_tier1_mask,&__pyx_mstate_global->__pyx_n_u_n,&__pyx_mstate_global->__pyx_n_u_min_p,&__pyx_mstate_global->__pyx_n_u_max_p,&__pyx_mstate_global->__pyx_n_u_period_step,&__pyx_mstate_global->__pyx_n_u_position_step,&__pyx_mstate_global->__pyx_n_u_allowed_mismatch_rate,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 515, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 538, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  8:
         values[7] = __Pyx_ArgRef_FASTCALL(__pyx_args, 7);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[7])) __PYX_ERR(0, 515, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[7])) __PYX_ERR(0, 538, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  7:
         values[6] = __Pyx_ArgRef_FASTCALL(__pyx_args, 6);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[6])) __PYX_ERR(0, 515, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[6])) __PYX_ERR(0, 538, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  6:
         values[5] = __Pyx_ArgRef_FASTCALL(__pyx_args, 5);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 515, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 538, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  5:
         values[4] = __Pyx_ArgRef_FASTCALL(__pyx_args, 4);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 515, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 538, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  4:
         values[3] = __Pyx_ArgRef_FASTCALL(__pyx_args, 3);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 515, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 538, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  3:
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 515, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 538, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 515, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 538, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 515, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 538, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "scan_simple_repeats", 0) < (0)) __PYX_ERR(0, 515, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "scan_simple_repeats", 0) < (0)) __PYX_ERR(0, 538, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 8; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("scan_simple_repeats", 1, 8, 8, i); __PYX_ERR(0, 515, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("scan_simple_repeats", 1, 8, 8, i); __PYX_ERR(0, 538, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 8)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 515, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 538, __pyx_L3_error)
       values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 515, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 538, __pyx_L3_error)
       values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 515, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 538, __pyx_L3_error)
       values[3] = __Pyx_ArgRef_FASTCALL(__pyx_args, 3);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 515, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 538, __pyx_L3_error)
       values[4] = __Pyx_ArgRef_FASTCALL(__pyx_args, 4);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 515, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 538, __pyx_L3_error)
       values[5] = __Pyx_ArgRef_FASTCALL(__pyx_args, 5);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 515, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 538, __pyx_L3_error)
       values[6] = __Pyx_ArgRef_FASTCALL(__pyx_args, 6);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[6])) __PYX_ERR(0, 515, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[6])) __PYX_ERR(0, 538, __pyx_L3_error)
       values[7] = __Pyx_ArgRef_FASTCALL(__pyx_args, 7);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[7])) __PYX_ERR(0, 515, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[7])) __PYX_ERR(0, 538, __pyx_L3_error)
     }
-    __pyx_v_text_arr = __Pyx_PyObject_to_MemoryviewSlice_ds_unsigned_char__const__(values[0], 0); if (unlikely(!__pyx_v_text_arr.memview)) __PYX_ERR(0, 516, __pyx_L3_error)
-    __pyx_v_tier1_mask = __Pyx_PyObject_to_MemoryviewSlice_ds_unsigned_char__const__(values[1], 0); if (unlikely(!__pyx_v_tier1_mask.memview)) __PYX_ERR(0, 517, __pyx_L3_error)
-    __pyx_v_n = __Pyx_PyLong_As_int(values[2]); if (unlikely((__pyx_v_n == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 518, __pyx_L3_error)
-    __pyx_v_min_p = __Pyx_PyLong_As_int(values[3]); if (unlikely((__pyx_v_min_p == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 519, __pyx_L3_error)
-    __pyx_v_max_p = __Pyx_PyLong_As_int(values[4]); if (unlikely((__pyx_v_max_p == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 520, __pyx_L3_error)
-    __pyx_v_period_step = __Pyx_PyLong_As_int(values[5]); if (unlikely((__pyx_v_period_step == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 521, __pyx_L3_error)
-    __pyx_v_position_step = __Pyx_PyLong_As_int(values[6]); if (unlikely((__pyx_v_position_step == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 522, __pyx_L3_error)
-    __pyx_v_allowed_mismatch_rate = __Pyx_PyFloat_AsDouble(values[7]); if (unlikely((__pyx_v_allowed_mismatch_rate == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 523, __pyx_L3_error)
+    __pyx_v_text_arr = __Pyx_PyObject_to_MemoryviewSlice_ds_unsigned_char__const__(values[0], 0); if (unlikely(!__pyx_v_text_arr.memview)) __PYX_ERR(0, 539, __pyx_L3_error)
+    __pyx_v_tier1_mask = __Pyx_PyObject_to_MemoryviewSlice_ds_unsigned_char__const__(values[1], 0); if (unlikely(!__pyx_v_tier1_mask.memview)) __PYX_ERR(0, 540, __pyx_L3_error)
+    __pyx_v_n = __Pyx_PyLong_As_int(values[2]); if (unlikely((__pyx_v_n == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 541, __pyx_L3_error)
+    __pyx_v_min_p = __Pyx_PyLong_As_int(values[3]); if (unlikely((__pyx_v_min_p == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 542, __pyx_L3_error)
+    __pyx_v_max_p = __Pyx_PyLong_As_int(values[4]); if (unlikely((__pyx_v_max_p == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 543, __pyx_L3_error)
+    __pyx_v_period_step = __Pyx_PyLong_As_int(values[5]); if (unlikely((__pyx_v_period_step == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 544, __pyx_L3_error)
+    __pyx_v_position_step = __Pyx_PyLong_As_int(values[6]); if (unlikely((__pyx_v_position_step == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 545, __pyx_L3_error)
+    __pyx_v_allowed_mismatch_rate = __Pyx_PyFloat_AsDouble(values[7]); if (unlikely((__pyx_v_allowed_mismatch_rate == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 546, __pyx_L3_error)
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("scan_simple_repeats", 1, 8, 8, __pyx_nargs); __PYX_ERR(0, 515, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("scan_simple_repeats", 1, 8, 8, __pyx_nargs); __PYX_ERR(0, 538, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -23903,7 +24051,7 @@ static PyObject *__pyx_pf_3src_13_accelerators_8scan_simple_repeats(CYTHON_UNUSE
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("scan_simple_repeats", 0);
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __pyx_f_3src_13_accelerators_scan_simple_repeats(__pyx_v_text_arr, __pyx_v_tier1_mask, __pyx_v_n, __pyx_v_min_p, __pyx_v_max_p, __pyx_v_period_step, __pyx_v_position_step, __pyx_v_allowed_mismatch_rate, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 515, __pyx_L1_error)
+  __pyx_t_1 = __pyx_f_3src_13_accelerators_scan_simple_repeats(__pyx_v_text_arr, __pyx_v_tier1_mask, __pyx_v_n, __pyx_v_min_p, __pyx_v_max_p, __pyx_v_period_step, __pyx_v_position_step, __pyx_v_allowed_mismatch_rate, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 538, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
@@ -23920,7 +24068,7 @@ static PyObject *__pyx_pf_3src_13_accelerators_8scan_simple_repeats(CYTHON_UNUSE
   return __pyx_r;
 }
 
-/* "src/_accelerators.pyx":583
+/* "src/_accelerators.pyx":606
  *     return results
  * 
  * cpdef list find_periodic_patterns(long[:] positions, int min_period, int max_period, int min_copies, double tolerance_ratio=0.01):             # <<<<<<<<<<<<<<
@@ -23978,7 +24126,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
     }
   }
 
-  /* "src/_accelerators.pyx":585
+  /* "src/_accelerators.pyx":608
  * cpdef list find_periodic_patterns(long[:] positions, int min_period, int max_period, int min_copies, double tolerance_ratio=0.01):
  *     """Find periodic patterns in a sorted list of positions."""
  *     cdef int n = positions.shape[0]             # <<<<<<<<<<<<<<
@@ -23987,19 +24135,19 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
 */
   __pyx_v_n = (__pyx_v_positions.shape[0]);
 
-  /* "src/_accelerators.pyx":586
+  /* "src/_accelerators.pyx":609
  *     """Find periodic patterns in a sorted list of positions."""
  *     cdef int n = positions.shape[0]
  *     cdef list results = []             # <<<<<<<<<<<<<<
  *     cdef int i, j, k
  *     cdef long p1, p2, diff, next_val, last_val, target
 */
-  __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 586, __pyx_L1_error)
+  __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 609, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_v_results = ((PyObject*)__pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "src/_accelerators.pyx":592
+  /* "src/_accelerators.pyx":615
  *     cdef int tolerance
  * 
  *     if n < min_copies:             # <<<<<<<<<<<<<<
@@ -24009,7 +24157,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
   __pyx_t_2 = (__pyx_v_n < __pyx_v_min_copies);
   if (__pyx_t_2) {
 
-    /* "src/_accelerators.pyx":593
+    /* "src/_accelerators.pyx":616
  * 
  *     if n < min_copies:
  *         return results             # <<<<<<<<<<<<<<
@@ -24021,7 +24169,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
     __pyx_r = __pyx_v_results;
     goto __pyx_L0;
 
-    /* "src/_accelerators.pyx":592
+    /* "src/_accelerators.pyx":615
  *     cdef int tolerance
  * 
  *     if n < min_copies:             # <<<<<<<<<<<<<<
@@ -24030,7 +24178,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
 */
   }
 
-  /* "src/_accelerators.pyx":596
+  /* "src/_accelerators.pyx":619
  * 
  *     # Limit N to avoid O(N^2) explosion on highly repetitive k-mers
  *     if n > 500:             # <<<<<<<<<<<<<<
@@ -24040,7 +24188,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
   __pyx_t_2 = (__pyx_v_n > 0x1F4);
   if (__pyx_t_2) {
 
-    /* "src/_accelerators.pyx":597
+    /* "src/_accelerators.pyx":620
  *     # Limit N to avoid O(N^2) explosion on highly repetitive k-mers
  *     if n > 500:
  *         n = 500             # <<<<<<<<<<<<<<
@@ -24049,7 +24197,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
 */
     __pyx_v_n = 0x1F4;
 
-    /* "src/_accelerators.pyx":596
+    /* "src/_accelerators.pyx":619
  * 
  *     # Limit N to avoid O(N^2) explosion on highly repetitive k-mers
  *     if n > 500:             # <<<<<<<<<<<<<<
@@ -24058,7 +24206,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
 */
   }
 
-  /* "src/_accelerators.pyx":599
+  /* "src/_accelerators.pyx":622
  *         n = 500
  * 
  *     for i in range(n):             # <<<<<<<<<<<<<<
@@ -24070,7 +24218,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
   for (__pyx_t_5 = 0; __pyx_t_5 < __pyx_t_4; __pyx_t_5+=1) {
     __pyx_v_i = __pyx_t_5;
 
-    /* "src/_accelerators.pyx":600
+    /* "src/_accelerators.pyx":623
  * 
  *     for i in range(n):
  *         p1 = positions[i]             # <<<<<<<<<<<<<<
@@ -24080,7 +24228,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
     __pyx_t_6 = __pyx_v_i;
     __pyx_v_p1 = (*((long *) ( /* dim=0 */ (__pyx_v_positions.data + __pyx_t_6 * __pyx_v_positions.strides[0]) )));
 
-    /* "src/_accelerators.pyx":601
+    /* "src/_accelerators.pyx":624
  *     for i in range(n):
  *         p1 = positions[i]
  *         for j in range(i + 1, n):             # <<<<<<<<<<<<<<
@@ -24092,7 +24240,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
     for (__pyx_t_9 = (__pyx_v_i + 1); __pyx_t_9 < __pyx_t_8; __pyx_t_9+=1) {
       __pyx_v_j = __pyx_t_9;
 
-      /* "src/_accelerators.pyx":602
+      /* "src/_accelerators.pyx":625
  *         p1 = positions[i]
  *         for j in range(i + 1, n):
  *             p2 = positions[j]             # <<<<<<<<<<<<<<
@@ -24102,7 +24250,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
       __pyx_t_6 = __pyx_v_j;
       __pyx_v_p2 = (*((long *) ( /* dim=0 */ (__pyx_v_positions.data + __pyx_t_6 * __pyx_v_positions.strides[0]) )));
 
-      /* "src/_accelerators.pyx":603
+      /* "src/_accelerators.pyx":626
  *         for j in range(i + 1, n):
  *             p2 = positions[j]
  *             diff = p2 - p1             # <<<<<<<<<<<<<<
@@ -24111,7 +24259,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
 */
       __pyx_v_diff = (__pyx_v_p2 - __pyx_v_p1);
 
-      /* "src/_accelerators.pyx":605
+      /* "src/_accelerators.pyx":628
  *             diff = p2 - p1
  * 
  *             if diff < min_period:             # <<<<<<<<<<<<<<
@@ -24121,7 +24269,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
       __pyx_t_2 = (__pyx_v_diff < __pyx_v_min_period);
       if (__pyx_t_2) {
 
-        /* "src/_accelerators.pyx":606
+        /* "src/_accelerators.pyx":629
  * 
  *             if diff < min_period:
  *                 continue             # <<<<<<<<<<<<<<
@@ -24130,7 +24278,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
 */
         goto __pyx_L7_continue;
 
-        /* "src/_accelerators.pyx":605
+        /* "src/_accelerators.pyx":628
  *             diff = p2 - p1
  * 
  *             if diff < min_period:             # <<<<<<<<<<<<<<
@@ -24139,7 +24287,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
 */
       }
 
-      /* "src/_accelerators.pyx":607
+      /* "src/_accelerators.pyx":630
  *             if diff < min_period:
  *                 continue
  *             if diff > max_period:             # <<<<<<<<<<<<<<
@@ -24149,7 +24297,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
       __pyx_t_2 = (__pyx_v_diff > __pyx_v_max_period);
       if (__pyx_t_2) {
 
-        /* "src/_accelerators.pyx":608
+        /* "src/_accelerators.pyx":631
  *                 continue
  *             if diff > max_period:
  *                 break             # <<<<<<<<<<<<<<
@@ -24158,7 +24306,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
 */
         goto __pyx_L8_break;
 
-        /* "src/_accelerators.pyx":607
+        /* "src/_accelerators.pyx":630
  *             if diff < min_period:
  *                 continue
  *             if diff > max_period:             # <<<<<<<<<<<<<<
@@ -24167,7 +24315,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
 */
       }
 
-      /* "src/_accelerators.pyx":610
+      /* "src/_accelerators.pyx":633
  *                 break
  * 
  *             count = 2             # <<<<<<<<<<<<<<
@@ -24176,7 +24324,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
 */
       __pyx_v_count = 2;
 
-      /* "src/_accelerators.pyx":611
+      /* "src/_accelerators.pyx":634
  * 
  *             count = 2
  *             last_val = p2             # <<<<<<<<<<<<<<
@@ -24185,7 +24333,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
 */
       __pyx_v_last_val = __pyx_v_p2;
 
-      /* "src/_accelerators.pyx":613
+      /* "src/_accelerators.pyx":636
  *             last_val = p2
  * 
  *             for k in range(j + 1, n):             # <<<<<<<<<<<<<<
@@ -24197,7 +24345,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
       for (__pyx_t_12 = (__pyx_v_j + 1); __pyx_t_12 < __pyx_t_11; __pyx_t_12+=1) {
         __pyx_v_k = __pyx_t_12;
 
-        /* "src/_accelerators.pyx":614
+        /* "src/_accelerators.pyx":637
  * 
  *             for k in range(j + 1, n):
  *                 next_val = positions[k]             # <<<<<<<<<<<<<<
@@ -24207,7 +24355,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
         __pyx_t_6 = __pyx_v_k;
         __pyx_v_next_val = (*((long *) ( /* dim=0 */ (__pyx_v_positions.data + __pyx_t_6 * __pyx_v_positions.strides[0]) )));
 
-        /* "src/_accelerators.pyx":615
+        /* "src/_accelerators.pyx":638
  *             for k in range(j + 1, n):
  *                 next_val = positions[k]
  *                 target = last_val + diff             # <<<<<<<<<<<<<<
@@ -24216,7 +24364,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
 */
         __pyx_v_target = (__pyx_v_last_val + __pyx_v_diff);
 
-        /* "src/_accelerators.pyx":616
+        /* "src/_accelerators.pyx":639
  *                 next_val = positions[k]
  *                 target = last_val + diff
  *                 tolerance = <int>(diff * tolerance_ratio) + 1             # <<<<<<<<<<<<<<
@@ -24225,7 +24373,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
 */
         __pyx_v_tolerance = (((int)(__pyx_v_diff * __pyx_v_tolerance_ratio)) + 1);
 
-        /* "src/_accelerators.pyx":618
+        /* "src/_accelerators.pyx":641
  *                 tolerance = <int>(diff * tolerance_ratio) + 1
  * 
  *                 if next_val < target - tolerance:             # <<<<<<<<<<<<<<
@@ -24235,7 +24383,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
         __pyx_t_2 = (__pyx_v_next_val < (__pyx_v_target - __pyx_v_tolerance));
         if (__pyx_t_2) {
 
-          /* "src/_accelerators.pyx":619
+          /* "src/_accelerators.pyx":642
  * 
  *                 if next_val < target - tolerance:
  *                     continue             # <<<<<<<<<<<<<<
@@ -24244,7 +24392,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
 */
           goto __pyx_L11_continue;
 
-          /* "src/_accelerators.pyx":618
+          /* "src/_accelerators.pyx":641
  *                 tolerance = <int>(diff * tolerance_ratio) + 1
  * 
  *                 if next_val < target - tolerance:             # <<<<<<<<<<<<<<
@@ -24253,7 +24401,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
 */
         }
 
-        /* "src/_accelerators.pyx":620
+        /* "src/_accelerators.pyx":643
  *                 if next_val < target - tolerance:
  *                     continue
  *                 elif next_val > target + tolerance:             # <<<<<<<<<<<<<<
@@ -24263,7 +24411,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
         __pyx_t_2 = (__pyx_v_next_val > (__pyx_v_target + __pyx_v_tolerance));
         if (__pyx_t_2) {
 
-          /* "src/_accelerators.pyx":621
+          /* "src/_accelerators.pyx":644
  *                     continue
  *                 elif next_val > target + tolerance:
  *                     break             # <<<<<<<<<<<<<<
@@ -24272,7 +24420,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
 */
           goto __pyx_L12_break;
 
-          /* "src/_accelerators.pyx":620
+          /* "src/_accelerators.pyx":643
  *                 if next_val < target - tolerance:
  *                     continue
  *                 elif next_val > target + tolerance:             # <<<<<<<<<<<<<<
@@ -24281,7 +24429,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
 */
         }
 
-        /* "src/_accelerators.pyx":623
+        /* "src/_accelerators.pyx":646
  *                     break
  *                 else:
  *                     count += 1             # <<<<<<<<<<<<<<
@@ -24291,7 +24439,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
         /*else*/ {
           __pyx_v_count = (__pyx_v_count + 1);
 
-          /* "src/_accelerators.pyx":624
+          /* "src/_accelerators.pyx":647
  *                 else:
  *                     count += 1
  *                     last_val = next_val             # <<<<<<<<<<<<<<
@@ -24304,7 +24452,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
       }
       __pyx_L12_break:;
 
-      /* "src/_accelerators.pyx":626
+      /* "src/_accelerators.pyx":649
  *                     last_val = next_val
  * 
  *             if count >= min_copies:             # <<<<<<<<<<<<<<
@@ -24314,34 +24462,34 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
       __pyx_t_2 = (__pyx_v_count >= __pyx_v_min_copies);
       if (__pyx_t_2) {
 
-        /* "src/_accelerators.pyx":627
+        /* "src/_accelerators.pyx":650
  * 
  *             if count >= min_copies:
  *                 results.append((p1, last_val, diff))             # <<<<<<<<<<<<<<
  * 
  *     return results
 */
-        __pyx_t_1 = __Pyx_PyLong_From_long(__pyx_v_p1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 627, __pyx_L1_error)
+        __pyx_t_1 = __Pyx_PyLong_From_long(__pyx_v_p1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 650, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_1);
-        __pyx_t_13 = __Pyx_PyLong_From_long(__pyx_v_last_val); if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 627, __pyx_L1_error)
+        __pyx_t_13 = __Pyx_PyLong_From_long(__pyx_v_last_val); if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 650, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_13);
-        __pyx_t_14 = __Pyx_PyLong_From_long(__pyx_v_diff); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 627, __pyx_L1_error)
+        __pyx_t_14 = __Pyx_PyLong_From_long(__pyx_v_diff); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 650, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_14);
-        __pyx_t_15 = PyTuple_New(3); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 627, __pyx_L1_error)
+        __pyx_t_15 = PyTuple_New(3); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 650, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_15);
         __Pyx_GIVEREF(__pyx_t_1);
-        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 0, __pyx_t_1) != (0)) __PYX_ERR(0, 627, __pyx_L1_error);
+        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 0, __pyx_t_1) != (0)) __PYX_ERR(0, 650, __pyx_L1_error);
         __Pyx_GIVEREF(__pyx_t_13);
-        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 1, __pyx_t_13) != (0)) __PYX_ERR(0, 627, __pyx_L1_error);
+        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 1, __pyx_t_13) != (0)) __PYX_ERR(0, 650, __pyx_L1_error);
         __Pyx_GIVEREF(__pyx_t_14);
-        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 2, __pyx_t_14) != (0)) __PYX_ERR(0, 627, __pyx_L1_error);
+        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 2, __pyx_t_14) != (0)) __PYX_ERR(0, 650, __pyx_L1_error);
         __pyx_t_1 = 0;
         __pyx_t_13 = 0;
         __pyx_t_14 = 0;
-        __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_results, __pyx_t_15); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 627, __pyx_L1_error)
+        __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_results, __pyx_t_15); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 650, __pyx_L1_error)
         __Pyx_DECREF(__pyx_t_15); __pyx_t_15 = 0;
 
-        /* "src/_accelerators.pyx":626
+        /* "src/_accelerators.pyx":649
  *                     last_val = next_val
  * 
  *             if count >= min_copies:             # <<<<<<<<<<<<<<
@@ -24354,7 +24502,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
     __pyx_L8_break:;
   }
 
-  /* "src/_accelerators.pyx":629
+  /* "src/_accelerators.pyx":652
  *                 results.append((p1, last_val, diff))
  * 
  *     return results             # <<<<<<<<<<<<<<
@@ -24366,7 +24514,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_patterns(__Pyx_memvi
   __pyx_r = __pyx_v_results;
   goto __pyx_L0;
 
-  /* "src/_accelerators.pyx":583
+  /* "src/_accelerators.pyx":606
  *     return results
  * 
  * cpdef list find_periodic_patterns(long[:] positions, int min_period, int max_period, int min_copies, double tolerance_ratio=0.01):             # <<<<<<<<<<<<<<
@@ -24433,69 +24581,69 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_positions,&__pyx_mstate_global->__pyx_n_u_min_period,&__pyx_mstate_global->__pyx_n_u_max_period,&__pyx_mstate_global->__pyx_n_u_min_copies,&__pyx_mstate_global->__pyx_n_u_tolerance_ratio,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 583, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 606, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  5:
         values[4] = __Pyx_ArgRef_FASTCALL(__pyx_args, 4);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 583, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 606, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  4:
         values[3] = __Pyx_ArgRef_FASTCALL(__pyx_args, 3);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 583, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 606, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  3:
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 583, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 606, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 583, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 606, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 583, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 606, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "find_periodic_patterns", 0) < (0)) __PYX_ERR(0, 583, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "find_periodic_patterns", 0) < (0)) __PYX_ERR(0, 606, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 4; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("find_periodic_patterns", 0, 4, 5, i); __PYX_ERR(0, 583, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("find_periodic_patterns", 0, 4, 5, i); __PYX_ERR(0, 606, __pyx_L3_error) }
       }
     } else {
       switch (__pyx_nargs) {
         case  5:
         values[4] = __Pyx_ArgRef_FASTCALL(__pyx_args, 4);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 583, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 606, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  4:
         values[3] = __Pyx_ArgRef_FASTCALL(__pyx_args, 3);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 583, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 606, __pyx_L3_error)
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 583, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 606, __pyx_L3_error)
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 583, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 606, __pyx_L3_error)
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 583, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 606, __pyx_L3_error)
         break;
         default: goto __pyx_L5_argtuple_error;
       }
     }
-    __pyx_v_positions = __Pyx_PyObject_to_MemoryviewSlice_ds_long(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_positions.memview)) __PYX_ERR(0, 583, __pyx_L3_error)
-    __pyx_v_min_period = __Pyx_PyLong_As_int(values[1]); if (unlikely((__pyx_v_min_period == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 583, __pyx_L3_error)
-    __pyx_v_max_period = __Pyx_PyLong_As_int(values[2]); if (unlikely((__pyx_v_max_period == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 583, __pyx_L3_error)
-    __pyx_v_min_copies = __Pyx_PyLong_As_int(values[3]); if (unlikely((__pyx_v_min_copies == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 583, __pyx_L3_error)
+    __pyx_v_positions = __Pyx_PyObject_to_MemoryviewSlice_ds_long(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_positions.memview)) __PYX_ERR(0, 606, __pyx_L3_error)
+    __pyx_v_min_period = __Pyx_PyLong_As_int(values[1]); if (unlikely((__pyx_v_min_period == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 606, __pyx_L3_error)
+    __pyx_v_max_period = __Pyx_PyLong_As_int(values[2]); if (unlikely((__pyx_v_max_period == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 606, __pyx_L3_error)
+    __pyx_v_min_copies = __Pyx_PyLong_As_int(values[3]); if (unlikely((__pyx_v_min_copies == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 606, __pyx_L3_error)
     if (values[4]) {
-      __pyx_v_tolerance_ratio = __Pyx_PyFloat_AsDouble(values[4]); if (unlikely((__pyx_v_tolerance_ratio == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 583, __pyx_L3_error)
+      __pyx_v_tolerance_ratio = __Pyx_PyFloat_AsDouble(values[4]); if (unlikely((__pyx_v_tolerance_ratio == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 606, __pyx_L3_error)
     } else {
       __pyx_v_tolerance_ratio = ((double)0.01);
     }
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("find_periodic_patterns", 0, 4, 5, __pyx_nargs); __PYX_ERR(0, 583, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("find_periodic_patterns", 0, 4, 5, __pyx_nargs); __PYX_ERR(0, 606, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -24530,7 +24678,7 @@ static PyObject *__pyx_pf_3src_13_accelerators_10find_periodic_patterns(CYTHON_U
   __Pyx_XDECREF(__pyx_r);
   __pyx_t_2.__pyx_n = 1;
   __pyx_t_2.tolerance_ratio = __pyx_v_tolerance_ratio;
-  __pyx_t_1 = __pyx_f_3src_13_accelerators_find_periodic_patterns(__pyx_v_positions, __pyx_v_min_period, __pyx_v_max_period, __pyx_v_min_copies, 1, &__pyx_t_2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 583, __pyx_L1_error)
+  __pyx_t_1 = __pyx_f_3src_13_accelerators_find_periodic_patterns(__pyx_v_positions, __pyx_v_min_period, __pyx_v_max_period, __pyx_v_min_copies, 1, &__pyx_t_2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 606, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
@@ -24547,7 +24695,7 @@ static PyObject *__pyx_pf_3src_13_accelerators_10find_periodic_patterns(CYTHON_U
   return __pyx_r;
 }
 
-/* "src/_accelerators.pyx":631
+/* "src/_accelerators.pyx":654
  *     return results
  * 
  * cpdef list find_periodic_runs(long[:] positions, int min_period, int max_period, int min_copies, double tolerance_ratio=0.01):             # <<<<<<<<<<<<<<
@@ -24600,7 +24748,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
     }
   }
 
-  /* "src/_accelerators.pyx":638
+  /* "src/_accelerators.pyx":661
  *     within tolerance and within [min_period, max_period].
  *     """
  *     cdef int n = positions.shape[0]             # <<<<<<<<<<<<<<
@@ -24609,19 +24757,19 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
   __pyx_v_n = (__pyx_v_positions.shape[0]);
 
-  /* "src/_accelerators.pyx":639
+  /* "src/_accelerators.pyx":662
  *     """
  *     cdef int n = positions.shape[0]
  *     cdef list results = []             # <<<<<<<<<<<<<<
  *     if n < min_copies:
  *         return results
 */
-  __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 639, __pyx_L1_error)
+  __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 662, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_v_results = ((PyObject*)__pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "src/_accelerators.pyx":640
+  /* "src/_accelerators.pyx":663
  *     cdef int n = positions.shape[0]
  *     cdef list results = []
  *     if n < min_copies:             # <<<<<<<<<<<<<<
@@ -24631,7 +24779,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
   __pyx_t_2 = (__pyx_v_n < __pyx_v_min_copies);
   if (__pyx_t_2) {
 
-    /* "src/_accelerators.pyx":641
+    /* "src/_accelerators.pyx":664
  *     cdef list results = []
  *     if n < min_copies:
  *         return results             # <<<<<<<<<<<<<<
@@ -24643,7 +24791,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
     __pyx_r = __pyx_v_results;
     goto __pyx_L0;
 
-    /* "src/_accelerators.pyx":640
+    /* "src/_accelerators.pyx":663
  *     cdef int n = positions.shape[0]
  *     cdef list results = []
  *     if n < min_copies:             # <<<<<<<<<<<<<<
@@ -24652,7 +24800,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
   }
 
-  /* "src/_accelerators.pyx":643
+  /* "src/_accelerators.pyx":666
  *         return results
  * 
  *     cdef long prev_pos = positions[0]             # <<<<<<<<<<<<<<
@@ -24662,7 +24810,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
   __pyx_t_3 = 0;
   __pyx_v_prev_pos = (*((long *) ( /* dim=0 */ (__pyx_v_positions.data + __pyx_t_3 * __pyx_v_positions.strides[0]) )));
 
-  /* "src/_accelerators.pyx":644
+  /* "src/_accelerators.pyx":667
  * 
  *     cdef long prev_pos = positions[0]
  *     cdef double last_diff = -1.0             # <<<<<<<<<<<<<<
@@ -24671,7 +24819,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
   __pyx_v_last_diff = -1.0;
 
-  /* "src/_accelerators.pyx":645
+  /* "src/_accelerators.pyx":668
  *     cdef long prev_pos = positions[0]
  *     cdef double last_diff = -1.0
  *     cdef int run_start_idx = 0             # <<<<<<<<<<<<<<
@@ -24680,7 +24828,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
   __pyx_v_run_start_idx = 0;
 
-  /* "src/_accelerators.pyx":646
+  /* "src/_accelerators.pyx":669
  *     cdef double last_diff = -1.0
  *     cdef int run_start_idx = 0
  *     cdef int gap_count = 0  # number of consecutive gaps consistent with last_diff             # <<<<<<<<<<<<<<
@@ -24689,7 +24837,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
   __pyx_v_gap_count = 0;
 
-  /* "src/_accelerators.pyx":655
+  /* "src/_accelerators.pyx":678
  *     cdef int period_int
  * 
  *     for i in range(1, n):             # <<<<<<<<<<<<<<
@@ -24701,7 +24849,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
   for (__pyx_t_6 = 1; __pyx_t_6 < __pyx_t_5; __pyx_t_6+=1) {
     __pyx_v_i = __pyx_t_6;
 
-    /* "src/_accelerators.pyx":656
+    /* "src/_accelerators.pyx":679
  * 
  *     for i in range(1, n):
  *         cur_pos = positions[i]             # <<<<<<<<<<<<<<
@@ -24711,7 +24859,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
     __pyx_t_3 = __pyx_v_i;
     __pyx_v_cur_pos = (*((long *) ( /* dim=0 */ (__pyx_v_positions.data + __pyx_t_3 * __pyx_v_positions.strides[0]) )));
 
-    /* "src/_accelerators.pyx":657
+    /* "src/_accelerators.pyx":680
  *     for i in range(1, n):
  *         cur_pos = positions[i]
  *         diff = cur_pos - prev_pos             # <<<<<<<<<<<<<<
@@ -24720,7 +24868,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
     __pyx_v_diff = (__pyx_v_cur_pos - __pyx_v_prev_pos);
 
-    /* "src/_accelerators.pyx":658
+    /* "src/_accelerators.pyx":681
  *         cur_pos = positions[i]
  *         diff = cur_pos - prev_pos
  *         prev_pos = cur_pos             # <<<<<<<<<<<<<<
@@ -24729,7 +24877,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
     __pyx_v_prev_pos = __pyx_v_cur_pos;
 
-    /* "src/_accelerators.pyx":660
+    /* "src/_accelerators.pyx":683
  *         prev_pos = cur_pos
  * 
  *         if diff < min_period or diff > max_period:             # <<<<<<<<<<<<<<
@@ -24747,7 +24895,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
     __pyx_L7_bool_binop_done:;
     if (__pyx_t_2) {
 
-      /* "src/_accelerators.pyx":662
+      /* "src/_accelerators.pyx":685
  *         if diff < min_period or diff > max_period:
  *             # finish any existing run
  *             if gap_count + 1 >= min_copies:             # <<<<<<<<<<<<<<
@@ -24757,7 +24905,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
       __pyx_t_2 = ((__pyx_v_gap_count + 1) >= __pyx_v_min_copies);
       if (__pyx_t_2) {
 
-        /* "src/_accelerators.pyx":663
+        /* "src/_accelerators.pyx":686
  *             # finish any existing run
  *             if gap_count + 1 >= min_copies:
  *                 run_start_pos = positions[run_start_idx]             # <<<<<<<<<<<<<<
@@ -24767,7 +24915,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
         __pyx_t_3 = __pyx_v_run_start_idx;
         __pyx_v_run_start_pos = (*((long *) ( /* dim=0 */ (__pyx_v_positions.data + __pyx_t_3 * __pyx_v_positions.strides[0]) )));
 
-        /* "src/_accelerators.pyx":664
+        /* "src/_accelerators.pyx":687
  *             if gap_count + 1 >= min_copies:
  *                 run_start_pos = positions[run_start_idx]
  *                 run_end_pos = positions[i - 1]             # <<<<<<<<<<<<<<
@@ -24777,7 +24925,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
         __pyx_t_3 = (__pyx_v_i - 1);
         __pyx_v_run_end_pos = (*((long *) ( /* dim=0 */ (__pyx_v_positions.data + __pyx_t_3 * __pyx_v_positions.strides[0]) )));
 
-        /* "src/_accelerators.pyx":665
+        /* "src/_accelerators.pyx":688
  *                 run_start_pos = positions[run_start_idx]
  *                 run_end_pos = positions[i - 1]
  *                 period_int = <int>(last_diff + 0.5)             # <<<<<<<<<<<<<<
@@ -24786,34 +24934,34 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
         __pyx_v_period_int = ((int)(__pyx_v_last_diff + 0.5));
 
-        /* "src/_accelerators.pyx":666
+        /* "src/_accelerators.pyx":689
  *                 run_end_pos = positions[i - 1]
  *                 period_int = <int>(last_diff + 0.5)
  *                 results.append((run_start_pos, run_end_pos, period_int))             # <<<<<<<<<<<<<<
  *             # reset
  *             run_start_idx = i
 */
-        __pyx_t_1 = __Pyx_PyLong_From_long(__pyx_v_run_start_pos); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 666, __pyx_L1_error)
+        __pyx_t_1 = __Pyx_PyLong_From_long(__pyx_v_run_start_pos); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 689, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_1);
-        __pyx_t_8 = __Pyx_PyLong_From_long(__pyx_v_run_end_pos); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 666, __pyx_L1_error)
+        __pyx_t_8 = __Pyx_PyLong_From_long(__pyx_v_run_end_pos); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 689, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_8);
-        __pyx_t_9 = __Pyx_PyLong_From_int(__pyx_v_period_int); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 666, __pyx_L1_error)
+        __pyx_t_9 = __Pyx_PyLong_From_int(__pyx_v_period_int); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 689, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_9);
-        __pyx_t_10 = PyTuple_New(3); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 666, __pyx_L1_error)
+        __pyx_t_10 = PyTuple_New(3); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 689, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_10);
         __Pyx_GIVEREF(__pyx_t_1);
-        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_10, 0, __pyx_t_1) != (0)) __PYX_ERR(0, 666, __pyx_L1_error);
+        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_10, 0, __pyx_t_1) != (0)) __PYX_ERR(0, 689, __pyx_L1_error);
         __Pyx_GIVEREF(__pyx_t_8);
-        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_10, 1, __pyx_t_8) != (0)) __PYX_ERR(0, 666, __pyx_L1_error);
+        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_10, 1, __pyx_t_8) != (0)) __PYX_ERR(0, 689, __pyx_L1_error);
         __Pyx_GIVEREF(__pyx_t_9);
-        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_10, 2, __pyx_t_9) != (0)) __PYX_ERR(0, 666, __pyx_L1_error);
+        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_10, 2, __pyx_t_9) != (0)) __PYX_ERR(0, 689, __pyx_L1_error);
         __pyx_t_1 = 0;
         __pyx_t_8 = 0;
         __pyx_t_9 = 0;
-        __pyx_t_11 = __Pyx_PyList_Append(__pyx_v_results, __pyx_t_10); if (unlikely(__pyx_t_11 == ((int)-1))) __PYX_ERR(0, 666, __pyx_L1_error)
+        __pyx_t_11 = __Pyx_PyList_Append(__pyx_v_results, __pyx_t_10); if (unlikely(__pyx_t_11 == ((int)-1))) __PYX_ERR(0, 689, __pyx_L1_error)
         __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
 
-        /* "src/_accelerators.pyx":662
+        /* "src/_accelerators.pyx":685
  *         if diff < min_period or diff > max_period:
  *             # finish any existing run
  *             if gap_count + 1 >= min_copies:             # <<<<<<<<<<<<<<
@@ -24822,7 +24970,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
       }
 
-      /* "src/_accelerators.pyx":668
+      /* "src/_accelerators.pyx":691
  *                 results.append((run_start_pos, run_end_pos, period_int))
  *             # reset
  *             run_start_idx = i             # <<<<<<<<<<<<<<
@@ -24831,7 +24979,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
       __pyx_v_run_start_idx = __pyx_v_i;
 
-      /* "src/_accelerators.pyx":669
+      /* "src/_accelerators.pyx":692
  *             # reset
  *             run_start_idx = i
  *             gap_count = 0             # <<<<<<<<<<<<<<
@@ -24840,7 +24988,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
       __pyx_v_gap_count = 0;
 
-      /* "src/_accelerators.pyx":670
+      /* "src/_accelerators.pyx":693
  *             run_start_idx = i
  *             gap_count = 0
  *             last_diff = -1.0             # <<<<<<<<<<<<<<
@@ -24849,7 +24997,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
       __pyx_v_last_diff = -1.0;
 
-      /* "src/_accelerators.pyx":671
+      /* "src/_accelerators.pyx":694
  *             gap_count = 0
  *             last_diff = -1.0
  *             continue             # <<<<<<<<<<<<<<
@@ -24858,7 +25006,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
       goto __pyx_L4_continue;
 
-      /* "src/_accelerators.pyx":660
+      /* "src/_accelerators.pyx":683
  *         prev_pos = cur_pos
  * 
  *         if diff < min_period or diff > max_period:             # <<<<<<<<<<<<<<
@@ -24867,7 +25015,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
     }
 
-    /* "src/_accelerators.pyx":673
+    /* "src/_accelerators.pyx":696
  *             continue
  * 
  *         if last_diff < 0:             # <<<<<<<<<<<<<<
@@ -24877,7 +25025,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
     __pyx_t_2 = (__pyx_v_last_diff < 0.0);
     if (__pyx_t_2) {
 
-      /* "src/_accelerators.pyx":674
+      /* "src/_accelerators.pyx":697
  * 
  *         if last_diff < 0:
  *             last_diff = diff             # <<<<<<<<<<<<<<
@@ -24886,7 +25034,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
       __pyx_v_last_diff = __pyx_v_diff;
 
-      /* "src/_accelerators.pyx":675
+      /* "src/_accelerators.pyx":698
  *         if last_diff < 0:
  *             last_diff = diff
  *             gap_count = 1             # <<<<<<<<<<<<<<
@@ -24895,7 +25043,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
       __pyx_v_gap_count = 1;
 
-      /* "src/_accelerators.pyx":676
+      /* "src/_accelerators.pyx":699
  *             last_diff = diff
  *             gap_count = 1
  *             run_start_idx = i - 1             # <<<<<<<<<<<<<<
@@ -24904,7 +25052,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
       __pyx_v_run_start_idx = (__pyx_v_i - 1);
 
-      /* "src/_accelerators.pyx":673
+      /* "src/_accelerators.pyx":696
  *             continue
  * 
  *         if last_diff < 0:             # <<<<<<<<<<<<<<
@@ -24914,7 +25062,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
       goto __pyx_L10;
     }
 
-    /* "src/_accelerators.pyx":678
+    /* "src/_accelerators.pyx":701
  *             run_start_idx = i - 1
  *         else:
  *             tol = last_diff * tolerance_ratio             # <<<<<<<<<<<<<<
@@ -24924,7 +25072,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
     /*else*/ {
       __pyx_v_tol = (__pyx_v_last_diff * __pyx_v_tolerance_ratio);
 
-      /* "src/_accelerators.pyx":679
+      /* "src/_accelerators.pyx":702
  *         else:
  *             tol = last_diff * tolerance_ratio
  *             if tol < 1.0:             # <<<<<<<<<<<<<<
@@ -24934,7 +25082,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
       __pyx_t_2 = (__pyx_v_tol < 1.0);
       if (__pyx_t_2) {
 
-        /* "src/_accelerators.pyx":680
+        /* "src/_accelerators.pyx":703
  *             tol = last_diff * tolerance_ratio
  *             if tol < 1.0:
  *                 tol = 1.0             # <<<<<<<<<<<<<<
@@ -24943,7 +25091,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
         __pyx_v_tol = 1.0;
 
-        /* "src/_accelerators.pyx":679
+        /* "src/_accelerators.pyx":702
  *         else:
  *             tol = last_diff * tolerance_ratio
  *             if tol < 1.0:             # <<<<<<<<<<<<<<
@@ -24952,7 +25100,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
       }
 
-      /* "src/_accelerators.pyx":681
+      /* "src/_accelerators.pyx":704
  *             if tol < 1.0:
  *                 tol = 1.0
  *             if diff >= last_diff - tol and diff <= last_diff + tol:             # <<<<<<<<<<<<<<
@@ -24970,7 +25118,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
       __pyx_L13_bool_binop_done:;
       if (__pyx_t_2) {
 
-        /* "src/_accelerators.pyx":682
+        /* "src/_accelerators.pyx":705
  *                 tol = 1.0
  *             if diff >= last_diff - tol and diff <= last_diff + tol:
  *                 gap_count += 1             # <<<<<<<<<<<<<<
@@ -24979,7 +25127,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
         __pyx_v_gap_count = (__pyx_v_gap_count + 1);
 
-        /* "src/_accelerators.pyx":681
+        /* "src/_accelerators.pyx":704
  *             if tol < 1.0:
  *                 tol = 1.0
  *             if diff >= last_diff - tol and diff <= last_diff + tol:             # <<<<<<<<<<<<<<
@@ -24989,7 +25137,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
         goto __pyx_L12;
       }
 
-      /* "src/_accelerators.pyx":685
+      /* "src/_accelerators.pyx":708
  *             else:
  *                 # end current run
  *                 if gap_count + 1 >= min_copies:             # <<<<<<<<<<<<<<
@@ -25000,7 +25148,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
         __pyx_t_2 = ((__pyx_v_gap_count + 1) >= __pyx_v_min_copies);
         if (__pyx_t_2) {
 
-          /* "src/_accelerators.pyx":686
+          /* "src/_accelerators.pyx":709
  *                 # end current run
  *                 if gap_count + 1 >= min_copies:
  *                     run_start_pos = positions[run_start_idx]             # <<<<<<<<<<<<<<
@@ -25010,7 +25158,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
           __pyx_t_3 = __pyx_v_run_start_idx;
           __pyx_v_run_start_pos = (*((long *) ( /* dim=0 */ (__pyx_v_positions.data + __pyx_t_3 * __pyx_v_positions.strides[0]) )));
 
-          /* "src/_accelerators.pyx":687
+          /* "src/_accelerators.pyx":710
  *                 if gap_count + 1 >= min_copies:
  *                     run_start_pos = positions[run_start_idx]
  *                     run_end_pos = positions[i - 1]             # <<<<<<<<<<<<<<
@@ -25020,7 +25168,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
           __pyx_t_3 = (__pyx_v_i - 1);
           __pyx_v_run_end_pos = (*((long *) ( /* dim=0 */ (__pyx_v_positions.data + __pyx_t_3 * __pyx_v_positions.strides[0]) )));
 
-          /* "src/_accelerators.pyx":688
+          /* "src/_accelerators.pyx":711
  *                     run_start_pos = positions[run_start_idx]
  *                     run_end_pos = positions[i - 1]
  *                     period_int = <int>(last_diff + 0.5)             # <<<<<<<<<<<<<<
@@ -25029,34 +25177,34 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
           __pyx_v_period_int = ((int)(__pyx_v_last_diff + 0.5));
 
-          /* "src/_accelerators.pyx":689
+          /* "src/_accelerators.pyx":712
  *                     run_end_pos = positions[i - 1]
  *                     period_int = <int>(last_diff + 0.5)
  *                     results.append((run_start_pos, run_end_pos, period_int))             # <<<<<<<<<<<<<<
  *                 # start new run with this gap
  *                 last_diff = diff
 */
-          __pyx_t_10 = __Pyx_PyLong_From_long(__pyx_v_run_start_pos); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 689, __pyx_L1_error)
+          __pyx_t_10 = __Pyx_PyLong_From_long(__pyx_v_run_start_pos); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 712, __pyx_L1_error)
           __Pyx_GOTREF(__pyx_t_10);
-          __pyx_t_9 = __Pyx_PyLong_From_long(__pyx_v_run_end_pos); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 689, __pyx_L1_error)
+          __pyx_t_9 = __Pyx_PyLong_From_long(__pyx_v_run_end_pos); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 712, __pyx_L1_error)
           __Pyx_GOTREF(__pyx_t_9);
-          __pyx_t_8 = __Pyx_PyLong_From_int(__pyx_v_period_int); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 689, __pyx_L1_error)
+          __pyx_t_8 = __Pyx_PyLong_From_int(__pyx_v_period_int); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 712, __pyx_L1_error)
           __Pyx_GOTREF(__pyx_t_8);
-          __pyx_t_1 = PyTuple_New(3); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 689, __pyx_L1_error)
+          __pyx_t_1 = PyTuple_New(3); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 712, __pyx_L1_error)
           __Pyx_GOTREF(__pyx_t_1);
           __Pyx_GIVEREF(__pyx_t_10);
-          if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_t_10) != (0)) __PYX_ERR(0, 689, __pyx_L1_error);
+          if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_t_10) != (0)) __PYX_ERR(0, 712, __pyx_L1_error);
           __Pyx_GIVEREF(__pyx_t_9);
-          if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 1, __pyx_t_9) != (0)) __PYX_ERR(0, 689, __pyx_L1_error);
+          if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 1, __pyx_t_9) != (0)) __PYX_ERR(0, 712, __pyx_L1_error);
           __Pyx_GIVEREF(__pyx_t_8);
-          if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 2, __pyx_t_8) != (0)) __PYX_ERR(0, 689, __pyx_L1_error);
+          if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 2, __pyx_t_8) != (0)) __PYX_ERR(0, 712, __pyx_L1_error);
           __pyx_t_10 = 0;
           __pyx_t_9 = 0;
           __pyx_t_8 = 0;
-          __pyx_t_11 = __Pyx_PyList_Append(__pyx_v_results, __pyx_t_1); if (unlikely(__pyx_t_11 == ((int)-1))) __PYX_ERR(0, 689, __pyx_L1_error)
+          __pyx_t_11 = __Pyx_PyList_Append(__pyx_v_results, __pyx_t_1); if (unlikely(__pyx_t_11 == ((int)-1))) __PYX_ERR(0, 712, __pyx_L1_error)
           __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-          /* "src/_accelerators.pyx":685
+          /* "src/_accelerators.pyx":708
  *             else:
  *                 # end current run
  *                 if gap_count + 1 >= min_copies:             # <<<<<<<<<<<<<<
@@ -25065,7 +25213,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
         }
 
-        /* "src/_accelerators.pyx":691
+        /* "src/_accelerators.pyx":714
  *                     results.append((run_start_pos, run_end_pos, period_int))
  *                 # start new run with this gap
  *                 last_diff = diff             # <<<<<<<<<<<<<<
@@ -25074,7 +25222,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
         __pyx_v_last_diff = __pyx_v_diff;
 
-        /* "src/_accelerators.pyx":692
+        /* "src/_accelerators.pyx":715
  *                 # start new run with this gap
  *                 last_diff = diff
  *                 gap_count = 1             # <<<<<<<<<<<<<<
@@ -25083,7 +25231,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
         __pyx_v_gap_count = 1;
 
-        /* "src/_accelerators.pyx":693
+        /* "src/_accelerators.pyx":716
  *                 last_diff = diff
  *                 gap_count = 1
  *                 run_start_idx = i - 1             # <<<<<<<<<<<<<<
@@ -25098,7 +25246,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
     __pyx_L4_continue:;
   }
 
-  /* "src/_accelerators.pyx":696
+  /* "src/_accelerators.pyx":719
  * 
  *     # flush at end
  *     if gap_count + 1 >= min_copies:             # <<<<<<<<<<<<<<
@@ -25108,7 +25256,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
   __pyx_t_2 = ((__pyx_v_gap_count + 1) >= __pyx_v_min_copies);
   if (__pyx_t_2) {
 
-    /* "src/_accelerators.pyx":697
+    /* "src/_accelerators.pyx":720
  *     # flush at end
  *     if gap_count + 1 >= min_copies:
  *         run_start_pos = positions[run_start_idx]             # <<<<<<<<<<<<<<
@@ -25118,7 +25266,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
     __pyx_t_3 = __pyx_v_run_start_idx;
     __pyx_v_run_start_pos = (*((long *) ( /* dim=0 */ (__pyx_v_positions.data + __pyx_t_3 * __pyx_v_positions.strides[0]) )));
 
-    /* "src/_accelerators.pyx":698
+    /* "src/_accelerators.pyx":721
  *     if gap_count + 1 >= min_copies:
  *         run_start_pos = positions[run_start_idx]
  *         run_end_pos = positions[n - 1]             # <<<<<<<<<<<<<<
@@ -25128,7 +25276,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
     __pyx_t_3 = (__pyx_v_n - 1);
     __pyx_v_run_end_pos = (*((long *) ( /* dim=0 */ (__pyx_v_positions.data + __pyx_t_3 * __pyx_v_positions.strides[0]) )));
 
-    /* "src/_accelerators.pyx":699
+    /* "src/_accelerators.pyx":722
  *         run_start_pos = positions[run_start_idx]
  *         run_end_pos = positions[n - 1]
  *         period_int = <int>(last_diff + 0.5)             # <<<<<<<<<<<<<<
@@ -25137,34 +25285,34 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
     __pyx_v_period_int = ((int)(__pyx_v_last_diff + 0.5));
 
-    /* "src/_accelerators.pyx":700
+    /* "src/_accelerators.pyx":723
  *         run_end_pos = positions[n - 1]
  *         period_int = <int>(last_diff + 0.5)
  *         results.append((run_start_pos, run_end_pos, period_int))             # <<<<<<<<<<<<<<
  * 
  *     return results
 */
-    __pyx_t_1 = __Pyx_PyLong_From_long(__pyx_v_run_start_pos); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 700, __pyx_L1_error)
+    __pyx_t_1 = __Pyx_PyLong_From_long(__pyx_v_run_start_pos); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 723, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
-    __pyx_t_8 = __Pyx_PyLong_From_long(__pyx_v_run_end_pos); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 700, __pyx_L1_error)
+    __pyx_t_8 = __Pyx_PyLong_From_long(__pyx_v_run_end_pos); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 723, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_8);
-    __pyx_t_9 = __Pyx_PyLong_From_int(__pyx_v_period_int); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 700, __pyx_L1_error)
+    __pyx_t_9 = __Pyx_PyLong_From_int(__pyx_v_period_int); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 723, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_9);
-    __pyx_t_10 = PyTuple_New(3); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 700, __pyx_L1_error)
+    __pyx_t_10 = PyTuple_New(3); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 723, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_10);
     __Pyx_GIVEREF(__pyx_t_1);
-    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_10, 0, __pyx_t_1) != (0)) __PYX_ERR(0, 700, __pyx_L1_error);
+    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_10, 0, __pyx_t_1) != (0)) __PYX_ERR(0, 723, __pyx_L1_error);
     __Pyx_GIVEREF(__pyx_t_8);
-    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_10, 1, __pyx_t_8) != (0)) __PYX_ERR(0, 700, __pyx_L1_error);
+    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_10, 1, __pyx_t_8) != (0)) __PYX_ERR(0, 723, __pyx_L1_error);
     __Pyx_GIVEREF(__pyx_t_9);
-    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_10, 2, __pyx_t_9) != (0)) __PYX_ERR(0, 700, __pyx_L1_error);
+    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_10, 2, __pyx_t_9) != (0)) __PYX_ERR(0, 723, __pyx_L1_error);
     __pyx_t_1 = 0;
     __pyx_t_8 = 0;
     __pyx_t_9 = 0;
-    __pyx_t_11 = __Pyx_PyList_Append(__pyx_v_results, __pyx_t_10); if (unlikely(__pyx_t_11 == ((int)-1))) __PYX_ERR(0, 700, __pyx_L1_error)
+    __pyx_t_11 = __Pyx_PyList_Append(__pyx_v_results, __pyx_t_10); if (unlikely(__pyx_t_11 == ((int)-1))) __PYX_ERR(0, 723, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
 
-    /* "src/_accelerators.pyx":696
+    /* "src/_accelerators.pyx":719
  * 
  *     # flush at end
  *     if gap_count + 1 >= min_copies:             # <<<<<<<<<<<<<<
@@ -25173,7 +25321,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
 */
   }
 
-  /* "src/_accelerators.pyx":702
+  /* "src/_accelerators.pyx":725
  *         results.append((run_start_pos, run_end_pos, period_int))
  * 
  *     return results             # <<<<<<<<<<<<<<
@@ -25185,7 +25333,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_periodic_runs(__Pyx_memviewsl
   __pyx_r = __pyx_v_results;
   goto __pyx_L0;
 
-  /* "src/_accelerators.pyx":631
+  /* "src/_accelerators.pyx":654
  *     return results
  * 
  * cpdef list find_periodic_runs(long[:] positions, int min_period, int max_period, int min_copies, double tolerance_ratio=0.01):             # <<<<<<<<<<<<<<
@@ -25252,69 +25400,69 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_positions,&__pyx_mstate_global->__pyx_n_u_min_period,&__pyx_mstate_global->__pyx_n_u_max_period,&__pyx_mstate_global->__pyx_n_u_min_copies,&__pyx_mstate_global->__pyx_n_u_tolerance_ratio,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 631, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 654, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  5:
         values[4] = __Pyx_ArgRef_FASTCALL(__pyx_args, 4);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 631, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 654, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  4:
         values[3] = __Pyx_ArgRef_FASTCALL(__pyx_args, 3);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 631, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 654, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  3:
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 631, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 654, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 631, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 654, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 631, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 654, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "find_periodic_runs", 0) < (0)) __PYX_ERR(0, 631, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "find_periodic_runs", 0) < (0)) __PYX_ERR(0, 654, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 4; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("find_periodic_runs", 0, 4, 5, i); __PYX_ERR(0, 631, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("find_periodic_runs", 0, 4, 5, i); __PYX_ERR(0, 654, __pyx_L3_error) }
       }
     } else {
       switch (__pyx_nargs) {
         case  5:
         values[4] = __Pyx_ArgRef_FASTCALL(__pyx_args, 4);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 631, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 654, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  4:
         values[3] = __Pyx_ArgRef_FASTCALL(__pyx_args, 3);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 631, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 654, __pyx_L3_error)
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 631, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 654, __pyx_L3_error)
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 631, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 654, __pyx_L3_error)
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 631, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 654, __pyx_L3_error)
         break;
         default: goto __pyx_L5_argtuple_error;
       }
     }
-    __pyx_v_positions = __Pyx_PyObject_to_MemoryviewSlice_ds_long(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_positions.memview)) __PYX_ERR(0, 631, __pyx_L3_error)
-    __pyx_v_min_period = __Pyx_PyLong_As_int(values[1]); if (unlikely((__pyx_v_min_period == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 631, __pyx_L3_error)
-    __pyx_v_max_period = __Pyx_PyLong_As_int(values[2]); if (unlikely((__pyx_v_max_period == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 631, __pyx_L3_error)
-    __pyx_v_min_copies = __Pyx_PyLong_As_int(values[3]); if (unlikely((__pyx_v_min_copies == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 631, __pyx_L3_error)
+    __pyx_v_positions = __Pyx_PyObject_to_MemoryviewSlice_ds_long(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_positions.memview)) __PYX_ERR(0, 654, __pyx_L3_error)
+    __pyx_v_min_period = __Pyx_PyLong_As_int(values[1]); if (unlikely((__pyx_v_min_period == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 654, __pyx_L3_error)
+    __pyx_v_max_period = __Pyx_PyLong_As_int(values[2]); if (unlikely((__pyx_v_max_period == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 654, __pyx_L3_error)
+    __pyx_v_min_copies = __Pyx_PyLong_As_int(values[3]); if (unlikely((__pyx_v_min_copies == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 654, __pyx_L3_error)
     if (values[4]) {
-      __pyx_v_tolerance_ratio = __Pyx_PyFloat_AsDouble(values[4]); if (unlikely((__pyx_v_tolerance_ratio == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 631, __pyx_L3_error)
+      __pyx_v_tolerance_ratio = __Pyx_PyFloat_AsDouble(values[4]); if (unlikely((__pyx_v_tolerance_ratio == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 654, __pyx_L3_error)
     } else {
       __pyx_v_tolerance_ratio = ((double)0.01);
     }
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("find_periodic_runs", 0, 4, 5, __pyx_nargs); __PYX_ERR(0, 631, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("find_periodic_runs", 0, 4, 5, __pyx_nargs); __PYX_ERR(0, 654, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -25349,7 +25497,7 @@ static PyObject *__pyx_pf_3src_13_accelerators_12find_periodic_runs(CYTHON_UNUSE
   __Pyx_XDECREF(__pyx_r);
   __pyx_t_2.__pyx_n = 1;
   __pyx_t_2.tolerance_ratio = __pyx_v_tolerance_ratio;
-  __pyx_t_1 = __pyx_f_3src_13_accelerators_find_periodic_runs(__pyx_v_positions, __pyx_v_min_period, __pyx_v_max_period, __pyx_v_min_copies, 1, &__pyx_t_2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 631, __pyx_L1_error)
+  __pyx_t_1 = __pyx_f_3src_13_accelerators_find_periodic_runs(__pyx_v_positions, __pyx_v_min_period, __pyx_v_max_period, __pyx_v_min_copies, 1, &__pyx_t_2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 654, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
@@ -25366,7 +25514,7 @@ static PyObject *__pyx_pf_3src_13_accelerators_12find_periodic_runs(CYTHON_UNUSE
   return __pyx_r;
 }
 
-/* "src/_accelerators.pyx":706
+/* "src/_accelerators.pyx":729
  * from libc.stdlib cimport malloc, free
  * 
  * cpdef tuple align_unit_to_window(             # <<<<<<<<<<<<<<
@@ -25466,7 +25614,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("align_unit_to_window", 0);
 
-  /* "src/_accelerators.pyx":713
+  /* "src/_accelerators.pyx":736
  * ):
  *     """Cython implementation of Needleman-Wunsch alignment for repeat units."""
  *     cdef int m = motif.shape[0]             # <<<<<<<<<<<<<<
@@ -25475,7 +25623,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
   __pyx_v_m = (__pyx_v_motif.shape[0]);
 
-  /* "src/_accelerators.pyx":714
+  /* "src/_accelerators.pyx":737
  *     """Cython implementation of Needleman-Wunsch alignment for repeat units."""
  *     cdef int m = motif.shape[0]
  *     cdef int n = window.shape[0]             # <<<<<<<<<<<<<<
@@ -25484,7 +25632,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
   __pyx_v_n = (__pyx_v_window.shape[0]);
 
-  /* "src/_accelerators.pyx":716
+  /* "src/_accelerators.pyx":739
  *     cdef int n = window.shape[0]
  * 
  *     if m == 0 or n == 0:             # <<<<<<<<<<<<<<
@@ -25502,7 +25650,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
   __pyx_L4_bool_binop_done:;
   if (__pyx_t_1) {
 
-    /* "src/_accelerators.pyx":717
+    /* "src/_accelerators.pyx":740
  * 
  *     if m == 0 or n == 0:
  *         return None             # <<<<<<<<<<<<<<
@@ -25513,7 +25661,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
     __pyx_r = ((PyObject*)Py_None); __Pyx_INCREF(Py_None);
     goto __pyx_L0;
 
-    /* "src/_accelerators.pyx":716
+    /* "src/_accelerators.pyx":739
  *     cdef int n = window.shape[0]
  * 
  *     if m == 0 or n == 0:             # <<<<<<<<<<<<<<
@@ -25522,7 +25670,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
   }
 
-  /* "src/_accelerators.pyx":719
+  /* "src/_accelerators.pyx":742
  *         return None
  * 
  *     if max_indel < 0: max_indel = 0             # <<<<<<<<<<<<<<
@@ -25534,7 +25682,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
     __pyx_v_max_indel = 0;
   }
 
-  /* "src/_accelerators.pyx":720
+  /* "src/_accelerators.pyx":743
  * 
  *     if max_indel < 0: max_indel = 0
  *     if mismatch_tolerance < 0: mismatch_tolerance = 0             # <<<<<<<<<<<<<<
@@ -25546,7 +25694,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
     __pyx_v_mismatch_tolerance = 0;
   }
 
-  /* "src/_accelerators.pyx":722
+  /* "src/_accelerators.pyx":745
  *     if mismatch_tolerance < 0: mismatch_tolerance = 0
  * 
  *     cdef int lower = m - max_indel             # <<<<<<<<<<<<<<
@@ -25555,7 +25703,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
   __pyx_v_lower = (__pyx_v_m - __pyx_v_max_indel);
 
-  /* "src/_accelerators.pyx":723
+  /* "src/_accelerators.pyx":746
  * 
  *     cdef int lower = m - max_indel
  *     if lower < 0: lower = 0             # <<<<<<<<<<<<<<
@@ -25567,7 +25715,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
     __pyx_v_lower = 0;
   }
 
-  /* "src/_accelerators.pyx":724
+  /* "src/_accelerators.pyx":747
  *     cdef int lower = m - max_indel
  *     if lower < 0: lower = 0
  *     cdef int upper = m + max_indel             # <<<<<<<<<<<<<<
@@ -25576,7 +25724,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
   __pyx_v_upper = (__pyx_v_m + __pyx_v_max_indel);
 
-  /* "src/_accelerators.pyx":725
+  /* "src/_accelerators.pyx":748
  *     if lower < 0: lower = 0
  *     cdef int upper = m + max_indel
  *     if upper > n: upper = n             # <<<<<<<<<<<<<<
@@ -25588,7 +25736,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
     __pyx_v_upper = __pyx_v_n;
   }
 
-  /* "src/_accelerators.pyx":727
+  /* "src/_accelerators.pyx":750
  *     if upper > n: upper = n
  * 
  *     if lower > upper:             # <<<<<<<<<<<<<<
@@ -25598,7 +25746,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
   __pyx_t_1 = (__pyx_v_lower > __pyx_v_upper);
   if (__pyx_t_1) {
 
-    /* "src/_accelerators.pyx":728
+    /* "src/_accelerators.pyx":751
  * 
  *     if lower > upper:
  *         return None             # <<<<<<<<<<<<<<
@@ -25609,7 +25757,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
     __pyx_r = ((PyObject*)Py_None); __Pyx_INCREF(Py_None);
     goto __pyx_L0;
 
-    /* "src/_accelerators.pyx":727
+    /* "src/_accelerators.pyx":750
  *     if upper > n: upper = n
  * 
  *     if lower > upper:             # <<<<<<<<<<<<<<
@@ -25618,7 +25766,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
   }
 
-  /* "src/_accelerators.pyx":730
+  /* "src/_accelerators.pyx":753
  *         return None
  * 
  *     cdef int inf = m + n + 10             # <<<<<<<<<<<<<<
@@ -25627,7 +25775,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
   __pyx_v_inf = ((__pyx_v_m + __pyx_v_n) + 10);
 
-  /* "src/_accelerators.pyx":731
+  /* "src/_accelerators.pyx":754
  * 
  *     cdef int inf = m + n + 10
  *     cdef int rows = m + 1             # <<<<<<<<<<<<<<
@@ -25636,7 +25784,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
   __pyx_v_rows = (__pyx_v_m + 1);
 
-  /* "src/_accelerators.pyx":732
+  /* "src/_accelerators.pyx":755
  *     cdef int inf = m + n + 10
  *     cdef int rows = m + 1
  *     cdef int cols = n + 1             # <<<<<<<<<<<<<<
@@ -25645,7 +25793,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
   __pyx_v_cols = (__pyx_v_n + 1);
 
-  /* "src/_accelerators.pyx":735
+  /* "src/_accelerators.pyx":758
  * 
  *     # Allocate flattened arrays
  *     cdef int* dp = <int*> malloc(rows * cols * sizeof(int))             # <<<<<<<<<<<<<<
@@ -25654,7 +25802,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
   __pyx_v_dp = ((int *)malloc(((__pyx_v_rows * __pyx_v_cols) * (sizeof(int)))));
 
-  /* "src/_accelerators.pyx":736
+  /* "src/_accelerators.pyx":759
  *     # Allocate flattened arrays
  *     cdef int* dp = <int*> malloc(rows * cols * sizeof(int))
  *     cdef char* ptr = <char*> malloc(rows * cols * sizeof(char))             # <<<<<<<<<<<<<<
@@ -25663,7 +25811,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
   __pyx_v_ptr = ((char *)malloc(((__pyx_v_rows * __pyx_v_cols) * (sizeof(char)))));
 
-  /* "src/_accelerators.pyx":738
+  /* "src/_accelerators.pyx":761
  *     cdef char* ptr = <char*> malloc(rows * cols * sizeof(char))
  * 
  *     if not dp or not ptr:             # <<<<<<<<<<<<<<
@@ -25681,7 +25829,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
   __pyx_L12_bool_binop_done:;
   if (__pyx_t_1) {
 
-    /* "src/_accelerators.pyx":739
+    /* "src/_accelerators.pyx":762
  * 
  *     if not dp or not ptr:
  *         if dp: free(dp)             # <<<<<<<<<<<<<<
@@ -25693,7 +25841,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
       free(__pyx_v_dp);
     }
 
-    /* "src/_accelerators.pyx":740
+    /* "src/_accelerators.pyx":763
  *     if not dp or not ptr:
  *         if dp: free(dp)
  *         if ptr: free(ptr)             # <<<<<<<<<<<<<<
@@ -25705,16 +25853,16 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
       free(__pyx_v_ptr);
     }
 
-    /* "src/_accelerators.pyx":741
+    /* "src/_accelerators.pyx":764
  *         if dp: free(dp)
  *         if ptr: free(ptr)
  *         raise MemoryError()             # <<<<<<<<<<<<<<
  * 
  *     cdef int i, j, idx
 */
-    PyErr_NoMemory(); __PYX_ERR(0, 741, __pyx_L1_error)
+    PyErr_NoMemory(); __PYX_ERR(0, 764, __pyx_L1_error)
 
-    /* "src/_accelerators.pyx":738
+    /* "src/_accelerators.pyx":761
  *     cdef char* ptr = <char*> malloc(rows * cols * sizeof(char))
  * 
  *     if not dp or not ptr:             # <<<<<<<<<<<<<<
@@ -25723,7 +25871,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
   }
 
-  /* "src/_accelerators.pyx":747
+  /* "src/_accelerators.pyx":770
  *     cdef char best_ptr
  *     cdef int j_min, j_max
  *     cdef int band_extra = max_indel + 2             # <<<<<<<<<<<<<<
@@ -25732,7 +25880,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
   __pyx_v_band_extra = (__pyx_v_max_indel + 2);
 
-  /* "src/_accelerators.pyx":763
+  /* "src/_accelerators.pyx":786
  *     # 0=Stop, 1=Match(M), 2=Sub(S), 3=Del(D), 4=Ins(I)
  * 
  *     try:             # <<<<<<<<<<<<<<
@@ -25741,7 +25889,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
   /*try:*/ {
 
-    /* "src/_accelerators.pyx":765
+    /* "src/_accelerators.pyx":788
  *     try:
  *         # Initialize
  *         for i in range(rows):             # <<<<<<<<<<<<<<
@@ -25753,7 +25901,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
     for (__pyx_t_5 = 0; __pyx_t_5 < __pyx_t_4; __pyx_t_5+=1) {
       __pyx_v_i = __pyx_t_5;
 
-      /* "src/_accelerators.pyx":766
+      /* "src/_accelerators.pyx":789
  *         # Initialize
  *         for i in range(rows):
  *             for j in range(cols):             # <<<<<<<<<<<<<<
@@ -25765,7 +25913,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
       for (__pyx_t_8 = 0; __pyx_t_8 < __pyx_t_7; __pyx_t_8+=1) {
         __pyx_v_j = __pyx_t_8;
 
-        /* "src/_accelerators.pyx":767
+        /* "src/_accelerators.pyx":790
  *         for i in range(rows):
  *             for j in range(cols):
  *                 dp[i * cols + j] = inf             # <<<<<<<<<<<<<<
@@ -25774,7 +25922,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
         (__pyx_v_dp[((__pyx_v_i * __pyx_v_cols) + __pyx_v_j)]) = __pyx_v_inf;
 
-        /* "src/_accelerators.pyx":768
+        /* "src/_accelerators.pyx":791
  *             for j in range(cols):
  *                 dp[i * cols + j] = inf
  *                 ptr[i * cols + j] = 0             # <<<<<<<<<<<<<<
@@ -25785,7 +25933,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
       }
     }
 
-    /* "src/_accelerators.pyx":770
+    /* "src/_accelerators.pyx":793
  *                 ptr[i * cols + j] = 0
  * 
  *         dp[0] = 0             # <<<<<<<<<<<<<<
@@ -25794,7 +25942,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
     (__pyx_v_dp[0]) = 0;
 
-    /* "src/_accelerators.pyx":771
+    /* "src/_accelerators.pyx":794
  * 
  *         dp[0] = 0
  *         for j in range(1, cols):             # <<<<<<<<<<<<<<
@@ -25806,7 +25954,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
     for (__pyx_t_5 = 1; __pyx_t_5 < __pyx_t_4; __pyx_t_5+=1) {
       __pyx_v_j = __pyx_t_5;
 
-      /* "src/_accelerators.pyx":772
+      /* "src/_accelerators.pyx":795
  *         dp[0] = 0
  *         for j in range(1, cols):
  *             dp[j] = j             # <<<<<<<<<<<<<<
@@ -25815,7 +25963,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
       (__pyx_v_dp[__pyx_v_j]) = __pyx_v_j;
 
-      /* "src/_accelerators.pyx":773
+      /* "src/_accelerators.pyx":796
  *         for j in range(1, cols):
  *             dp[j] = j
  *             ptr[j] = 4 # I             # <<<<<<<<<<<<<<
@@ -25825,7 +25973,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
       (__pyx_v_ptr[__pyx_v_j]) = 4;
     }
 
-    /* "src/_accelerators.pyx":775
+    /* "src/_accelerators.pyx":798
  *             ptr[j] = 4 # I
  * 
  *         for i in range(1, rows):             # <<<<<<<<<<<<<<
@@ -25837,7 +25985,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
     for (__pyx_t_5 = 1; __pyx_t_5 < __pyx_t_4; __pyx_t_5+=1) {
       __pyx_v_i = __pyx_t_5;
 
-      /* "src/_accelerators.pyx":776
+      /* "src/_accelerators.pyx":799
  * 
  *         for i in range(1, rows):
  *             dp[i * cols] = i             # <<<<<<<<<<<<<<
@@ -25846,7 +25994,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
       (__pyx_v_dp[(__pyx_v_i * __pyx_v_cols)]) = __pyx_v_i;
 
-      /* "src/_accelerators.pyx":777
+      /* "src/_accelerators.pyx":800
  *         for i in range(1, rows):
  *             dp[i * cols] = i
  *             ptr[i * cols] = 3 # D             # <<<<<<<<<<<<<<
@@ -25856,7 +26004,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
       (__pyx_v_ptr[(__pyx_v_i * __pyx_v_cols)]) = 3;
     }
 
-    /* "src/_accelerators.pyx":780
+    /* "src/_accelerators.pyx":803
  * 
  *         # Fill DP
  *         for i in range(1, rows):             # <<<<<<<<<<<<<<
@@ -25868,7 +26016,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
     for (__pyx_t_5 = 1; __pyx_t_5 < __pyx_t_4; __pyx_t_5+=1) {
       __pyx_v_i = __pyx_t_5;
 
-      /* "src/_accelerators.pyx":781
+      /* "src/_accelerators.pyx":804
  *         # Fill DP
  *         for i in range(1, rows):
  *             j_min = i - band_extra             # <<<<<<<<<<<<<<
@@ -25877,7 +26025,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
       __pyx_v_j_min = (__pyx_v_i - __pyx_v_band_extra);
 
-      /* "src/_accelerators.pyx":782
+      /* "src/_accelerators.pyx":805
  *         for i in range(1, rows):
  *             j_min = i - band_extra
  *             if j_min < 1: j_min = 1             # <<<<<<<<<<<<<<
@@ -25889,7 +26037,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
         __pyx_v_j_min = 1;
       }
 
-      /* "src/_accelerators.pyx":783
+      /* "src/_accelerators.pyx":806
  *             j_min = i - band_extra
  *             if j_min < 1: j_min = 1
  *             j_max = i + band_extra             # <<<<<<<<<<<<<<
@@ -25898,7 +26046,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
       __pyx_v_j_max = (__pyx_v_i + __pyx_v_band_extra);
 
-      /* "src/_accelerators.pyx":784
+      /* "src/_accelerators.pyx":807
  *             if j_min < 1: j_min = 1
  *             j_max = i + band_extra
  *             if j_max > n: j_max = n             # <<<<<<<<<<<<<<
@@ -25910,7 +26058,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
         __pyx_v_j_max = __pyx_v_n;
       }
 
-      /* "src/_accelerators.pyx":786
+      /* "src/_accelerators.pyx":809
  *             if j_max > n: j_max = n
  * 
  *             for j in range(j_min, j_max + 1):             # <<<<<<<<<<<<<<
@@ -25922,7 +26070,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
       for (__pyx_t_6 = __pyx_v_j_min; __pyx_t_6 < __pyx_t_10; __pyx_t_6+=1) {
         __pyx_v_j = __pyx_t_6;
 
-        /* "src/_accelerators.pyx":788
+        /* "src/_accelerators.pyx":811
  *             for j in range(j_min, j_max + 1):
  *                 # Match/Sub
  *                 sub_cost = dp[(i - 1) * cols + (j - 1)] + (1 if motif[i - 1] != window[j - 1] else 0)             # <<<<<<<<<<<<<<
@@ -25939,7 +26087,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
         }
         __pyx_v_sub_cost = ((__pyx_v_dp[(((__pyx_v_i - 1) * __pyx_v_cols) + (__pyx_v_j - 1))]) + __pyx_t_11);
 
-        /* "src/_accelerators.pyx":790
+        /* "src/_accelerators.pyx":813
  *                 sub_cost = dp[(i - 1) * cols + (j - 1)] + (1 if motif[i - 1] != window[j - 1] else 0)
  *                 # Del (gap in window, consume motif)
  *                 del_cost = dp[(i - 1) * cols + j] + 1             # <<<<<<<<<<<<<<
@@ -25948,7 +26096,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
         __pyx_v_del_cost = ((__pyx_v_dp[(((__pyx_v_i - 1) * __pyx_v_cols) + __pyx_v_j)]) + 1);
 
-        /* "src/_accelerators.pyx":792
+        /* "src/_accelerators.pyx":815
  *                 del_cost = dp[(i - 1) * cols + j] + 1
  *                 # Ins (gap in motif, consume window)
  *                 ins_cost = dp[i * cols + (j - 1)] + 1             # <<<<<<<<<<<<<<
@@ -25957,7 +26105,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
         __pyx_v_ins_cost = ((__pyx_v_dp[((__pyx_v_i * __pyx_v_cols) + (__pyx_v_j - 1))]) + 1);
 
-        /* "src/_accelerators.pyx":794
+        /* "src/_accelerators.pyx":817
  *                 ins_cost = dp[i * cols + (j - 1)] + 1
  * 
  *                 best_cost = sub_cost             # <<<<<<<<<<<<<<
@@ -25966,7 +26114,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
         __pyx_v_best_cost = __pyx_v_sub_cost;
 
-        /* "src/_accelerators.pyx":795
+        /* "src/_accelerators.pyx":818
  * 
  *                 best_cost = sub_cost
  *                 best_ptr = 1 if motif[i - 1] == window[j - 1] else 2 # M or S             # <<<<<<<<<<<<<<
@@ -25983,7 +26131,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
         }
         __pyx_v_best_ptr = __pyx_t_14;
 
-        /* "src/_accelerators.pyx":797
+        /* "src/_accelerators.pyx":820
  *                 best_ptr = 1 if motif[i - 1] == window[j - 1] else 2 # M or S
  * 
  *                 if del_cost < best_cost:             # <<<<<<<<<<<<<<
@@ -25993,7 +26141,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
         __pyx_t_1 = (__pyx_v_del_cost < __pyx_v_best_cost);
         if (__pyx_t_1) {
 
-          /* "src/_accelerators.pyx":798
+          /* "src/_accelerators.pyx":821
  * 
  *                 if del_cost < best_cost:
  *                     best_cost = del_cost             # <<<<<<<<<<<<<<
@@ -26002,7 +26150,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
           __pyx_v_best_cost = __pyx_v_del_cost;
 
-          /* "src/_accelerators.pyx":799
+          /* "src/_accelerators.pyx":822
  *                 if del_cost < best_cost:
  *                     best_cost = del_cost
  *                     best_ptr = 3 # D             # <<<<<<<<<<<<<<
@@ -26011,7 +26159,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
           __pyx_v_best_ptr = 3;
 
-          /* "src/_accelerators.pyx":797
+          /* "src/_accelerators.pyx":820
  *                 best_ptr = 1 if motif[i - 1] == window[j - 1] else 2 # M or S
  * 
  *                 if del_cost < best_cost:             # <<<<<<<<<<<<<<
@@ -26020,7 +26168,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
         }
 
-        /* "src/_accelerators.pyx":800
+        /* "src/_accelerators.pyx":823
  *                     best_cost = del_cost
  *                     best_ptr = 3 # D
  *                 if ins_cost < best_cost:             # <<<<<<<<<<<<<<
@@ -26030,7 +26178,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
         __pyx_t_1 = (__pyx_v_ins_cost < __pyx_v_best_cost);
         if (__pyx_t_1) {
 
-          /* "src/_accelerators.pyx":801
+          /* "src/_accelerators.pyx":824
  *                     best_ptr = 3 # D
  *                 if ins_cost < best_cost:
  *                     best_cost = ins_cost             # <<<<<<<<<<<<<<
@@ -26039,7 +26187,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
           __pyx_v_best_cost = __pyx_v_ins_cost;
 
-          /* "src/_accelerators.pyx":802
+          /* "src/_accelerators.pyx":825
  *                 if ins_cost < best_cost:
  *                     best_cost = ins_cost
  *                     best_ptr = 4 # I             # <<<<<<<<<<<<<<
@@ -26048,7 +26196,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
           __pyx_v_best_ptr = 4;
 
-          /* "src/_accelerators.pyx":800
+          /* "src/_accelerators.pyx":823
  *                     best_cost = del_cost
  *                     best_ptr = 3 # D
  *                 if ins_cost < best_cost:             # <<<<<<<<<<<<<<
@@ -26057,7 +26205,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
         }
 
-        /* "src/_accelerators.pyx":804
+        /* "src/_accelerators.pyx":827
  *                     best_ptr = 4 # I
  * 
  *                 dp[i * cols + j] = best_cost             # <<<<<<<<<<<<<<
@@ -26066,7 +26214,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
         (__pyx_v_dp[((__pyx_v_i * __pyx_v_cols) + __pyx_v_j)]) = __pyx_v_best_cost;
 
-        /* "src/_accelerators.pyx":805
+        /* "src/_accelerators.pyx":828
  * 
  *                 dp[i * cols + j] = best_cost
  *                 ptr[i * cols + j] = best_ptr             # <<<<<<<<<<<<<<
@@ -26077,7 +26225,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
       }
     }
 
-    /* "src/_accelerators.pyx":808
+    /* "src/_accelerators.pyx":831
  * 
  *         # Find best end
  *         best_j = -1             # <<<<<<<<<<<<<<
@@ -26086,7 +26234,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
     __pyx_v_best_j = -1;
 
-    /* "src/_accelerators.pyx":809
+    /* "src/_accelerators.pyx":832
  *         # Find best end
  *         best_j = -1
  *         min_final_cost = inf             # <<<<<<<<<<<<<<
@@ -26095,7 +26243,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
     __pyx_v_min_final_cost = __pyx_v_inf;
 
-    /* "src/_accelerators.pyx":811
+    /* "src/_accelerators.pyx":834
  *         min_final_cost = inf
  * 
  *         for j in range(lower, upper + 1):             # <<<<<<<<<<<<<<
@@ -26107,7 +26255,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
     for (__pyx_t_3 = __pyx_v_lower; __pyx_t_3 < __pyx_t_10; __pyx_t_3+=1) {
       __pyx_v_j = __pyx_t_3;
 
-      /* "src/_accelerators.pyx":812
+      /* "src/_accelerators.pyx":835
  * 
  *         for j in range(lower, upper + 1):
  *             cost = dp[m * cols + j]             # <<<<<<<<<<<<<<
@@ -26116,7 +26264,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
       __pyx_v_cost = (__pyx_v_dp[((__pyx_v_m * __pyx_v_cols) + __pyx_v_j)]);
 
-      /* "src/_accelerators.pyx":813
+      /* "src/_accelerators.pyx":836
  *         for j in range(lower, upper + 1):
  *             cost = dp[m * cols + j]
  *             if cost < min_final_cost:             # <<<<<<<<<<<<<<
@@ -26126,7 +26274,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
       __pyx_t_1 = (__pyx_v_cost < __pyx_v_min_final_cost);
       if (__pyx_t_1) {
 
-        /* "src/_accelerators.pyx":814
+        /* "src/_accelerators.pyx":837
  *             cost = dp[m * cols + j]
  *             if cost < min_final_cost:
  *                 min_final_cost = cost             # <<<<<<<<<<<<<<
@@ -26135,7 +26283,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
         __pyx_v_min_final_cost = __pyx_v_cost;
 
-        /* "src/_accelerators.pyx":815
+        /* "src/_accelerators.pyx":838
  *             if cost < min_final_cost:
  *                 min_final_cost = cost
  *                 best_j = j             # <<<<<<<<<<<<<<
@@ -26144,7 +26292,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
         __pyx_v_best_j = __pyx_v_j;
 
-        /* "src/_accelerators.pyx":813
+        /* "src/_accelerators.pyx":836
  *         for j in range(lower, upper + 1):
  *             cost = dp[m * cols + j]
  *             if cost < min_final_cost:             # <<<<<<<<<<<<<<
@@ -26154,7 +26302,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
       }
     }
 
-    /* "src/_accelerators.pyx":817
+    /* "src/_accelerators.pyx":840
  *                 best_j = j
  * 
  *         if best_j <= 0 or min_final_cost >= inf:             # <<<<<<<<<<<<<<
@@ -26172,7 +26320,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
     __pyx_L39_bool_binop_done:;
     if (__pyx_t_1) {
 
-      /* "src/_accelerators.pyx":818
+      /* "src/_accelerators.pyx":841
  * 
  *         if best_j <= 0 or min_final_cost >= inf:
  *             return None             # <<<<<<<<<<<<<<
@@ -26183,7 +26331,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
       __pyx_r = ((PyObject*)Py_None); __Pyx_INCREF(Py_None);
       goto __pyx_L16_return;
 
-      /* "src/_accelerators.pyx":817
+      /* "src/_accelerators.pyx":840
  *                 best_j = j
  * 
  *         if best_j <= 0 or min_final_cost >= inf:             # <<<<<<<<<<<<<<
@@ -26192,31 +26340,31 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
     }
 
-    /* "src/_accelerators.pyx":824
+    /* "src/_accelerators.pyx":847
  *         # Since we can't easily append to lists in reverse in C, we'll use a temporary buffer or just Python lists
  * 
  *         aligned_ref_codes = []             # <<<<<<<<<<<<<<
  *         aligned_query_codes = []
  * 
 */
-    __pyx_t_15 = PyList_New(0); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 824, __pyx_L17_error)
+    __pyx_t_15 = PyList_New(0); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 847, __pyx_L17_error)
     __Pyx_GOTREF(__pyx_t_15);
     __pyx_v_aligned_ref_codes = ((PyObject*)__pyx_t_15);
     __pyx_t_15 = 0;
 
-    /* "src/_accelerators.pyx":825
+    /* "src/_accelerators.pyx":848
  * 
  *         aligned_ref_codes = []
  *         aligned_query_codes = []             # <<<<<<<<<<<<<<
  * 
  *         i = m
 */
-    __pyx_t_15 = PyList_New(0); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 825, __pyx_L17_error)
+    __pyx_t_15 = PyList_New(0); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 848, __pyx_L17_error)
     __Pyx_GOTREF(__pyx_t_15);
     __pyx_v_aligned_query_codes = ((PyObject*)__pyx_t_15);
     __pyx_t_15 = 0;
 
-    /* "src/_accelerators.pyx":827
+    /* "src/_accelerators.pyx":850
  *         aligned_query_codes = []
  * 
  *         i = m             # <<<<<<<<<<<<<<
@@ -26225,7 +26373,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
     __pyx_v_i = __pyx_v_m;
 
-    /* "src/_accelerators.pyx":828
+    /* "src/_accelerators.pyx":851
  * 
  *         i = m
  *         j = best_j             # <<<<<<<<<<<<<<
@@ -26234,7 +26382,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
     __pyx_v_j = __pyx_v_best_j;
 
-    /* "src/_accelerators.pyx":830
+    /* "src/_accelerators.pyx":853
  *         j = best_j
  * 
  *         while i > 0 or j > 0:             # <<<<<<<<<<<<<<
@@ -26253,7 +26401,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
       __pyx_L43_bool_binop_done:;
       if (!__pyx_t_1) break;
 
-      /* "src/_accelerators.pyx":831
+      /* "src/_accelerators.pyx":854
  * 
  *         while i > 0 or j > 0:
  *             op = ptr[i * cols + j]             # <<<<<<<<<<<<<<
@@ -26262,7 +26410,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
       __pyx_v_op = (__pyx_v_ptr[((__pyx_v_i * __pyx_v_cols) + __pyx_v_j)]);
 
-      /* "src/_accelerators.pyx":832
+      /* "src/_accelerators.pyx":855
  *         while i > 0 or j > 0:
  *             op = ptr[i * cols + j]
  *             if op == 1 or op == 2: # M or S             # <<<<<<<<<<<<<<
@@ -26273,7 +26421,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
         case 1:
         case 2:
 
-        /* "src/_accelerators.pyx":833
+        /* "src/_accelerators.pyx":856
  *             op = ptr[i * cols + j]
  *             if op == 1 or op == 2: # M or S
  *                 aligned_ref_codes.append(motif[i - 1])             # <<<<<<<<<<<<<<
@@ -26281,12 +26429,12 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
  *                 i -= 1
 */
         __pyx_t_12 = (__pyx_v_i - 1);
-        __pyx_t_15 = __Pyx_PyLong_From_unsigned_char((*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_motif.data + __pyx_t_12 * __pyx_v_motif.strides[0]) )))); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 833, __pyx_L17_error)
+        __pyx_t_15 = __Pyx_PyLong_From_unsigned_char((*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_motif.data + __pyx_t_12 * __pyx_v_motif.strides[0]) )))); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 856, __pyx_L17_error)
         __Pyx_GOTREF(__pyx_t_15);
-        __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_aligned_ref_codes, __pyx_t_15); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 833, __pyx_L17_error)
+        __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_aligned_ref_codes, __pyx_t_15); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 856, __pyx_L17_error)
         __Pyx_DECREF(__pyx_t_15); __pyx_t_15 = 0;
 
-        /* "src/_accelerators.pyx":834
+        /* "src/_accelerators.pyx":857
  *             if op == 1 or op == 2: # M or S
  *                 aligned_ref_codes.append(motif[i - 1])
  *                 aligned_query_codes.append(window[j - 1])             # <<<<<<<<<<<<<<
@@ -26294,12 +26442,12 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
  *                 j -= 1
 */
         __pyx_t_12 = (__pyx_v_j - 1);
-        __pyx_t_15 = __Pyx_PyLong_From_unsigned_char((*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_window.data + __pyx_t_12 * __pyx_v_window.strides[0]) )))); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 834, __pyx_L17_error)
+        __pyx_t_15 = __Pyx_PyLong_From_unsigned_char((*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_window.data + __pyx_t_12 * __pyx_v_window.strides[0]) )))); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 857, __pyx_L17_error)
         __Pyx_GOTREF(__pyx_t_15);
-        __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_aligned_query_codes, __pyx_t_15); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 834, __pyx_L17_error)
+        __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_aligned_query_codes, __pyx_t_15); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 857, __pyx_L17_error)
         __Pyx_DECREF(__pyx_t_15); __pyx_t_15 = 0;
 
-        /* "src/_accelerators.pyx":835
+        /* "src/_accelerators.pyx":858
  *                 aligned_ref_codes.append(motif[i - 1])
  *                 aligned_query_codes.append(window[j - 1])
  *                 i -= 1             # <<<<<<<<<<<<<<
@@ -26308,7 +26456,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
         __pyx_v_i = (__pyx_v_i - 1);
 
-        /* "src/_accelerators.pyx":836
+        /* "src/_accelerators.pyx":859
  *                 aligned_query_codes.append(window[j - 1])
  *                 i -= 1
  *                 j -= 1             # <<<<<<<<<<<<<<
@@ -26317,7 +26465,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
         __pyx_v_j = (__pyx_v_j - 1);
 
-        /* "src/_accelerators.pyx":832
+        /* "src/_accelerators.pyx":855
  *         while i > 0 or j > 0:
  *             op = ptr[i * cols + j]
  *             if op == 1 or op == 2: # M or S             # <<<<<<<<<<<<<<
@@ -26327,7 +26475,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
         break;
         case 3:
 
-        /* "src/_accelerators.pyx":838
+        /* "src/_accelerators.pyx":861
  *                 j -= 1
  *             elif op == 3: # D
  *                 aligned_ref_codes.append(motif[i - 1])             # <<<<<<<<<<<<<<
@@ -26335,21 +26483,21 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
  *                 i -= 1
 */
         __pyx_t_12 = (__pyx_v_i - 1);
-        __pyx_t_15 = __Pyx_PyLong_From_unsigned_char((*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_motif.data + __pyx_t_12 * __pyx_v_motif.strides[0]) )))); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 838, __pyx_L17_error)
+        __pyx_t_15 = __Pyx_PyLong_From_unsigned_char((*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_motif.data + __pyx_t_12 * __pyx_v_motif.strides[0]) )))); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 861, __pyx_L17_error)
         __Pyx_GOTREF(__pyx_t_15);
-        __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_aligned_ref_codes, __pyx_t_15); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 838, __pyx_L17_error)
+        __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_aligned_ref_codes, __pyx_t_15); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 861, __pyx_L17_error)
         __Pyx_DECREF(__pyx_t_15); __pyx_t_15 = 0;
 
-        /* "src/_accelerators.pyx":839
+        /* "src/_accelerators.pyx":862
  *             elif op == 3: # D
  *                 aligned_ref_codes.append(motif[i - 1])
  *                 aligned_query_codes.append(45) # '-' is 45             # <<<<<<<<<<<<<<
  *                 i -= 1
  *             elif op == 4: # I
 */
-        __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_aligned_query_codes, __pyx_mstate_global->__pyx_int_45); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 839, __pyx_L17_error)
+        __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_aligned_query_codes, __pyx_mstate_global->__pyx_int_45); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 862, __pyx_L17_error)
 
-        /* "src/_accelerators.pyx":840
+        /* "src/_accelerators.pyx":863
  *                 aligned_ref_codes.append(motif[i - 1])
  *                 aligned_query_codes.append(45) # '-' is 45
  *                 i -= 1             # <<<<<<<<<<<<<<
@@ -26358,7 +26506,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
         __pyx_v_i = (__pyx_v_i - 1);
 
-        /* "src/_accelerators.pyx":837
+        /* "src/_accelerators.pyx":860
  *                 i -= 1
  *                 j -= 1
  *             elif op == 3: # D             # <<<<<<<<<<<<<<
@@ -26368,16 +26516,16 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
         break;
         case 4:
 
-        /* "src/_accelerators.pyx":842
+        /* "src/_accelerators.pyx":865
  *                 i -= 1
  *             elif op == 4: # I
  *                 aligned_ref_codes.append(45) # '-'             # <<<<<<<<<<<<<<
  *                 aligned_query_codes.append(window[j - 1])
  *                 j -= 1
 */
-        __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_aligned_ref_codes, __pyx_mstate_global->__pyx_int_45); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 842, __pyx_L17_error)
+        __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_aligned_ref_codes, __pyx_mstate_global->__pyx_int_45); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 865, __pyx_L17_error)
 
-        /* "src/_accelerators.pyx":843
+        /* "src/_accelerators.pyx":866
  *             elif op == 4: # I
  *                 aligned_ref_codes.append(45) # '-'
  *                 aligned_query_codes.append(window[j - 1])             # <<<<<<<<<<<<<<
@@ -26385,12 +26533,12 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
  *             else:
 */
         __pyx_t_12 = (__pyx_v_j - 1);
-        __pyx_t_15 = __Pyx_PyLong_From_unsigned_char((*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_window.data + __pyx_t_12 * __pyx_v_window.strides[0]) )))); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 843, __pyx_L17_error)
+        __pyx_t_15 = __Pyx_PyLong_From_unsigned_char((*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_window.data + __pyx_t_12 * __pyx_v_window.strides[0]) )))); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 866, __pyx_L17_error)
         __Pyx_GOTREF(__pyx_t_15);
-        __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_aligned_query_codes, __pyx_t_15); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 843, __pyx_L17_error)
+        __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_aligned_query_codes, __pyx_t_15); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 866, __pyx_L17_error)
         __Pyx_DECREF(__pyx_t_15); __pyx_t_15 = 0;
 
-        /* "src/_accelerators.pyx":844
+        /* "src/_accelerators.pyx":867
  *                 aligned_ref_codes.append(45) # '-'
  *                 aligned_query_codes.append(window[j - 1])
  *                 j -= 1             # <<<<<<<<<<<<<<
@@ -26399,7 +26547,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
         __pyx_v_j = (__pyx_v_j - 1);
 
-        /* "src/_accelerators.pyx":841
+        /* "src/_accelerators.pyx":864
  *                 aligned_query_codes.append(45) # '-' is 45
  *                 i -= 1
  *             elif op == 4: # I             # <<<<<<<<<<<<<<
@@ -26409,7 +26557,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
         break;
         default:
 
-        /* "src/_accelerators.pyx":846
+        /* "src/_accelerators.pyx":869
  *                 j -= 1
  *             else:
  *                 break             # <<<<<<<<<<<<<<
@@ -26422,49 +26570,49 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
     }
     __pyx_L42_break:;
 
-    /* "src/_accelerators.pyx":849
+    /* "src/_accelerators.pyx":872
  * 
  *         # Reverse
  *         aligned_ref_codes.reverse()             # <<<<<<<<<<<<<<
  *         aligned_query_codes.reverse()
  * 
 */
-    __pyx_t_16 = PyList_Reverse(__pyx_v_aligned_ref_codes); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 849, __pyx_L17_error)
+    __pyx_t_16 = PyList_Reverse(__pyx_v_aligned_ref_codes); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 872, __pyx_L17_error)
 
-    /* "src/_accelerators.pyx":850
+    /* "src/_accelerators.pyx":873
  *         # Reverse
  *         aligned_ref_codes.reverse()
  *         aligned_query_codes.reverse()             # <<<<<<<<<<<<<<
  * 
  *         # Process alignment to generate operations
 */
-    __pyx_t_16 = PyList_Reverse(__pyx_v_aligned_query_codes); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 850, __pyx_L17_error)
+    __pyx_t_16 = PyList_Reverse(__pyx_v_aligned_query_codes); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 873, __pyx_L17_error)
 
-    /* "src/_accelerators.pyx":853
+    /* "src/_accelerators.pyx":876
  * 
  *         # Process alignment to generate operations
  *         operations = []             # <<<<<<<<<<<<<<
  *         observed_bases = []
  *         mismatch_count = 0
 */
-    __pyx_t_15 = PyList_New(0); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 853, __pyx_L17_error)
+    __pyx_t_15 = PyList_New(0); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 876, __pyx_L17_error)
     __Pyx_GOTREF(__pyx_t_15);
     __pyx_v_operations = ((PyObject*)__pyx_t_15);
     __pyx_t_15 = 0;
 
-    /* "src/_accelerators.pyx":854
+    /* "src/_accelerators.pyx":877
  *         # Process alignment to generate operations
  *         operations = []
  *         observed_bases = []             # <<<<<<<<<<<<<<
  *         mismatch_count = 0
  *         insertion_len = 0
 */
-    __pyx_t_15 = PyList_New(0); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 854, __pyx_L17_error)
+    __pyx_t_15 = PyList_New(0); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 877, __pyx_L17_error)
     __Pyx_GOTREF(__pyx_t_15);
     __pyx_v_observed_bases = ((PyObject*)__pyx_t_15);
     __pyx_t_15 = 0;
 
-    /* "src/_accelerators.pyx":855
+    /* "src/_accelerators.pyx":878
  *         operations = []
  *         observed_bases = []
  *         mismatch_count = 0             # <<<<<<<<<<<<<<
@@ -26473,7 +26621,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
     __pyx_v_mismatch_count = 0;
 
-    /* "src/_accelerators.pyx":856
+    /* "src/_accelerators.pyx":879
  *         observed_bases = []
  *         mismatch_count = 0
  *         insertion_len = 0             # <<<<<<<<<<<<<<
@@ -26482,7 +26630,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
     __pyx_v_insertion_len = 0;
 
-    /* "src/_accelerators.pyx":857
+    /* "src/_accelerators.pyx":880
  *         mismatch_count = 0
  *         insertion_len = 0
  *         deletion_len = 0             # <<<<<<<<<<<<<<
@@ -26491,7 +26639,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
     __pyx_v_deletion_len = 0;
 
-    /* "src/_accelerators.pyx":859
+    /* "src/_accelerators.pyx":882
  *         deletion_len = 0
  * 
  *         ref_pos = 0             # <<<<<<<<<<<<<<
@@ -26500,19 +26648,19 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
     __pyx_v_ref_pos = 0;
 
-    /* "src/_accelerators.pyx":860
+    /* "src/_accelerators.pyx":883
  * 
  *         ref_pos = 0
  *         pending_ins = []             # <<<<<<<<<<<<<<
  *         pending_ins_pos = 0
  *         pending_del_len = 0
 */
-    __pyx_t_15 = PyList_New(0); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 860, __pyx_L17_error)
+    __pyx_t_15 = PyList_New(0); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 883, __pyx_L17_error)
     __Pyx_GOTREF(__pyx_t_15);
     __pyx_v_pending_ins = ((PyObject*)__pyx_t_15);
     __pyx_t_15 = 0;
 
-    /* "src/_accelerators.pyx":861
+    /* "src/_accelerators.pyx":884
  *         ref_pos = 0
  *         pending_ins = []
  *         pending_ins_pos = 0             # <<<<<<<<<<<<<<
@@ -26521,7 +26669,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
     __pyx_v_pending_ins_pos = 0;
 
-    /* "src/_accelerators.pyx":862
+    /* "src/_accelerators.pyx":885
  *         pending_ins = []
  *         pending_ins_pos = 0
  *         pending_del_len = 0             # <<<<<<<<<<<<<<
@@ -26530,7 +26678,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
     __pyx_v_pending_del_len = 0;
 
-    /* "src/_accelerators.pyx":863
+    /* "src/_accelerators.pyx":886
  *         pending_ins_pos = 0
  *         pending_del_len = 0
  *         pending_del_pos = 0             # <<<<<<<<<<<<<<
@@ -26539,73 +26687,73 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
     __pyx_v_pending_del_pos = 0;
 
-    /* "src/_accelerators.pyx":865
+    /* "src/_accelerators.pyx":888
  *         pending_del_pos = 0
  * 
  *         for k in range(len(aligned_ref_codes)):             # <<<<<<<<<<<<<<
  *             r_code = aligned_ref_codes[k]
  *             q_code = aligned_query_codes[k]
 */
-    __pyx_t_17 = __Pyx_PyList_GET_SIZE(__pyx_v_aligned_ref_codes); if (unlikely(__pyx_t_17 == ((Py_ssize_t)-1))) __PYX_ERR(0, 865, __pyx_L17_error)
+    __pyx_t_17 = __Pyx_PyList_GET_SIZE(__pyx_v_aligned_ref_codes); if (unlikely(__pyx_t_17 == ((Py_ssize_t)-1))) __PYX_ERR(0, 888, __pyx_L17_error)
     __pyx_t_18 = __pyx_t_17;
     for (__pyx_t_19 = 0; __pyx_t_19 < __pyx_t_18; __pyx_t_19+=1) {
       __pyx_v_k = __pyx_t_19;
 
-      /* "src/_accelerators.pyx":866
+      /* "src/_accelerators.pyx":889
  * 
  *         for k in range(len(aligned_ref_codes)):
  *             r_code = aligned_ref_codes[k]             # <<<<<<<<<<<<<<
  *             q_code = aligned_query_codes[k]
  * 
 */
-      __pyx_t_3 = __Pyx_PyLong_As_int(__Pyx_PyList_GET_ITEM(__pyx_v_aligned_ref_codes, __pyx_v_k)); if (unlikely((__pyx_t_3 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 866, __pyx_L17_error)
+      __pyx_t_3 = __Pyx_PyLong_As_int(__Pyx_PyList_GET_ITEM(__pyx_v_aligned_ref_codes, __pyx_v_k)); if (unlikely((__pyx_t_3 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 889, __pyx_L17_error)
       __pyx_v_r_code = __pyx_t_3;
 
-      /* "src/_accelerators.pyx":867
+      /* "src/_accelerators.pyx":890
  *         for k in range(len(aligned_ref_codes)):
  *             r_code = aligned_ref_codes[k]
  *             q_code = aligned_query_codes[k]             # <<<<<<<<<<<<<<
  * 
  *             r_char = chr(r_code)
 */
-      __pyx_t_3 = __Pyx_PyLong_As_int(__Pyx_PyList_GET_ITEM(__pyx_v_aligned_query_codes, __pyx_v_k)); if (unlikely((__pyx_t_3 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 867, __pyx_L17_error)
+      __pyx_t_3 = __Pyx_PyLong_As_int(__Pyx_PyList_GET_ITEM(__pyx_v_aligned_query_codes, __pyx_v_k)); if (unlikely((__pyx_t_3 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 890, __pyx_L17_error)
       __pyx_v_q_code = __pyx_t_3;
 
-      /* "src/_accelerators.pyx":869
+      /* "src/_accelerators.pyx":892
  *             q_code = aligned_query_codes[k]
  * 
  *             r_char = chr(r_code)             # <<<<<<<<<<<<<<
  *             q_char = chr(q_code)
  * 
 */
-      __pyx_t_15 = PyUnicode_FromOrdinal(__pyx_v_r_code); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 869, __pyx_L17_error)
+      __pyx_t_15 = PyUnicode_FromOrdinal(__pyx_v_r_code); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 892, __pyx_L17_error)
       __Pyx_GOTREF(__pyx_t_15);
       __Pyx_XDECREF_SET(__pyx_v_r_char, ((PyObject*)__pyx_t_15));
       __pyx_t_15 = 0;
 
-      /* "src/_accelerators.pyx":870
+      /* "src/_accelerators.pyx":893
  * 
  *             r_char = chr(r_code)
  *             q_char = chr(q_code)             # <<<<<<<<<<<<<<
  * 
  *             if r_char == '-':
 */
-      __pyx_t_15 = PyUnicode_FromOrdinal(__pyx_v_q_code); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 870, __pyx_L17_error)
+      __pyx_t_15 = PyUnicode_FromOrdinal(__pyx_v_q_code); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 893, __pyx_L17_error)
       __Pyx_GOTREF(__pyx_t_15);
       __Pyx_XDECREF_SET(__pyx_v_q_char, ((PyObject*)__pyx_t_15));
       __pyx_t_15 = 0;
 
-      /* "src/_accelerators.pyx":872
+      /* "src/_accelerators.pyx":895
  *             q_char = chr(q_code)
  * 
  *             if r_char == '-':             # <<<<<<<<<<<<<<
  *                 if not pending_ins:
  *                     pending_ins_pos = ref_pos
 */
-      __pyx_t_1 = (__Pyx_PyUnicode_Equals(__pyx_v_r_char, __pyx_mstate_global->__pyx_kp_u__7, Py_EQ)); if (unlikely((__pyx_t_1 < 0))) __PYX_ERR(0, 872, __pyx_L17_error)
+      __pyx_t_1 = (__Pyx_PyUnicode_Equals(__pyx_v_r_char, __pyx_mstate_global->__pyx_kp_u__7, Py_EQ)); if (unlikely((__pyx_t_1 < 0))) __PYX_ERR(0, 895, __pyx_L17_error)
       if (__pyx_t_1) {
 
-        /* "src/_accelerators.pyx":873
+        /* "src/_accelerators.pyx":896
  * 
  *             if r_char == '-':
  *                 if not pending_ins:             # <<<<<<<<<<<<<<
@@ -26614,14 +26762,14 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
         {
           Py_ssize_t __pyx_temp = __Pyx_PyList_GET_SIZE(__pyx_v_pending_ins);
-          if (unlikely(((!CYTHON_ASSUME_SAFE_SIZE) && __pyx_temp < 0))) __PYX_ERR(0, 873, __pyx_L17_error)
+          if (unlikely(((!CYTHON_ASSUME_SAFE_SIZE) && __pyx_temp < 0))) __PYX_ERR(0, 896, __pyx_L17_error)
           __pyx_t_1 = (__pyx_temp != 0);
         }
 
         __pyx_t_2 = (!__pyx_t_1);
         if (__pyx_t_2) {
 
-          /* "src/_accelerators.pyx":874
+          /* "src/_accelerators.pyx":897
  *             if r_char == '-':
  *                 if not pending_ins:
  *                     pending_ins_pos = ref_pos             # <<<<<<<<<<<<<<
@@ -26630,7 +26778,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
           __pyx_v_pending_ins_pos = __pyx_v_ref_pos;
 
-          /* "src/_accelerators.pyx":873
+          /* "src/_accelerators.pyx":896
  * 
  *             if r_char == '-':
  *                 if not pending_ins:             # <<<<<<<<<<<<<<
@@ -26639,16 +26787,16 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
         }
 
-        /* "src/_accelerators.pyx":875
+        /* "src/_accelerators.pyx":898
  *                 if not pending_ins:
  *                     pending_ins_pos = ref_pos
  *                 pending_ins.append(q_char)             # <<<<<<<<<<<<<<
  *                 continue
  * 
 */
-        __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_pending_ins, __pyx_v_q_char); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 875, __pyx_L17_error)
+        __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_pending_ins, __pyx_v_q_char); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 898, __pyx_L17_error)
 
-        /* "src/_accelerators.pyx":876
+        /* "src/_accelerators.pyx":899
  *                     pending_ins_pos = ref_pos
  *                 pending_ins.append(q_char)
  *                 continue             # <<<<<<<<<<<<<<
@@ -26657,7 +26805,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
         goto __pyx_L45_continue;
 
-        /* "src/_accelerators.pyx":872
+        /* "src/_accelerators.pyx":895
  *             q_char = chr(q_code)
  * 
  *             if r_char == '-':             # <<<<<<<<<<<<<<
@@ -26666,7 +26814,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
       }
 
-      /* "src/_accelerators.pyx":878
+      /* "src/_accelerators.pyx":901
  *                 continue
  * 
  *             if pending_ins:             # <<<<<<<<<<<<<<
@@ -26675,48 +26823,48 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
       {
         Py_ssize_t __pyx_temp = __Pyx_PyList_GET_SIZE(__pyx_v_pending_ins);
-        if (unlikely(((!CYTHON_ASSUME_SAFE_SIZE) && __pyx_temp < 0))) __PYX_ERR(0, 878, __pyx_L17_error)
+        if (unlikely(((!CYTHON_ASSUME_SAFE_SIZE) && __pyx_temp < 0))) __PYX_ERR(0, 901, __pyx_L17_error)
         __pyx_t_2 = (__pyx_temp != 0);
       }
 
       if (__pyx_t_2) {
 
-        /* "src/_accelerators.pyx":879
+        /* "src/_accelerators.pyx":902
  * 
  *             if pending_ins:
  *                 ins_seq = "".join(pending_ins)             # <<<<<<<<<<<<<<
  *                 operations.append(('ins', pending_ins_pos, ins_seq))
  *                 insertion_len += len(ins_seq)
 */
-        __pyx_t_15 = PyUnicode_Join(__pyx_mstate_global->__pyx_kp_u__8, __pyx_v_pending_ins); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 879, __pyx_L17_error)
+        __pyx_t_15 = PyUnicode_Join(__pyx_mstate_global->__pyx_kp_u__8, __pyx_v_pending_ins); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 902, __pyx_L17_error)
         __Pyx_GOTREF(__pyx_t_15);
         __Pyx_XDECREF_SET(__pyx_v_ins_seq, ((PyObject*)__pyx_t_15));
         __pyx_t_15 = 0;
 
-        /* "src/_accelerators.pyx":880
+        /* "src/_accelerators.pyx":903
  *             if pending_ins:
  *                 ins_seq = "".join(pending_ins)
  *                 operations.append(('ins', pending_ins_pos, ins_seq))             # <<<<<<<<<<<<<<
  *                 insertion_len += len(ins_seq)
  *                 pending_ins = []
 */
-        __pyx_t_15 = __Pyx_PyLong_From_int(__pyx_v_pending_ins_pos); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 880, __pyx_L17_error)
+        __pyx_t_15 = __Pyx_PyLong_From_int(__pyx_v_pending_ins_pos); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 903, __pyx_L17_error)
         __Pyx_GOTREF(__pyx_t_15);
-        __pyx_t_20 = PyTuple_New(3); if (unlikely(!__pyx_t_20)) __PYX_ERR(0, 880, __pyx_L17_error)
+        __pyx_t_20 = PyTuple_New(3); if (unlikely(!__pyx_t_20)) __PYX_ERR(0, 903, __pyx_L17_error)
         __Pyx_GOTREF(__pyx_t_20);
         __Pyx_INCREF(__pyx_mstate_global->__pyx_n_u_ins);
         __Pyx_GIVEREF(__pyx_mstate_global->__pyx_n_u_ins);
-        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_20, 0, __pyx_mstate_global->__pyx_n_u_ins) != (0)) __PYX_ERR(0, 880, __pyx_L17_error);
+        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_20, 0, __pyx_mstate_global->__pyx_n_u_ins) != (0)) __PYX_ERR(0, 903, __pyx_L17_error);
         __Pyx_GIVEREF(__pyx_t_15);
-        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_20, 1, __pyx_t_15) != (0)) __PYX_ERR(0, 880, __pyx_L17_error);
+        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_20, 1, __pyx_t_15) != (0)) __PYX_ERR(0, 903, __pyx_L17_error);
         __Pyx_INCREF(__pyx_v_ins_seq);
         __Pyx_GIVEREF(__pyx_v_ins_seq);
-        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_20, 2, __pyx_v_ins_seq) != (0)) __PYX_ERR(0, 880, __pyx_L17_error);
+        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_20, 2, __pyx_v_ins_seq) != (0)) __PYX_ERR(0, 903, __pyx_L17_error);
         __pyx_t_15 = 0;
-        __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_operations, __pyx_t_20); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 880, __pyx_L17_error)
+        __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_operations, __pyx_t_20); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 903, __pyx_L17_error)
         __Pyx_DECREF(__pyx_t_20); __pyx_t_20 = 0;
 
-        /* "src/_accelerators.pyx":881
+        /* "src/_accelerators.pyx":904
  *                 ins_seq = "".join(pending_ins)
  *                 operations.append(('ins', pending_ins_pos, ins_seq))
  *                 insertion_len += len(ins_seq)             # <<<<<<<<<<<<<<
@@ -26725,24 +26873,24 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
         if (unlikely(__pyx_v_ins_seq == Py_None)) {
           PyErr_SetString(PyExc_TypeError, "object of type 'NoneType' has no len()");
-          __PYX_ERR(0, 881, __pyx_L17_error)
+          __PYX_ERR(0, 904, __pyx_L17_error)
         }
-        __pyx_t_21 = __Pyx_PyUnicode_GET_LENGTH(__pyx_v_ins_seq); if (unlikely(__pyx_t_21 == ((Py_ssize_t)-1))) __PYX_ERR(0, 881, __pyx_L17_error)
+        __pyx_t_21 = __Pyx_PyUnicode_GET_LENGTH(__pyx_v_ins_seq); if (unlikely(__pyx_t_21 == ((Py_ssize_t)-1))) __PYX_ERR(0, 904, __pyx_L17_error)
         __pyx_v_insertion_len = (__pyx_v_insertion_len + __pyx_t_21);
 
-        /* "src/_accelerators.pyx":882
+        /* "src/_accelerators.pyx":905
  *                 operations.append(('ins', pending_ins_pos, ins_seq))
  *                 insertion_len += len(ins_seq)
  *                 pending_ins = []             # <<<<<<<<<<<<<<
  *                 pending_ins_pos = 0
  * 
 */
-        __pyx_t_20 = PyList_New(0); if (unlikely(!__pyx_t_20)) __PYX_ERR(0, 882, __pyx_L17_error)
+        __pyx_t_20 = PyList_New(0); if (unlikely(!__pyx_t_20)) __PYX_ERR(0, 905, __pyx_L17_error)
         __Pyx_GOTREF(__pyx_t_20);
         __Pyx_DECREF_SET(__pyx_v_pending_ins, ((PyObject*)__pyx_t_20));
         __pyx_t_20 = 0;
 
-        /* "src/_accelerators.pyx":883
+        /* "src/_accelerators.pyx":906
  *                 insertion_len += len(ins_seq)
  *                 pending_ins = []
  *                 pending_ins_pos = 0             # <<<<<<<<<<<<<<
@@ -26751,7 +26899,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
         __pyx_v_pending_ins_pos = 0;
 
-        /* "src/_accelerators.pyx":878
+        /* "src/_accelerators.pyx":901
  *                 continue
  * 
  *             if pending_ins:             # <<<<<<<<<<<<<<
@@ -26760,7 +26908,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
       }
 
-      /* "src/_accelerators.pyx":885
+      /* "src/_accelerators.pyx":908
  *                 pending_ins_pos = 0
  * 
  *             ref_pos += 1             # <<<<<<<<<<<<<<
@@ -26769,17 +26917,17 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
       __pyx_v_ref_pos = (__pyx_v_ref_pos + 1);
 
-      /* "src/_accelerators.pyx":887
+      /* "src/_accelerators.pyx":910
  *             ref_pos += 1
  * 
  *             if q_char == '-':             # <<<<<<<<<<<<<<
  *                 if pending_del_len == 0:
  *                     pending_del_pos = ref_pos
 */
-      __pyx_t_2 = (__Pyx_PyUnicode_Equals(__pyx_v_q_char, __pyx_mstate_global->__pyx_kp_u__7, Py_EQ)); if (unlikely((__pyx_t_2 < 0))) __PYX_ERR(0, 887, __pyx_L17_error)
+      __pyx_t_2 = (__Pyx_PyUnicode_Equals(__pyx_v_q_char, __pyx_mstate_global->__pyx_kp_u__7, Py_EQ)); if (unlikely((__pyx_t_2 < 0))) __PYX_ERR(0, 910, __pyx_L17_error)
       if (__pyx_t_2) {
 
-        /* "src/_accelerators.pyx":888
+        /* "src/_accelerators.pyx":911
  * 
  *             if q_char == '-':
  *                 if pending_del_len == 0:             # <<<<<<<<<<<<<<
@@ -26789,7 +26937,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
         __pyx_t_2 = (__pyx_v_pending_del_len == 0);
         if (__pyx_t_2) {
 
-          /* "src/_accelerators.pyx":889
+          /* "src/_accelerators.pyx":912
  *             if q_char == '-':
  *                 if pending_del_len == 0:
  *                     pending_del_pos = ref_pos             # <<<<<<<<<<<<<<
@@ -26798,7 +26946,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
           __pyx_v_pending_del_pos = __pyx_v_ref_pos;
 
-          /* "src/_accelerators.pyx":888
+          /* "src/_accelerators.pyx":911
  * 
  *             if q_char == '-':
  *                 if pending_del_len == 0:             # <<<<<<<<<<<<<<
@@ -26807,7 +26955,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
         }
 
-        /* "src/_accelerators.pyx":890
+        /* "src/_accelerators.pyx":913
  *                 if pending_del_len == 0:
  *                     pending_del_pos = ref_pos
  *                 pending_del_len += 1             # <<<<<<<<<<<<<<
@@ -26816,7 +26964,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
         __pyx_v_pending_del_len = (__pyx_v_pending_del_len + 1);
 
-        /* "src/_accelerators.pyx":891
+        /* "src/_accelerators.pyx":914
  *                     pending_del_pos = ref_pos
  *                 pending_del_len += 1
  *                 continue             # <<<<<<<<<<<<<<
@@ -26825,7 +26973,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
         goto __pyx_L45_continue;
 
-        /* "src/_accelerators.pyx":887
+        /* "src/_accelerators.pyx":910
  *             ref_pos += 1
  * 
  *             if q_char == '-':             # <<<<<<<<<<<<<<
@@ -26834,7 +26982,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
       }
 
-      /* "src/_accelerators.pyx":893
+      /* "src/_accelerators.pyx":916
  *                 continue
  * 
  *             if pending_del_len > 0:             # <<<<<<<<<<<<<<
@@ -26844,32 +26992,32 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
       __pyx_t_2 = (__pyx_v_pending_del_len > 0);
       if (__pyx_t_2) {
 
-        /* "src/_accelerators.pyx":894
+        /* "src/_accelerators.pyx":917
  * 
  *             if pending_del_len > 0:
  *                 operations.append(('del', pending_del_pos, pending_del_len))             # <<<<<<<<<<<<<<
  *                 deletion_len += pending_del_len
  *                 pending_del_len = 0
 */
-        __pyx_t_20 = __Pyx_PyLong_From_int(__pyx_v_pending_del_pos); if (unlikely(!__pyx_t_20)) __PYX_ERR(0, 894, __pyx_L17_error)
+        __pyx_t_20 = __Pyx_PyLong_From_int(__pyx_v_pending_del_pos); if (unlikely(!__pyx_t_20)) __PYX_ERR(0, 917, __pyx_L17_error)
         __Pyx_GOTREF(__pyx_t_20);
-        __pyx_t_15 = __Pyx_PyLong_From_int(__pyx_v_pending_del_len); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 894, __pyx_L17_error)
+        __pyx_t_15 = __Pyx_PyLong_From_int(__pyx_v_pending_del_len); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 917, __pyx_L17_error)
         __Pyx_GOTREF(__pyx_t_15);
-        __pyx_t_22 = PyTuple_New(3); if (unlikely(!__pyx_t_22)) __PYX_ERR(0, 894, __pyx_L17_error)
+        __pyx_t_22 = PyTuple_New(3); if (unlikely(!__pyx_t_22)) __PYX_ERR(0, 917, __pyx_L17_error)
         __Pyx_GOTREF(__pyx_t_22);
         __Pyx_INCREF(__pyx_mstate_global->__pyx_n_u_del);
         __Pyx_GIVEREF(__pyx_mstate_global->__pyx_n_u_del);
-        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_22, 0, __pyx_mstate_global->__pyx_n_u_del) != (0)) __PYX_ERR(0, 894, __pyx_L17_error);
+        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_22, 0, __pyx_mstate_global->__pyx_n_u_del) != (0)) __PYX_ERR(0, 917, __pyx_L17_error);
         __Pyx_GIVEREF(__pyx_t_20);
-        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_22, 1, __pyx_t_20) != (0)) __PYX_ERR(0, 894, __pyx_L17_error);
+        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_22, 1, __pyx_t_20) != (0)) __PYX_ERR(0, 917, __pyx_L17_error);
         __Pyx_GIVEREF(__pyx_t_15);
-        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_22, 2, __pyx_t_15) != (0)) __PYX_ERR(0, 894, __pyx_L17_error);
+        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_22, 2, __pyx_t_15) != (0)) __PYX_ERR(0, 917, __pyx_L17_error);
         __pyx_t_20 = 0;
         __pyx_t_15 = 0;
-        __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_operations, __pyx_t_22); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 894, __pyx_L17_error)
+        __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_operations, __pyx_t_22); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 917, __pyx_L17_error)
         __Pyx_DECREF(__pyx_t_22); __pyx_t_22 = 0;
 
-        /* "src/_accelerators.pyx":895
+        /* "src/_accelerators.pyx":918
  *             if pending_del_len > 0:
  *                 operations.append(('del', pending_del_pos, pending_del_len))
  *                 deletion_len += pending_del_len             # <<<<<<<<<<<<<<
@@ -26878,7 +27026,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
         __pyx_v_deletion_len = (__pyx_v_deletion_len + __pyx_v_pending_del_len);
 
-        /* "src/_accelerators.pyx":896
+        /* "src/_accelerators.pyx":919
  *                 operations.append(('del', pending_del_pos, pending_del_len))
  *                 deletion_len += pending_del_len
  *                 pending_del_len = 0             # <<<<<<<<<<<<<<
@@ -26887,7 +27035,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
         __pyx_v_pending_del_len = 0;
 
-        /* "src/_accelerators.pyx":893
+        /* "src/_accelerators.pyx":916
  *                 continue
  * 
  *             if pending_del_len > 0:             # <<<<<<<<<<<<<<
@@ -26896,27 +27044,27 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
       }
 
-      /* "src/_accelerators.pyx":898
+      /* "src/_accelerators.pyx":921
  *                 pending_del_len = 0
  * 
  *             observed_bases.append((ref_pos - 1, q_char))             # <<<<<<<<<<<<<<
  * 
  *             if r_code != q_code:
 */
-      __pyx_t_22 = __Pyx_PyLong_From_long((__pyx_v_ref_pos - 1)); if (unlikely(!__pyx_t_22)) __PYX_ERR(0, 898, __pyx_L17_error)
+      __pyx_t_22 = __Pyx_PyLong_From_long((__pyx_v_ref_pos - 1)); if (unlikely(!__pyx_t_22)) __PYX_ERR(0, 921, __pyx_L17_error)
       __Pyx_GOTREF(__pyx_t_22);
-      __pyx_t_15 = PyTuple_New(2); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 898, __pyx_L17_error)
+      __pyx_t_15 = PyTuple_New(2); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 921, __pyx_L17_error)
       __Pyx_GOTREF(__pyx_t_15);
       __Pyx_GIVEREF(__pyx_t_22);
-      if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 0, __pyx_t_22) != (0)) __PYX_ERR(0, 898, __pyx_L17_error);
+      if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 0, __pyx_t_22) != (0)) __PYX_ERR(0, 921, __pyx_L17_error);
       __Pyx_INCREF(__pyx_v_q_char);
       __Pyx_GIVEREF(__pyx_v_q_char);
-      if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 1, __pyx_v_q_char) != (0)) __PYX_ERR(0, 898, __pyx_L17_error);
+      if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 1, __pyx_v_q_char) != (0)) __PYX_ERR(0, 921, __pyx_L17_error);
       __pyx_t_22 = 0;
-      __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_observed_bases, __pyx_t_15); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 898, __pyx_L17_error)
+      __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_observed_bases, __pyx_t_15); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 921, __pyx_L17_error)
       __Pyx_DECREF(__pyx_t_15); __pyx_t_15 = 0;
 
-      /* "src/_accelerators.pyx":900
+      /* "src/_accelerators.pyx":923
  *             observed_bases.append((ref_pos - 1, q_char))
  * 
  *             if r_code != q_code:             # <<<<<<<<<<<<<<
@@ -26926,33 +27074,33 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
       __pyx_t_2 = (__pyx_v_r_code != __pyx_v_q_code);
       if (__pyx_t_2) {
 
-        /* "src/_accelerators.pyx":901
+        /* "src/_accelerators.pyx":924
  * 
  *             if r_code != q_code:
  *                 operations.append(('sub', ref_pos, r_char, q_char))             # <<<<<<<<<<<<<<
  *                 mismatch_count += 1
  * 
 */
-        __pyx_t_15 = __Pyx_PyLong_From_int(__pyx_v_ref_pos); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 901, __pyx_L17_error)
+        __pyx_t_15 = __Pyx_PyLong_From_int(__pyx_v_ref_pos); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 924, __pyx_L17_error)
         __Pyx_GOTREF(__pyx_t_15);
-        __pyx_t_22 = PyTuple_New(4); if (unlikely(!__pyx_t_22)) __PYX_ERR(0, 901, __pyx_L17_error)
+        __pyx_t_22 = PyTuple_New(4); if (unlikely(!__pyx_t_22)) __PYX_ERR(0, 924, __pyx_L17_error)
         __Pyx_GOTREF(__pyx_t_22);
         __Pyx_INCREF(__pyx_mstate_global->__pyx_n_u_sub);
         __Pyx_GIVEREF(__pyx_mstate_global->__pyx_n_u_sub);
-        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_22, 0, __pyx_mstate_global->__pyx_n_u_sub) != (0)) __PYX_ERR(0, 901, __pyx_L17_error);
+        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_22, 0, __pyx_mstate_global->__pyx_n_u_sub) != (0)) __PYX_ERR(0, 924, __pyx_L17_error);
         __Pyx_GIVEREF(__pyx_t_15);
-        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_22, 1, __pyx_t_15) != (0)) __PYX_ERR(0, 901, __pyx_L17_error);
+        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_22, 1, __pyx_t_15) != (0)) __PYX_ERR(0, 924, __pyx_L17_error);
         __Pyx_INCREF(__pyx_v_r_char);
         __Pyx_GIVEREF(__pyx_v_r_char);
-        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_22, 2, __pyx_v_r_char) != (0)) __PYX_ERR(0, 901, __pyx_L17_error);
+        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_22, 2, __pyx_v_r_char) != (0)) __PYX_ERR(0, 924, __pyx_L17_error);
         __Pyx_INCREF(__pyx_v_q_char);
         __Pyx_GIVEREF(__pyx_v_q_char);
-        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_22, 3, __pyx_v_q_char) != (0)) __PYX_ERR(0, 901, __pyx_L17_error);
+        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_22, 3, __pyx_v_q_char) != (0)) __PYX_ERR(0, 924, __pyx_L17_error);
         __pyx_t_15 = 0;
-        __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_operations, __pyx_t_22); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 901, __pyx_L17_error)
+        __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_operations, __pyx_t_22); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 924, __pyx_L17_error)
         __Pyx_DECREF(__pyx_t_22); __pyx_t_22 = 0;
 
-        /* "src/_accelerators.pyx":902
+        /* "src/_accelerators.pyx":925
  *             if r_code != q_code:
  *                 operations.append(('sub', ref_pos, r_char, q_char))
  *                 mismatch_count += 1             # <<<<<<<<<<<<<<
@@ -26961,7 +27109,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
         __pyx_v_mismatch_count = (__pyx_v_mismatch_count + 1);
 
-        /* "src/_accelerators.pyx":900
+        /* "src/_accelerators.pyx":923
  *             observed_bases.append((ref_pos - 1, q_char))
  * 
  *             if r_code != q_code:             # <<<<<<<<<<<<<<
@@ -26972,7 +27120,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
       __pyx_L45_continue:;
     }
 
-    /* "src/_accelerators.pyx":904
+    /* "src/_accelerators.pyx":927
  *                 mismatch_count += 1
  * 
  *         if pending_ins:             # <<<<<<<<<<<<<<
@@ -26981,48 +27129,48 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
     {
       Py_ssize_t __pyx_temp = __Pyx_PyList_GET_SIZE(__pyx_v_pending_ins);
-      if (unlikely(((!CYTHON_ASSUME_SAFE_SIZE) && __pyx_temp < 0))) __PYX_ERR(0, 904, __pyx_L17_error)
+      if (unlikely(((!CYTHON_ASSUME_SAFE_SIZE) && __pyx_temp < 0))) __PYX_ERR(0, 927, __pyx_L17_error)
       __pyx_t_2 = (__pyx_temp != 0);
     }
 
     if (__pyx_t_2) {
 
-      /* "src/_accelerators.pyx":905
+      /* "src/_accelerators.pyx":928
  * 
  *         if pending_ins:
  *             ins_seq = "".join(pending_ins)             # <<<<<<<<<<<<<<
  *             operations.append(('ins', pending_ins_pos, ins_seq))
  *             insertion_len += len(ins_seq)
 */
-      __pyx_t_22 = PyUnicode_Join(__pyx_mstate_global->__pyx_kp_u__8, __pyx_v_pending_ins); if (unlikely(!__pyx_t_22)) __PYX_ERR(0, 905, __pyx_L17_error)
+      __pyx_t_22 = PyUnicode_Join(__pyx_mstate_global->__pyx_kp_u__8, __pyx_v_pending_ins); if (unlikely(!__pyx_t_22)) __PYX_ERR(0, 928, __pyx_L17_error)
       __Pyx_GOTREF(__pyx_t_22);
       __Pyx_XDECREF_SET(__pyx_v_ins_seq, ((PyObject*)__pyx_t_22));
       __pyx_t_22 = 0;
 
-      /* "src/_accelerators.pyx":906
+      /* "src/_accelerators.pyx":929
  *         if pending_ins:
  *             ins_seq = "".join(pending_ins)
  *             operations.append(('ins', pending_ins_pos, ins_seq))             # <<<<<<<<<<<<<<
  *             insertion_len += len(ins_seq)
  * 
 */
-      __pyx_t_22 = __Pyx_PyLong_From_int(__pyx_v_pending_ins_pos); if (unlikely(!__pyx_t_22)) __PYX_ERR(0, 906, __pyx_L17_error)
+      __pyx_t_22 = __Pyx_PyLong_From_int(__pyx_v_pending_ins_pos); if (unlikely(!__pyx_t_22)) __PYX_ERR(0, 929, __pyx_L17_error)
       __Pyx_GOTREF(__pyx_t_22);
-      __pyx_t_15 = PyTuple_New(3); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 906, __pyx_L17_error)
+      __pyx_t_15 = PyTuple_New(3); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 929, __pyx_L17_error)
       __Pyx_GOTREF(__pyx_t_15);
       __Pyx_INCREF(__pyx_mstate_global->__pyx_n_u_ins);
       __Pyx_GIVEREF(__pyx_mstate_global->__pyx_n_u_ins);
-      if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 0, __pyx_mstate_global->__pyx_n_u_ins) != (0)) __PYX_ERR(0, 906, __pyx_L17_error);
+      if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 0, __pyx_mstate_global->__pyx_n_u_ins) != (0)) __PYX_ERR(0, 929, __pyx_L17_error);
       __Pyx_GIVEREF(__pyx_t_22);
-      if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 1, __pyx_t_22) != (0)) __PYX_ERR(0, 906, __pyx_L17_error);
+      if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 1, __pyx_t_22) != (0)) __PYX_ERR(0, 929, __pyx_L17_error);
       __Pyx_INCREF(__pyx_v_ins_seq);
       __Pyx_GIVEREF(__pyx_v_ins_seq);
-      if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 2, __pyx_v_ins_seq) != (0)) __PYX_ERR(0, 906, __pyx_L17_error);
+      if (__Pyx_PyTuple_SET_ITEM(__pyx_t_15, 2, __pyx_v_ins_seq) != (0)) __PYX_ERR(0, 929, __pyx_L17_error);
       __pyx_t_22 = 0;
-      __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_operations, __pyx_t_15); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 906, __pyx_L17_error)
+      __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_operations, __pyx_t_15); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 929, __pyx_L17_error)
       __Pyx_DECREF(__pyx_t_15); __pyx_t_15 = 0;
 
-      /* "src/_accelerators.pyx":907
+      /* "src/_accelerators.pyx":930
  *             ins_seq = "".join(pending_ins)
  *             operations.append(('ins', pending_ins_pos, ins_seq))
  *             insertion_len += len(ins_seq)             # <<<<<<<<<<<<<<
@@ -27031,12 +27179,12 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
       if (unlikely(__pyx_v_ins_seq == Py_None)) {
         PyErr_SetString(PyExc_TypeError, "object of type 'NoneType' has no len()");
-        __PYX_ERR(0, 907, __pyx_L17_error)
+        __PYX_ERR(0, 930, __pyx_L17_error)
       }
-      __pyx_t_17 = __Pyx_PyUnicode_GET_LENGTH(__pyx_v_ins_seq); if (unlikely(__pyx_t_17 == ((Py_ssize_t)-1))) __PYX_ERR(0, 907, __pyx_L17_error)
+      __pyx_t_17 = __Pyx_PyUnicode_GET_LENGTH(__pyx_v_ins_seq); if (unlikely(__pyx_t_17 == ((Py_ssize_t)-1))) __PYX_ERR(0, 930, __pyx_L17_error)
       __pyx_v_insertion_len = (__pyx_v_insertion_len + __pyx_t_17);
 
-      /* "src/_accelerators.pyx":904
+      /* "src/_accelerators.pyx":927
  *                 mismatch_count += 1
  * 
  *         if pending_ins:             # <<<<<<<<<<<<<<
@@ -27045,7 +27193,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
     }
 
-    /* "src/_accelerators.pyx":909
+    /* "src/_accelerators.pyx":932
  *             insertion_len += len(ins_seq)
  * 
  *         if pending_del_len > 0:             # <<<<<<<<<<<<<<
@@ -27055,32 +27203,32 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
     __pyx_t_2 = (__pyx_v_pending_del_len > 0);
     if (__pyx_t_2) {
 
-      /* "src/_accelerators.pyx":910
+      /* "src/_accelerators.pyx":933
  * 
  *         if pending_del_len > 0:
  *             operations.append(('del', pending_del_pos, pending_del_len))             # <<<<<<<<<<<<<<
  *             deletion_len += pending_del_len
  * 
 */
-      __pyx_t_15 = __Pyx_PyLong_From_int(__pyx_v_pending_del_pos); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 910, __pyx_L17_error)
+      __pyx_t_15 = __Pyx_PyLong_From_int(__pyx_v_pending_del_pos); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 933, __pyx_L17_error)
       __Pyx_GOTREF(__pyx_t_15);
-      __pyx_t_22 = __Pyx_PyLong_From_int(__pyx_v_pending_del_len); if (unlikely(!__pyx_t_22)) __PYX_ERR(0, 910, __pyx_L17_error)
+      __pyx_t_22 = __Pyx_PyLong_From_int(__pyx_v_pending_del_len); if (unlikely(!__pyx_t_22)) __PYX_ERR(0, 933, __pyx_L17_error)
       __Pyx_GOTREF(__pyx_t_22);
-      __pyx_t_20 = PyTuple_New(3); if (unlikely(!__pyx_t_20)) __PYX_ERR(0, 910, __pyx_L17_error)
+      __pyx_t_20 = PyTuple_New(3); if (unlikely(!__pyx_t_20)) __PYX_ERR(0, 933, __pyx_L17_error)
       __Pyx_GOTREF(__pyx_t_20);
       __Pyx_INCREF(__pyx_mstate_global->__pyx_n_u_del);
       __Pyx_GIVEREF(__pyx_mstate_global->__pyx_n_u_del);
-      if (__Pyx_PyTuple_SET_ITEM(__pyx_t_20, 0, __pyx_mstate_global->__pyx_n_u_del) != (0)) __PYX_ERR(0, 910, __pyx_L17_error);
+      if (__Pyx_PyTuple_SET_ITEM(__pyx_t_20, 0, __pyx_mstate_global->__pyx_n_u_del) != (0)) __PYX_ERR(0, 933, __pyx_L17_error);
       __Pyx_GIVEREF(__pyx_t_15);
-      if (__Pyx_PyTuple_SET_ITEM(__pyx_t_20, 1, __pyx_t_15) != (0)) __PYX_ERR(0, 910, __pyx_L17_error);
+      if (__Pyx_PyTuple_SET_ITEM(__pyx_t_20, 1, __pyx_t_15) != (0)) __PYX_ERR(0, 933, __pyx_L17_error);
       __Pyx_GIVEREF(__pyx_t_22);
-      if (__Pyx_PyTuple_SET_ITEM(__pyx_t_20, 2, __pyx_t_22) != (0)) __PYX_ERR(0, 910, __pyx_L17_error);
+      if (__Pyx_PyTuple_SET_ITEM(__pyx_t_20, 2, __pyx_t_22) != (0)) __PYX_ERR(0, 933, __pyx_L17_error);
       __pyx_t_15 = 0;
       __pyx_t_22 = 0;
-      __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_operations, __pyx_t_20); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 910, __pyx_L17_error)
+      __pyx_t_16 = __Pyx_PyList_Append(__pyx_v_operations, __pyx_t_20); if (unlikely(__pyx_t_16 == ((int)-1))) __PYX_ERR(0, 933, __pyx_L17_error)
       __Pyx_DECREF(__pyx_t_20); __pyx_t_20 = 0;
 
-      /* "src/_accelerators.pyx":911
+      /* "src/_accelerators.pyx":934
  *         if pending_del_len > 0:
  *             operations.append(('del', pending_del_pos, pending_del_len))
  *             deletion_len += pending_del_len             # <<<<<<<<<<<<<<
@@ -27089,7 +27237,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
       __pyx_v_deletion_len = (__pyx_v_deletion_len + __pyx_v_pending_del_len);
 
-      /* "src/_accelerators.pyx":909
+      /* "src/_accelerators.pyx":932
  *             insertion_len += len(ins_seq)
  * 
  *         if pending_del_len > 0:             # <<<<<<<<<<<<<<
@@ -27098,7 +27246,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
     }
 
-    /* "src/_accelerators.pyx":913
+    /* "src/_accelerators.pyx":936
  *             deletion_len += pending_del_len
  * 
  *         if mismatch_count > mismatch_tolerance:             # <<<<<<<<<<<<<<
@@ -27108,7 +27256,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
     __pyx_t_2 = (__pyx_v_mismatch_count > __pyx_v_mismatch_tolerance);
     if (__pyx_t_2) {
 
-      /* "src/_accelerators.pyx":914
+      /* "src/_accelerators.pyx":937
  * 
  *         if mismatch_count > mismatch_tolerance:
  *             return None             # <<<<<<<<<<<<<<
@@ -27119,7 +27267,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
       __pyx_r = ((PyObject*)Py_None); __Pyx_INCREF(Py_None);
       goto __pyx_L16_return;
 
-      /* "src/_accelerators.pyx":913
+      /* "src/_accelerators.pyx":936
  *             deletion_len += pending_del_len
  * 
  *         if mismatch_count > mismatch_tolerance:             # <<<<<<<<<<<<<<
@@ -27128,7 +27276,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
     }
 
-    /* "src/_accelerators.pyx":916
+    /* "src/_accelerators.pyx":939
  *             return None
  * 
  *         if insertion_len > max_indel or deletion_len > max_indel:             # <<<<<<<<<<<<<<
@@ -27146,7 +27294,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
     __pyx_L58_bool_binop_done:;
     if (__pyx_t_2) {
 
-      /* "src/_accelerators.pyx":917
+      /* "src/_accelerators.pyx":940
  * 
  *         if insertion_len > max_indel or deletion_len > max_indel:
  *             return None             # <<<<<<<<<<<<<<
@@ -27157,7 +27305,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
       __pyx_r = ((PyObject*)Py_None); __Pyx_INCREF(Py_None);
       goto __pyx_L16_return;
 
-      /* "src/_accelerators.pyx":916
+      /* "src/_accelerators.pyx":939
  *             return None
  * 
  *         if insertion_len > max_indel or deletion_len > max_indel:             # <<<<<<<<<<<<<<
@@ -27166,7 +27314,7 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
 */
     }
 
-    /* "src/_accelerators.pyx":921
+    /* "src/_accelerators.pyx":944
  *         # Construct unit_sequence from window
  *         # window is bytes/memoryview, convert to string
  *         unit_sequence = bytes(window[:best_j]).decode('ascii', 'replace')             # <<<<<<<<<<<<<<
@@ -27192,10 +27340,10 @@ static PyObject *__pyx_f_3src_13_accelerators_align_unit_to_window(__Pyx_memview
     0,
     1) < 0))
 {
-    __PYX_ERR(0, 921, __pyx_L17_error)
+    __PYX_ERR(0, 944, __pyx_L17_error)
 }
 
-__pyx_t_15 = __pyx_memoryview_fromslice(__pyx_t_23, 1, (PyObject *(*)(char *)) __pyx_memview_get_unsigned_char__const__, (int (*)(char *, PyObject *)) NULL, 0);; if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 921, __pyx_L17_error)
+__pyx_t_15 = __pyx_memoryview_fromslice(__pyx_t_23, 1, (PyObject *(*)(char *)) __pyx_memview_get_unsigned_char__const__, (int (*)(char *, PyObject *)) NULL, 0);; if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 944, __pyx_L17_error)
     __Pyx_GOTREF(__pyx_t_15);
     __PYX_XCLEAR_MEMVIEW(&__pyx_t_23, 1);
     __pyx_t_23.memview = NULL; __pyx_t_23.data = NULL;
@@ -27205,16 +27353,16 @@ __pyx_t_15 = __pyx_memoryview_fromslice(__pyx_t_23, 1, (PyObject *(*)(char *)) _
       __pyx_t_20 = __Pyx_PyObject_FastCall((PyObject*)(&PyBytes_Type), __pyx_callargs+__pyx_t_24, (2-__pyx_t_24) | (__pyx_t_24*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
       __Pyx_XDECREF(__pyx_t_22); __pyx_t_22 = 0;
       __Pyx_DECREF(__pyx_t_15); __pyx_t_15 = 0;
-      if (unlikely(!__pyx_t_20)) __PYX_ERR(0, 921, __pyx_L17_error)
+      if (unlikely(!__pyx_t_20)) __PYX_ERR(0, 944, __pyx_L17_error)
       __Pyx_GOTREF(__pyx_t_20);
     }
-    __pyx_t_15 = __Pyx_decode_bytes(__pyx_t_20, 0, PY_SSIZE_T_MAX, NULL, __pyx_k_replace, PyUnicode_DecodeASCII); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 921, __pyx_L17_error)
+    __pyx_t_15 = __Pyx_decode_bytes(__pyx_t_20, 0, PY_SSIZE_T_MAX, NULL, __pyx_k_replace, PyUnicode_DecodeASCII); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 944, __pyx_L17_error)
     __Pyx_GOTREF(__pyx_t_15);
     __Pyx_DECREF(__pyx_t_20); __pyx_t_20 = 0;
     __pyx_v_unit_sequence = ((PyObject*)__pyx_t_15);
     __pyx_t_15 = 0;
 
-    /* "src/_accelerators.pyx":923
+    /* "src/_accelerators.pyx":946
  *         unit_sequence = bytes(window[:best_j]).decode('ascii', 'replace')
  * 
  *         return (             # <<<<<<<<<<<<<<
@@ -27223,84 +27371,84 @@ __pyx_t_15 = __pyx_memoryview_fromslice(__pyx_t_23, 1, (PyObject *(*)(char *)) _
 */
     __Pyx_XDECREF(__pyx_r);
 
-    /* "src/_accelerators.pyx":924
+    /* "src/_accelerators.pyx":947
  * 
  *         return (
  *             best_j,             # <<<<<<<<<<<<<<
  *             unit_sequence,
  *             mismatch_count,
 */
-    __pyx_t_15 = __Pyx_PyLong_From_int(__pyx_v_best_j); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 924, __pyx_L17_error)
+    __pyx_t_15 = __Pyx_PyLong_From_int(__pyx_v_best_j); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 947, __pyx_L17_error)
     __Pyx_GOTREF(__pyx_t_15);
 
-    /* "src/_accelerators.pyx":926
+    /* "src/_accelerators.pyx":949
  *             best_j,
  *             unit_sequence,
  *             mismatch_count,             # <<<<<<<<<<<<<<
  *             insertion_len,
  *             deletion_len,
 */
-    __pyx_t_20 = __Pyx_PyLong_From_int(__pyx_v_mismatch_count); if (unlikely(!__pyx_t_20)) __PYX_ERR(0, 926, __pyx_L17_error)
+    __pyx_t_20 = __Pyx_PyLong_From_int(__pyx_v_mismatch_count); if (unlikely(!__pyx_t_20)) __PYX_ERR(0, 949, __pyx_L17_error)
     __Pyx_GOTREF(__pyx_t_20);
 
-    /* "src/_accelerators.pyx":927
+    /* "src/_accelerators.pyx":950
  *             unit_sequence,
  *             mismatch_count,
  *             insertion_len,             # <<<<<<<<<<<<<<
  *             deletion_len,
  *             operations,
 */
-    __pyx_t_22 = __Pyx_PyLong_From_int(__pyx_v_insertion_len); if (unlikely(!__pyx_t_22)) __PYX_ERR(0, 927, __pyx_L17_error)
+    __pyx_t_22 = __Pyx_PyLong_From_int(__pyx_v_insertion_len); if (unlikely(!__pyx_t_22)) __PYX_ERR(0, 950, __pyx_L17_error)
     __Pyx_GOTREF(__pyx_t_22);
 
-    /* "src/_accelerators.pyx":928
+    /* "src/_accelerators.pyx":951
  *             mismatch_count,
  *             insertion_len,
  *             deletion_len,             # <<<<<<<<<<<<<<
  *             operations,
  *             observed_bases,
 */
-    __pyx_t_25 = __Pyx_PyLong_From_int(__pyx_v_deletion_len); if (unlikely(!__pyx_t_25)) __PYX_ERR(0, 928, __pyx_L17_error)
+    __pyx_t_25 = __Pyx_PyLong_From_int(__pyx_v_deletion_len); if (unlikely(!__pyx_t_25)) __PYX_ERR(0, 951, __pyx_L17_error)
     __Pyx_GOTREF(__pyx_t_25);
 
-    /* "src/_accelerators.pyx":931
+    /* "src/_accelerators.pyx":954
  *             operations,
  *             observed_bases,
  *             min_final_cost             # <<<<<<<<<<<<<<
  *         )
  * 
 */
-    __pyx_t_26 = __Pyx_PyLong_From_int(__pyx_v_min_final_cost); if (unlikely(!__pyx_t_26)) __PYX_ERR(0, 931, __pyx_L17_error)
+    __pyx_t_26 = __Pyx_PyLong_From_int(__pyx_v_min_final_cost); if (unlikely(!__pyx_t_26)) __PYX_ERR(0, 954, __pyx_L17_error)
     __Pyx_GOTREF(__pyx_t_26);
 
-    /* "src/_accelerators.pyx":924
+    /* "src/_accelerators.pyx":947
  * 
  *         return (
  *             best_j,             # <<<<<<<<<<<<<<
  *             unit_sequence,
  *             mismatch_count,
 */
-    __pyx_t_27 = PyTuple_New(8); if (unlikely(!__pyx_t_27)) __PYX_ERR(0, 924, __pyx_L17_error)
+    __pyx_t_27 = PyTuple_New(8); if (unlikely(!__pyx_t_27)) __PYX_ERR(0, 947, __pyx_L17_error)
     __Pyx_GOTREF(__pyx_t_27);
     __Pyx_GIVEREF(__pyx_t_15);
-    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_27, 0, __pyx_t_15) != (0)) __PYX_ERR(0, 924, __pyx_L17_error);
+    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_27, 0, __pyx_t_15) != (0)) __PYX_ERR(0, 947, __pyx_L17_error);
     __Pyx_INCREF(__pyx_v_unit_sequence);
     __Pyx_GIVEREF(__pyx_v_unit_sequence);
-    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_27, 1, __pyx_v_unit_sequence) != (0)) __PYX_ERR(0, 924, __pyx_L17_error);
+    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_27, 1, __pyx_v_unit_sequence) != (0)) __PYX_ERR(0, 947, __pyx_L17_error);
     __Pyx_GIVEREF(__pyx_t_20);
-    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_27, 2, __pyx_t_20) != (0)) __PYX_ERR(0, 924, __pyx_L17_error);
+    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_27, 2, __pyx_t_20) != (0)) __PYX_ERR(0, 947, __pyx_L17_error);
     __Pyx_GIVEREF(__pyx_t_22);
-    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_27, 3, __pyx_t_22) != (0)) __PYX_ERR(0, 924, __pyx_L17_error);
+    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_27, 3, __pyx_t_22) != (0)) __PYX_ERR(0, 947, __pyx_L17_error);
     __Pyx_GIVEREF(__pyx_t_25);
-    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_27, 4, __pyx_t_25) != (0)) __PYX_ERR(0, 924, __pyx_L17_error);
+    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_27, 4, __pyx_t_25) != (0)) __PYX_ERR(0, 947, __pyx_L17_error);
     __Pyx_INCREF(__pyx_v_operations);
     __Pyx_GIVEREF(__pyx_v_operations);
-    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_27, 5, __pyx_v_operations) != (0)) __PYX_ERR(0, 924, __pyx_L17_error);
+    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_27, 5, __pyx_v_operations) != (0)) __PYX_ERR(0, 947, __pyx_L17_error);
     __Pyx_INCREF(__pyx_v_observed_bases);
     __Pyx_GIVEREF(__pyx_v_observed_bases);
-    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_27, 6, __pyx_v_observed_bases) != (0)) __PYX_ERR(0, 924, __pyx_L17_error);
+    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_27, 6, __pyx_v_observed_bases) != (0)) __PYX_ERR(0, 947, __pyx_L17_error);
     __Pyx_GIVEREF(__pyx_t_26);
-    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_27, 7, __pyx_t_26) != (0)) __PYX_ERR(0, 924, __pyx_L17_error);
+    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_27, 7, __pyx_t_26) != (0)) __PYX_ERR(0, 947, __pyx_L17_error);
     __pyx_t_15 = 0;
     __pyx_t_20 = 0;
     __pyx_t_22 = 0;
@@ -27311,7 +27459,7 @@ __pyx_t_15 = __pyx_memoryview_fromslice(__pyx_t_23, 1, (PyObject *(*)(char *)) _
     goto __pyx_L16_return;
   }
 
-  /* "src/_accelerators.pyx":935
+  /* "src/_accelerators.pyx":958
  * 
  *     finally:
  *         free(dp)             # <<<<<<<<<<<<<<
@@ -27344,7 +27492,7 @@ __pyx_t_15 = __pyx_memoryview_fromslice(__pyx_t_23, 1, (PyObject *(*)(char *)) _
       {
         free(__pyx_v_dp);
 
-        /* "src/_accelerators.pyx":936
+        /* "src/_accelerators.pyx":959
  *     finally:
  *         free(dp)
  *         free(ptr)             # <<<<<<<<<<<<<<
@@ -27369,7 +27517,7 @@ __pyx_t_15 = __pyx_memoryview_fromslice(__pyx_t_23, 1, (PyObject *(*)(char *)) _
       __pyx_t_35 = __pyx_r;
       __pyx_r = 0;
 
-      /* "src/_accelerators.pyx":935
+      /* "src/_accelerators.pyx":958
  * 
  *     finally:
  *         free(dp)             # <<<<<<<<<<<<<<
@@ -27378,7 +27526,7 @@ __pyx_t_15 = __pyx_memoryview_fromslice(__pyx_t_23, 1, (PyObject *(*)(char *)) _
 */
       free(__pyx_v_dp);
 
-      /* "src/_accelerators.pyx":936
+      /* "src/_accelerators.pyx":959
  *     finally:
  *         free(dp)
  *         free(ptr)             # <<<<<<<<<<<<<<
@@ -27392,7 +27540,7 @@ __pyx_t_15 = __pyx_memoryview_fromslice(__pyx_t_23, 1, (PyObject *(*)(char *)) _
     }
   }
 
-  /* "src/_accelerators.pyx":706
+  /* "src/_accelerators.pyx":729
  * from libc.stdlib cimport malloc, free
  * 
  * cpdef tuple align_unit_to_window(             # <<<<<<<<<<<<<<
@@ -27469,53 +27617,53 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_motif,&__pyx_mstate_global->__pyx_n_u_window,&__pyx_mstate_global->__pyx_n_u_max_indel,&__pyx_mstate_global->__pyx_n_u_mismatch_tolerance,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 706, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 729, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  4:
         values[3] = __Pyx_ArgRef_FASTCALL(__pyx_args, 3);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 706, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 729, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  3:
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 706, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 729, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 706, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 729, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 706, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 729, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "align_unit_to_window", 0) < (0)) __PYX_ERR(0, 706, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "align_unit_to_window", 0) < (0)) __PYX_ERR(0, 729, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 4; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("align_unit_to_window", 1, 4, 4, i); __PYX_ERR(0, 706, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("align_unit_to_window", 1, 4, 4, i); __PYX_ERR(0, 729, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 4)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 706, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 729, __pyx_L3_error)
       values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 706, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 729, __pyx_L3_error)
       values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 706, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 729, __pyx_L3_error)
       values[3] = __Pyx_ArgRef_FASTCALL(__pyx_args, 3);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 706, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 729, __pyx_L3_error)
     }
-    __pyx_v_motif = __Pyx_PyObject_to_MemoryviewSlice_ds_unsigned_char__const__(values[0], 0); if (unlikely(!__pyx_v_motif.memview)) __PYX_ERR(0, 707, __pyx_L3_error)
-    __pyx_v_window = __Pyx_PyObject_to_MemoryviewSlice_ds_unsigned_char__const__(values[1], 0); if (unlikely(!__pyx_v_window.memview)) __PYX_ERR(0, 708, __pyx_L3_error)
-    __pyx_v_max_indel = __Pyx_PyLong_As_int(values[2]); if (unlikely((__pyx_v_max_indel == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 709, __pyx_L3_error)
-    __pyx_v_mismatch_tolerance = __Pyx_PyLong_As_int(values[3]); if (unlikely((__pyx_v_mismatch_tolerance == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 710, __pyx_L3_error)
+    __pyx_v_motif = __Pyx_PyObject_to_MemoryviewSlice_ds_unsigned_char__const__(values[0], 0); if (unlikely(!__pyx_v_motif.memview)) __PYX_ERR(0, 730, __pyx_L3_error)
+    __pyx_v_window = __Pyx_PyObject_to_MemoryviewSlice_ds_unsigned_char__const__(values[1], 0); if (unlikely(!__pyx_v_window.memview)) __PYX_ERR(0, 731, __pyx_L3_error)
+    __pyx_v_max_indel = __Pyx_PyLong_As_int(values[2]); if (unlikely((__pyx_v_max_indel == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 732, __pyx_L3_error)
+    __pyx_v_mismatch_tolerance = __Pyx_PyLong_As_int(values[3]); if (unlikely((__pyx_v_mismatch_tolerance == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 733, __pyx_L3_error)
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("align_unit_to_window", 1, 4, 4, __pyx_nargs); __PYX_ERR(0, 706, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("align_unit_to_window", 1, 4, 4, __pyx_nargs); __PYX_ERR(0, 729, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -27549,7 +27697,7 @@ static PyObject *__pyx_pf_3src_13_accelerators_14align_unit_to_window(CYTHON_UNU
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("align_unit_to_window", 0);
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __pyx_f_3src_13_accelerators_align_unit_to_window(__pyx_v_motif, __pyx_v_window, __pyx_v_max_indel, __pyx_v_mismatch_tolerance, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 706, __pyx_L1_error)
+  __pyx_t_1 = __pyx_f_3src_13_accelerators_align_unit_to_window(__pyx_v_motif, __pyx_v_window, __pyx_v_max_indel, __pyx_v_mismatch_tolerance, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 729, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
@@ -27566,7 +27714,7 @@ static PyObject *__pyx_pf_3src_13_accelerators_14align_unit_to_window(CYTHON_UNU
   return __pyx_r;
 }
 
-/* "src/_accelerators.pyx":938
+/* "src/_accelerators.pyx":961
  *         free(ptr)
  * 
  * cpdef list lcp_tandem_candidates(             # <<<<<<<<<<<<<<
@@ -27616,7 +27764,7 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
     }
   }
 
-  /* "src/_accelerators.pyx":958
+  /* "src/_accelerators.pyx":981
  *     Returns list of (period, text_position) tuples.
  *     """
  *     cdef int sa_len = sa.shape[0]             # <<<<<<<<<<<<<<
@@ -27625,19 +27773,19 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
 */
   __pyx_v_sa_len = (__pyx_v_sa.shape[0]);
 
-  /* "src/_accelerators.pyx":959
+  /* "src/_accelerators.pyx":982
  *     """
  *     cdef int sa_len = sa.shape[0]
  *     cdef list results = []             # <<<<<<<<<<<<<<
  *     cdef int i, L, pos_a, pos_b, diff, start
  *     cdef int lcp_len = lcp.shape[0]
 */
-  __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 959, __pyx_L1_error)
+  __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 982, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_v_results = ((PyObject*)__pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "src/_accelerators.pyx":961
+  /* "src/_accelerators.pyx":984
  *     cdef list results = []
  *     cdef int i, L, pos_a, pos_b, diff, start
  *     cdef int lcp_len = lcp.shape[0]             # <<<<<<<<<<<<<<
@@ -27646,7 +27794,7 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
 */
   __pyx_v_lcp_len = (__pyx_v_lcp.shape[0]);
 
-  /* "src/_accelerators.pyx":962
+  /* "src/_accelerators.pyx":985
  *     cdef int i, L, pos_a, pos_b, diff, start
  *     cdef int lcp_len = lcp.shape[0]
  *     cdef int limit = sa_len             # <<<<<<<<<<<<<<
@@ -27655,7 +27803,7 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
 */
   __pyx_v_limit = __pyx_v_sa_len;
 
-  /* "src/_accelerators.pyx":963
+  /* "src/_accelerators.pyx":986
  *     cdef int lcp_len = lcp.shape[0]
  *     cdef int limit = sa_len
  *     if lcp_len < limit:             # <<<<<<<<<<<<<<
@@ -27665,7 +27813,7 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
   __pyx_t_2 = (__pyx_v_lcp_len < __pyx_v_limit);
   if (__pyx_t_2) {
 
-    /* "src/_accelerators.pyx":964
+    /* "src/_accelerators.pyx":987
  *     cdef int limit = sa_len
  *     if lcp_len < limit:
  *         limit = lcp_len             # <<<<<<<<<<<<<<
@@ -27674,7 +27822,7 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
 */
     __pyx_v_limit = __pyx_v_lcp_len;
 
-    /* "src/_accelerators.pyx":963
+    /* "src/_accelerators.pyx":986
  *     cdef int lcp_len = lcp.shape[0]
  *     cdef int limit = sa_len
  *     if lcp_len < limit:             # <<<<<<<<<<<<<<
@@ -27683,7 +27831,7 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
 */
   }
 
-  /* "src/_accelerators.pyx":966
+  /* "src/_accelerators.pyx":989
  *         limit = lcp_len
  * 
  *     for i in range(1, limit):             # <<<<<<<<<<<<<<
@@ -27695,7 +27843,7 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
   for (__pyx_t_5 = 1; __pyx_t_5 < __pyx_t_4; __pyx_t_5+=1) {
     __pyx_v_i = __pyx_t_5;
 
-    /* "src/_accelerators.pyx":967
+    /* "src/_accelerators.pyx":990
  * 
  *     for i in range(1, limit):
  *         L = lcp[i]             # <<<<<<<<<<<<<<
@@ -27705,7 +27853,7 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
     __pyx_t_6 = __pyx_v_i;
     __pyx_v_L = (*((int const  *) ( /* dim=0 */ (__pyx_v_lcp.data + __pyx_t_6 * __pyx_v_lcp.strides[0]) )));
 
-    /* "src/_accelerators.pyx":968
+    /* "src/_accelerators.pyx":991
  *     for i in range(1, limit):
  *         L = lcp[i]
  *         if L < min_lcp_threshold:             # <<<<<<<<<<<<<<
@@ -27715,7 +27863,7 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
     __pyx_t_2 = (__pyx_v_L < __pyx_v_min_lcp_threshold);
     if (__pyx_t_2) {
 
-      /* "src/_accelerators.pyx":969
+      /* "src/_accelerators.pyx":992
  *         L = lcp[i]
  *         if L < min_lcp_threshold:
  *             continue             # <<<<<<<<<<<<<<
@@ -27724,7 +27872,7 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
 */
       goto __pyx_L4_continue;
 
-      /* "src/_accelerators.pyx":968
+      /* "src/_accelerators.pyx":991
  *     for i in range(1, limit):
  *         L = lcp[i]
  *         if L < min_lcp_threshold:             # <<<<<<<<<<<<<<
@@ -27733,7 +27881,7 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
 */
     }
 
-    /* "src/_accelerators.pyx":971
+    /* "src/_accelerators.pyx":994
  *             continue
  * 
  *         pos_a = sa[i - 1]             # <<<<<<<<<<<<<<
@@ -27743,7 +27891,7 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
     __pyx_t_6 = (__pyx_v_i - 1);
     __pyx_v_pos_a = (*((int const  *) ( /* dim=0 */ (__pyx_v_sa.data + __pyx_t_6 * __pyx_v_sa.strides[0]) )));
 
-    /* "src/_accelerators.pyx":972
+    /* "src/_accelerators.pyx":995
  * 
  *         pos_a = sa[i - 1]
  *         pos_b = sa[i]             # <<<<<<<<<<<<<<
@@ -27753,7 +27901,7 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
     __pyx_t_6 = __pyx_v_i;
     __pyx_v_pos_b = (*((int const  *) ( /* dim=0 */ (__pyx_v_sa.data + __pyx_t_6 * __pyx_v_sa.strides[0]) )));
 
-    /* "src/_accelerators.pyx":975
+    /* "src/_accelerators.pyx":998
  * 
  *         # Skip sentinel positions
  *         if pos_a >= n or pos_b >= n:             # <<<<<<<<<<<<<<
@@ -27771,7 +27919,7 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
     __pyx_L8_bool_binop_done:;
     if (__pyx_t_2) {
 
-      /* "src/_accelerators.pyx":976
+      /* "src/_accelerators.pyx":999
  *         # Skip sentinel positions
  *         if pos_a >= n or pos_b >= n:
  *             continue             # <<<<<<<<<<<<<<
@@ -27780,7 +27928,7 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
 */
       goto __pyx_L4_continue;
 
-      /* "src/_accelerators.pyx":975
+      /* "src/_accelerators.pyx":998
  * 
  *         # Skip sentinel positions
  *         if pos_a >= n or pos_b >= n:             # <<<<<<<<<<<<<<
@@ -27789,7 +27937,7 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
 */
     }
 
-    /* "src/_accelerators.pyx":978
+    /* "src/_accelerators.pyx":1001
  *             continue
  * 
  *         diff = pos_b - pos_a             # <<<<<<<<<<<<<<
@@ -27798,7 +27946,7 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
 */
     __pyx_v_diff = (__pyx_v_pos_b - __pyx_v_pos_a);
 
-    /* "src/_accelerators.pyx":979
+    /* "src/_accelerators.pyx":1002
  * 
  *         diff = pos_b - pos_a
  *         if diff < 0:             # <<<<<<<<<<<<<<
@@ -27808,7 +27956,7 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
     __pyx_t_2 = (__pyx_v_diff < 0);
     if (__pyx_t_2) {
 
-      /* "src/_accelerators.pyx":980
+      /* "src/_accelerators.pyx":1003
  *         diff = pos_b - pos_a
  *         if diff < 0:
  *             diff = -diff             # <<<<<<<<<<<<<<
@@ -27817,7 +27965,7 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
 */
       __pyx_v_diff = (-__pyx_v_diff);
 
-      /* "src/_accelerators.pyx":979
+      /* "src/_accelerators.pyx":1002
  * 
  *         diff = pos_b - pos_a
  *         if diff < 0:             # <<<<<<<<<<<<<<
@@ -27826,7 +27974,7 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
 */
     }
 
-    /* "src/_accelerators.pyx":982
+    /* "src/_accelerators.pyx":1005
  *             diff = -diff
  * 
  *         if diff < min_period or diff > max_period:             # <<<<<<<<<<<<<<
@@ -27844,7 +27992,7 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
     __pyx_L12_bool_binop_done:;
     if (__pyx_t_2) {
 
-      /* "src/_accelerators.pyx":983
+      /* "src/_accelerators.pyx":1006
  * 
  *         if diff < min_period or diff > max_period:
  *             continue             # <<<<<<<<<<<<<<
@@ -27853,7 +28001,7 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
 */
       goto __pyx_L4_continue;
 
-      /* "src/_accelerators.pyx":982
+      /* "src/_accelerators.pyx":1005
  *             diff = -diff
  * 
  *         if diff < min_period or diff > max_period:             # <<<<<<<<<<<<<<
@@ -27862,7 +28010,7 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
 */
     }
 
-    /* "src/_accelerators.pyx":985
+    /* "src/_accelerators.pyx":1008
  *             continue
  * 
  *         start = pos_a if pos_a < pos_b else pos_b             # <<<<<<<<<<<<<<
@@ -27877,31 +28025,31 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
     }
     __pyx_v_start = __pyx_t_8;
 
-    /* "src/_accelerators.pyx":986
+    /* "src/_accelerators.pyx":1009
  * 
  *         start = pos_a if pos_a < pos_b else pos_b
  *         results.append((diff, start))             # <<<<<<<<<<<<<<
  * 
  *     return results
 */
-    __pyx_t_1 = __Pyx_PyLong_From_int(__pyx_v_diff); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 986, __pyx_L1_error)
+    __pyx_t_1 = __Pyx_PyLong_From_int(__pyx_v_diff); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 1009, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
-    __pyx_t_9 = __Pyx_PyLong_From_int(__pyx_v_start); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 986, __pyx_L1_error)
+    __pyx_t_9 = __Pyx_PyLong_From_int(__pyx_v_start); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 1009, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_9);
-    __pyx_t_10 = PyTuple_New(2); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 986, __pyx_L1_error)
+    __pyx_t_10 = PyTuple_New(2); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 1009, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_10);
     __Pyx_GIVEREF(__pyx_t_1);
-    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_10, 0, __pyx_t_1) != (0)) __PYX_ERR(0, 986, __pyx_L1_error);
+    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_10, 0, __pyx_t_1) != (0)) __PYX_ERR(0, 1009, __pyx_L1_error);
     __Pyx_GIVEREF(__pyx_t_9);
-    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_10, 1, __pyx_t_9) != (0)) __PYX_ERR(0, 986, __pyx_L1_error);
+    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_10, 1, __pyx_t_9) != (0)) __PYX_ERR(0, 1009, __pyx_L1_error);
     __pyx_t_1 = 0;
     __pyx_t_9 = 0;
-    __pyx_t_11 = __Pyx_PyList_Append(__pyx_v_results, __pyx_t_10); if (unlikely(__pyx_t_11 == ((int)-1))) __PYX_ERR(0, 986, __pyx_L1_error)
+    __pyx_t_11 = __Pyx_PyList_Append(__pyx_v_results, __pyx_t_10); if (unlikely(__pyx_t_11 == ((int)-1))) __PYX_ERR(0, 1009, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
     __pyx_L4_continue:;
   }
 
-  /* "src/_accelerators.pyx":988
+  /* "src/_accelerators.pyx":1011
  *         results.append((diff, start))
  * 
  *     return results             # <<<<<<<<<<<<<<
@@ -27913,7 +28061,7 @@ static PyObject *__pyx_f_3src_13_accelerators_lcp_tandem_candidates(__Pyx_memvie
   __pyx_r = __pyx_v_results;
   goto __pyx_L0;
 
-  /* "src/_accelerators.pyx":938
+  /* "src/_accelerators.pyx":961
  *         free(ptr)
  * 
  * cpdef list lcp_tandem_candidates(             # <<<<<<<<<<<<<<
@@ -27980,76 +28128,76 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_sa,&__pyx_mstate_global->__pyx_n_u_lcp,&__pyx_mstate_global->__pyx_n_u_n,&__pyx_mstate_global->__pyx_n_u_min_period,&__pyx_mstate_global->__pyx_n_u_max_period,&__pyx_mstate_global->__pyx_n_u_min_lcp_threshold,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 938, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 961, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  6:
         values[5] = __Pyx_ArgRef_FASTCALL(__pyx_args, 5);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 938, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 961, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  5:
         values[4] = __Pyx_ArgRef_FASTCALL(__pyx_args, 4);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 938, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 961, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  4:
         values[3] = __Pyx_ArgRef_FASTCALL(__pyx_args, 3);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 938, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 961, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  3:
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 938, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 961, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 938, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 961, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 938, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 961, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "lcp_tandem_candidates", 0) < (0)) __PYX_ERR(0, 938, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "lcp_tandem_candidates", 0) < (0)) __PYX_ERR(0, 961, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 5; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("lcp_tandem_candidates", 0, 5, 6, i); __PYX_ERR(0, 938, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("lcp_tandem_candidates", 0, 5, 6, i); __PYX_ERR(0, 961, __pyx_L3_error) }
       }
     } else {
       switch (__pyx_nargs) {
         case  6:
         values[5] = __Pyx_ArgRef_FASTCALL(__pyx_args, 5);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 938, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 961, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  5:
         values[4] = __Pyx_ArgRef_FASTCALL(__pyx_args, 4);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 938, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 961, __pyx_L3_error)
         values[3] = __Pyx_ArgRef_FASTCALL(__pyx_args, 3);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 938, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 961, __pyx_L3_error)
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 938, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 961, __pyx_L3_error)
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 938, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 961, __pyx_L3_error)
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 938, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 961, __pyx_L3_error)
         break;
         default: goto __pyx_L5_argtuple_error;
       }
     }
-    __pyx_v_sa = __Pyx_PyObject_to_MemoryviewSlice_ds_int__const__(values[0], 0); if (unlikely(!__pyx_v_sa.memview)) __PYX_ERR(0, 939, __pyx_L3_error)
-    __pyx_v_lcp = __Pyx_PyObject_to_MemoryviewSlice_ds_int__const__(values[1], 0); if (unlikely(!__pyx_v_lcp.memview)) __PYX_ERR(0, 940, __pyx_L3_error)
-    __pyx_v_n = __Pyx_PyLong_As_int(values[2]); if (unlikely((__pyx_v_n == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 941, __pyx_L3_error)
-    __pyx_v_min_period = __Pyx_PyLong_As_int(values[3]); if (unlikely((__pyx_v_min_period == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 942, __pyx_L3_error)
-    __pyx_v_max_period = __Pyx_PyLong_As_int(values[4]); if (unlikely((__pyx_v_max_period == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 943, __pyx_L3_error)
+    __pyx_v_sa = __Pyx_PyObject_to_MemoryviewSlice_ds_int__const__(values[0], 0); if (unlikely(!__pyx_v_sa.memview)) __PYX_ERR(0, 962, __pyx_L3_error)
+    __pyx_v_lcp = __Pyx_PyObject_to_MemoryviewSlice_ds_int__const__(values[1], 0); if (unlikely(!__pyx_v_lcp.memview)) __PYX_ERR(0, 963, __pyx_L3_error)
+    __pyx_v_n = __Pyx_PyLong_As_int(values[2]); if (unlikely((__pyx_v_n == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 964, __pyx_L3_error)
+    __pyx_v_min_period = __Pyx_PyLong_As_int(values[3]); if (unlikely((__pyx_v_min_period == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 965, __pyx_L3_error)
+    __pyx_v_max_period = __Pyx_PyLong_As_int(values[4]); if (unlikely((__pyx_v_max_period == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 966, __pyx_L3_error)
     if (values[5]) {
-      __pyx_v_min_lcp_threshold = __Pyx_PyLong_As_int(values[5]); if (unlikely((__pyx_v_min_lcp_threshold == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 944, __pyx_L3_error)
+      __pyx_v_min_lcp_threshold = __Pyx_PyLong_As_int(values[5]); if (unlikely((__pyx_v_min_lcp_threshold == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 967, __pyx_L3_error)
     } else {
       __pyx_v_min_lcp_threshold = ((int)10);
     }
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("lcp_tandem_candidates", 0, 5, 6, __pyx_nargs); __PYX_ERR(0, 938, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("lcp_tandem_candidates", 0, 5, 6, __pyx_nargs); __PYX_ERR(0, 961, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -28086,7 +28234,7 @@ static PyObject *__pyx_pf_3src_13_accelerators_16lcp_tandem_candidates(CYTHON_UN
   __Pyx_XDECREF(__pyx_r);
   __pyx_t_2.__pyx_n = 1;
   __pyx_t_2.min_lcp_threshold = __pyx_v_min_lcp_threshold;
-  __pyx_t_1 = __pyx_f_3src_13_accelerators_lcp_tandem_candidates(__pyx_v_sa, __pyx_v_lcp, __pyx_v_n, __pyx_v_min_period, __pyx_v_max_period, 1, &__pyx_t_2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 938, __pyx_L1_error)
+  __pyx_t_1 = __pyx_f_3src_13_accelerators_lcp_tandem_candidates(__pyx_v_sa, __pyx_v_lcp, __pyx_v_n, __pyx_v_min_period, __pyx_v_max_period, 1, &__pyx_t_2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 961, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
@@ -28103,7 +28251,7 @@ static PyObject *__pyx_pf_3src_13_accelerators_16lcp_tandem_candidates(CYTHON_UN
   return __pyx_r;
 }
 
-/* "src/_accelerators.pyx":991
+/* "src/_accelerators.pyx":1014
  * 
  * 
  * cpdef list find_tandem_runs(             # <<<<<<<<<<<<<<
@@ -28141,7 +28289,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_tandem_runs(__Pyx_memviewslic
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("find_tandem_runs", 0);
 
-  /* "src/_accelerators.pyx":1004
+  /* "src/_accelerators.pyx":1027
  *     the end of the last copy (last_position + period).
  *     """
  *     cdef int n_pos = positions.shape[0]             # <<<<<<<<<<<<<<
@@ -28150,7 +28298,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_tandem_runs(__Pyx_memviewslic
 */
   __pyx_v_n_pos = (__pyx_v_positions.shape[0]);
 
-  /* "src/_accelerators.pyx":1005
+  /* "src/_accelerators.pyx":1028
  *     """
  *     cdef int n_pos = positions.shape[0]
  *     if n_pos < min_copies:             # <<<<<<<<<<<<<<
@@ -28160,7 +28308,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_tandem_runs(__Pyx_memviewslic
   __pyx_t_1 = (__pyx_v_n_pos < __pyx_v_min_copies);
   if (__pyx_t_1) {
 
-    /* "src/_accelerators.pyx":1006
+    /* "src/_accelerators.pyx":1029
  *     cdef int n_pos = positions.shape[0]
  *     if n_pos < min_copies:
  *         return []             # <<<<<<<<<<<<<<
@@ -28168,13 +28316,13 @@ static PyObject *__pyx_f_3src_13_accelerators_find_tandem_runs(__Pyx_memviewslic
  *     cdef list results = []
 */
     __Pyx_XDECREF(__pyx_r);
-    __pyx_t_2 = PyList_New(0); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1006, __pyx_L1_error)
+    __pyx_t_2 = PyList_New(0); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1029, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
     __pyx_r = ((PyObject*)__pyx_t_2);
     __pyx_t_2 = 0;
     goto __pyx_L0;
 
-    /* "src/_accelerators.pyx":1005
+    /* "src/_accelerators.pyx":1028
  *     """
  *     cdef int n_pos = positions.shape[0]
  *     if n_pos < min_copies:             # <<<<<<<<<<<<<<
@@ -28183,19 +28331,19 @@ static PyObject *__pyx_f_3src_13_accelerators_find_tandem_runs(__Pyx_memviewslic
 */
   }
 
-  /* "src/_accelerators.pyx":1008
+  /* "src/_accelerators.pyx":1031
  *         return []
  * 
  *     cdef list results = []             # <<<<<<<<<<<<<<
  *     cdef long run_start = positions[0]
  *     cdef long expected_next = positions[0] + period
 */
-  __pyx_t_2 = PyList_New(0); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1008, __pyx_L1_error)
+  __pyx_t_2 = PyList_New(0); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1031, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __pyx_v_results = ((PyObject*)__pyx_t_2);
   __pyx_t_2 = 0;
 
-  /* "src/_accelerators.pyx":1009
+  /* "src/_accelerators.pyx":1032
  * 
  *     cdef list results = []
  *     cdef long run_start = positions[0]             # <<<<<<<<<<<<<<
@@ -28205,7 +28353,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_tandem_runs(__Pyx_memviewslic
   __pyx_t_3 = 0;
   __pyx_v_run_start = (*((long *) ( /* dim=0 */ (__pyx_v_positions.data + __pyx_t_3 * __pyx_v_positions.strides[0]) )));
 
-  /* "src/_accelerators.pyx":1010
+  /* "src/_accelerators.pyx":1033
  *     cdef list results = []
  *     cdef long run_start = positions[0]
  *     cdef long expected_next = positions[0] + period             # <<<<<<<<<<<<<<
@@ -28215,7 +28363,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_tandem_runs(__Pyx_memviewslic
   __pyx_t_3 = 0;
   __pyx_v_expected_next = ((*((long *) ( /* dim=0 */ (__pyx_v_positions.data + __pyx_t_3 * __pyx_v_positions.strides[0]) ))) + __pyx_v_period);
 
-  /* "src/_accelerators.pyx":1011
+  /* "src/_accelerators.pyx":1034
  *     cdef long run_start = positions[0]
  *     cdef long expected_next = positions[0] + period
  *     cdef int count = 1             # <<<<<<<<<<<<<<
@@ -28224,7 +28372,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_tandem_runs(__Pyx_memviewslic
 */
   __pyx_v_count = 1;
 
-  /* "src/_accelerators.pyx":1014
+  /* "src/_accelerators.pyx":1037
  *     cdef int i
  * 
  *     for i in range(1, n_pos):             # <<<<<<<<<<<<<<
@@ -28236,7 +28384,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_tandem_runs(__Pyx_memviewslic
   for (__pyx_t_6 = 1; __pyx_t_6 < __pyx_t_5; __pyx_t_6+=1) {
     __pyx_v_i = __pyx_t_6;
 
-    /* "src/_accelerators.pyx":1015
+    /* "src/_accelerators.pyx":1038
  * 
  *     for i in range(1, n_pos):
  *         if positions[i] == expected_next:             # <<<<<<<<<<<<<<
@@ -28247,7 +28395,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_tandem_runs(__Pyx_memviewslic
     __pyx_t_1 = ((*((long *) ( /* dim=0 */ (__pyx_v_positions.data + __pyx_t_3 * __pyx_v_positions.strides[0]) ))) == __pyx_v_expected_next);
     if (__pyx_t_1) {
 
-      /* "src/_accelerators.pyx":1016
+      /* "src/_accelerators.pyx":1039
  *     for i in range(1, n_pos):
  *         if positions[i] == expected_next:
  *             count += 1             # <<<<<<<<<<<<<<
@@ -28256,7 +28404,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_tandem_runs(__Pyx_memviewslic
 */
       __pyx_v_count = (__pyx_v_count + 1);
 
-      /* "src/_accelerators.pyx":1017
+      /* "src/_accelerators.pyx":1040
  *         if positions[i] == expected_next:
  *             count += 1
  *             expected_next = positions[i] + period             # <<<<<<<<<<<<<<
@@ -28266,7 +28414,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_tandem_runs(__Pyx_memviewslic
       __pyx_t_3 = __pyx_v_i;
       __pyx_v_expected_next = ((*((long *) ( /* dim=0 */ (__pyx_v_positions.data + __pyx_t_3 * __pyx_v_positions.strides[0]) ))) + __pyx_v_period);
 
-      /* "src/_accelerators.pyx":1015
+      /* "src/_accelerators.pyx":1038
  * 
  *     for i in range(1, n_pos):
  *         if positions[i] == expected_next:             # <<<<<<<<<<<<<<
@@ -28276,7 +28424,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_tandem_runs(__Pyx_memviewslic
       goto __pyx_L6;
     }
 
-    /* "src/_accelerators.pyx":1019
+    /* "src/_accelerators.pyx":1042
  *             expected_next = positions[i] + period
  *         else:
  *             if count >= min_copies:             # <<<<<<<<<<<<<<
@@ -28287,29 +28435,29 @@ static PyObject *__pyx_f_3src_13_accelerators_find_tandem_runs(__Pyx_memviewslic
       __pyx_t_1 = (__pyx_v_count >= __pyx_v_min_copies);
       if (__pyx_t_1) {
 
-        /* "src/_accelerators.pyx":1021
+        /* "src/_accelerators.pyx":1044
  *             if count >= min_copies:
  *                 # run_end = last confirmed position + period
  *                 results.append((run_start, expected_next))             # <<<<<<<<<<<<<<
  *             run_start = positions[i]
  *             expected_next = positions[i] + period
 */
-        __pyx_t_2 = __Pyx_PyLong_From_long(__pyx_v_run_start); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1021, __pyx_L1_error)
+        __pyx_t_2 = __Pyx_PyLong_From_long(__pyx_v_run_start); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1044, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_2);
-        __pyx_t_7 = __Pyx_PyLong_From_long(__pyx_v_expected_next); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 1021, __pyx_L1_error)
+        __pyx_t_7 = __Pyx_PyLong_From_long(__pyx_v_expected_next); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 1044, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_7);
-        __pyx_t_8 = PyTuple_New(2); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 1021, __pyx_L1_error)
+        __pyx_t_8 = PyTuple_New(2); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 1044, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_8);
         __Pyx_GIVEREF(__pyx_t_2);
-        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_8, 0, __pyx_t_2) != (0)) __PYX_ERR(0, 1021, __pyx_L1_error);
+        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_8, 0, __pyx_t_2) != (0)) __PYX_ERR(0, 1044, __pyx_L1_error);
         __Pyx_GIVEREF(__pyx_t_7);
-        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_8, 1, __pyx_t_7) != (0)) __PYX_ERR(0, 1021, __pyx_L1_error);
+        if (__Pyx_PyTuple_SET_ITEM(__pyx_t_8, 1, __pyx_t_7) != (0)) __PYX_ERR(0, 1044, __pyx_L1_error);
         __pyx_t_2 = 0;
         __pyx_t_7 = 0;
-        __pyx_t_9 = __Pyx_PyList_Append(__pyx_v_results, __pyx_t_8); if (unlikely(__pyx_t_9 == ((int)-1))) __PYX_ERR(0, 1021, __pyx_L1_error)
+        __pyx_t_9 = __Pyx_PyList_Append(__pyx_v_results, __pyx_t_8); if (unlikely(__pyx_t_9 == ((int)-1))) __PYX_ERR(0, 1044, __pyx_L1_error)
         __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
 
-        /* "src/_accelerators.pyx":1019
+        /* "src/_accelerators.pyx":1042
  *             expected_next = positions[i] + period
  *         else:
  *             if count >= min_copies:             # <<<<<<<<<<<<<<
@@ -28318,7 +28466,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_tandem_runs(__Pyx_memviewslic
 */
       }
 
-      /* "src/_accelerators.pyx":1022
+      /* "src/_accelerators.pyx":1045
  *                 # run_end = last confirmed position + period
  *                 results.append((run_start, expected_next))
  *             run_start = positions[i]             # <<<<<<<<<<<<<<
@@ -28328,7 +28476,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_tandem_runs(__Pyx_memviewslic
       __pyx_t_3 = __pyx_v_i;
       __pyx_v_run_start = (*((long *) ( /* dim=0 */ (__pyx_v_positions.data + __pyx_t_3 * __pyx_v_positions.strides[0]) )));
 
-      /* "src/_accelerators.pyx":1023
+      /* "src/_accelerators.pyx":1046
  *                 results.append((run_start, expected_next))
  *             run_start = positions[i]
  *             expected_next = positions[i] + period             # <<<<<<<<<<<<<<
@@ -28338,7 +28486,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_tandem_runs(__Pyx_memviewslic
       __pyx_t_3 = __pyx_v_i;
       __pyx_v_expected_next = ((*((long *) ( /* dim=0 */ (__pyx_v_positions.data + __pyx_t_3 * __pyx_v_positions.strides[0]) ))) + __pyx_v_period);
 
-      /* "src/_accelerators.pyx":1024
+      /* "src/_accelerators.pyx":1047
  *             run_start = positions[i]
  *             expected_next = positions[i] + period
  *             count = 1             # <<<<<<<<<<<<<<
@@ -28350,7 +28498,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_tandem_runs(__Pyx_memviewslic
     __pyx_L6:;
   }
 
-  /* "src/_accelerators.pyx":1027
+  /* "src/_accelerators.pyx":1050
  * 
  *     # Flush final run
  *     if count >= min_copies:             # <<<<<<<<<<<<<<
@@ -28360,29 +28508,29 @@ static PyObject *__pyx_f_3src_13_accelerators_find_tandem_runs(__Pyx_memviewslic
   __pyx_t_1 = (__pyx_v_count >= __pyx_v_min_copies);
   if (__pyx_t_1) {
 
-    /* "src/_accelerators.pyx":1028
+    /* "src/_accelerators.pyx":1051
  *     # Flush final run
  *     if count >= min_copies:
  *         results.append((run_start, expected_next))             # <<<<<<<<<<<<<<
  * 
  *     return results
 */
-    __pyx_t_8 = __Pyx_PyLong_From_long(__pyx_v_run_start); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 1028, __pyx_L1_error)
+    __pyx_t_8 = __Pyx_PyLong_From_long(__pyx_v_run_start); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 1051, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_8);
-    __pyx_t_7 = __Pyx_PyLong_From_long(__pyx_v_expected_next); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 1028, __pyx_L1_error)
+    __pyx_t_7 = __Pyx_PyLong_From_long(__pyx_v_expected_next); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 1051, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_7);
-    __pyx_t_2 = PyTuple_New(2); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1028, __pyx_L1_error)
+    __pyx_t_2 = PyTuple_New(2); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1051, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
     __Pyx_GIVEREF(__pyx_t_8);
-    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_2, 0, __pyx_t_8) != (0)) __PYX_ERR(0, 1028, __pyx_L1_error);
+    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_2, 0, __pyx_t_8) != (0)) __PYX_ERR(0, 1051, __pyx_L1_error);
     __Pyx_GIVEREF(__pyx_t_7);
-    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_2, 1, __pyx_t_7) != (0)) __PYX_ERR(0, 1028, __pyx_L1_error);
+    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_2, 1, __pyx_t_7) != (0)) __PYX_ERR(0, 1051, __pyx_L1_error);
     __pyx_t_8 = 0;
     __pyx_t_7 = 0;
-    __pyx_t_9 = __Pyx_PyList_Append(__pyx_v_results, __pyx_t_2); if (unlikely(__pyx_t_9 == ((int)-1))) __PYX_ERR(0, 1028, __pyx_L1_error)
+    __pyx_t_9 = __Pyx_PyList_Append(__pyx_v_results, __pyx_t_2); if (unlikely(__pyx_t_9 == ((int)-1))) __PYX_ERR(0, 1051, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-    /* "src/_accelerators.pyx":1027
+    /* "src/_accelerators.pyx":1050
  * 
  *     # Flush final run
  *     if count >= min_copies:             # <<<<<<<<<<<<<<
@@ -28391,7 +28539,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_tandem_runs(__Pyx_memviewslic
 */
   }
 
-  /* "src/_accelerators.pyx":1030
+  /* "src/_accelerators.pyx":1053
  *         results.append((run_start, expected_next))
  * 
  *     return results             # <<<<<<<<<<<<<<
@@ -28403,7 +28551,7 @@ static PyObject *__pyx_f_3src_13_accelerators_find_tandem_runs(__Pyx_memviewslic
   __pyx_r = __pyx_v_results;
   goto __pyx_L0;
 
-  /* "src/_accelerators.pyx":991
+  /* "src/_accelerators.pyx":1014
  * 
  * 
  * cpdef list find_tandem_runs(             # <<<<<<<<<<<<<<
@@ -28467,46 +28615,46 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_positions,&__pyx_mstate_global->__pyx_n_u_period,&__pyx_mstate_global->__pyx_n_u_min_copies,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 991, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 1014, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  3:
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 991, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 1014, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 991, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 1014, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 991, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 1014, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "find_tandem_runs", 0) < (0)) __PYX_ERR(0, 991, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "find_tandem_runs", 0) < (0)) __PYX_ERR(0, 1014, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 3; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("find_tandem_runs", 1, 3, 3, i); __PYX_ERR(0, 991, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("find_tandem_runs", 1, 3, 3, i); __PYX_ERR(0, 1014, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 3)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 991, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 1014, __pyx_L3_error)
       values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 991, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 1014, __pyx_L3_error)
       values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 991, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 1014, __pyx_L3_error)
     }
-    __pyx_v_positions = __Pyx_PyObject_to_MemoryviewSlice_ds_long(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_positions.memview)) __PYX_ERR(0, 992, __pyx_L3_error)
-    __pyx_v_period = __Pyx_PyLong_As_int(values[1]); if (unlikely((__pyx_v_period == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 993, __pyx_L3_error)
-    __pyx_v_min_copies = __Pyx_PyLong_As_int(values[2]); if (unlikely((__pyx_v_min_copies == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 994, __pyx_L3_error)
+    __pyx_v_positions = __Pyx_PyObject_to_MemoryviewSlice_ds_long(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_positions.memview)) __PYX_ERR(0, 1015, __pyx_L3_error)
+    __pyx_v_period = __Pyx_PyLong_As_int(values[1]); if (unlikely((__pyx_v_period == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 1016, __pyx_L3_error)
+    __pyx_v_min_copies = __Pyx_PyLong_As_int(values[2]); if (unlikely((__pyx_v_min_copies == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 1017, __pyx_L3_error)
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("find_tandem_runs", 1, 3, 3, __pyx_nargs); __PYX_ERR(0, 991, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("find_tandem_runs", 1, 3, 3, __pyx_nargs); __PYX_ERR(0, 1014, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -28538,7 +28686,7 @@ static PyObject *__pyx_pf_3src_13_accelerators_18find_tandem_runs(CYTHON_UNUSED 
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("find_tandem_runs", 0);
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __pyx_f_3src_13_accelerators_find_tandem_runs(__pyx_v_positions, __pyx_v_period, __pyx_v_min_copies, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 991, __pyx_L1_error)
+  __pyx_t_1 = __pyx_f_3src_13_accelerators_find_tandem_runs(__pyx_v_positions, __pyx_v_period, __pyx_v_min_copies, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 1014, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
@@ -28555,7 +28703,7 @@ static PyObject *__pyx_pf_3src_13_accelerators_18find_tandem_runs(CYTHON_UNUSED 
   return __pyx_r;
 }
 
-/* "src/_accelerators.pyx":1033
+/* "src/_accelerators.pyx":1056
  * 
  * 
  * cpdef tuple anchor_scan_boundaries(             # <<<<<<<<<<<<<<
@@ -28594,7 +28742,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("anchor_scan_boundaries", 0);
 
-  /* "src/_accelerators.pyx":1049
+  /* "src/_accelerators.pyx":1072
  *     Returns (true_start, true_end).
  *     """
  *     cdef int true_start = seed_pos             # <<<<<<<<<<<<<<
@@ -28603,7 +28751,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
 */
   __pyx_v_true_start = __pyx_v_seed_pos;
 
-  /* "src/_accelerators.pyx":1050
+  /* "src/_accelerators.pyx":1073
  *     """
  *     cdef int true_start = seed_pos
  *     cdef int true_end = seed_pos + period             # <<<<<<<<<<<<<<
@@ -28612,7 +28760,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
 */
   __pyx_v_true_end = (__pyx_v_seed_pos + __pyx_v_period);
 
-  /* "src/_accelerators.pyx":1056
+  /* "src/_accelerators.pyx":1079
  *     # Motif reference is text_arr[seed_pos : seed_pos + period]
  *     # If seed_pos + period > n, clamp
  *     if seed_pos + period > n:             # <<<<<<<<<<<<<<
@@ -28622,7 +28770,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
   __pyx_t_1 = ((__pyx_v_seed_pos + __pyx_v_period) > __pyx_v_n);
   if (__pyx_t_1) {
 
-    /* "src/_accelerators.pyx":1057
+    /* "src/_accelerators.pyx":1080
  *     # If seed_pos + period > n, clamp
  *     if seed_pos + period > n:
  *         return (true_start, true_end)             # <<<<<<<<<<<<<<
@@ -28630,23 +28778,23 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
  *     # --- Scan backward ---
 */
     __Pyx_XDECREF(__pyx_r);
-    __pyx_t_2 = __Pyx_PyLong_From_int(__pyx_v_true_start); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1057, __pyx_L1_error)
+    __pyx_t_2 = __Pyx_PyLong_From_int(__pyx_v_true_start); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1080, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
-    __pyx_t_3 = __Pyx_PyLong_From_int(__pyx_v_true_end); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 1057, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_PyLong_From_int(__pyx_v_true_end); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 1080, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_3);
-    __pyx_t_4 = PyTuple_New(2); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1057, __pyx_L1_error)
+    __pyx_t_4 = PyTuple_New(2); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1080, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_4);
     __Pyx_GIVEREF(__pyx_t_2);
-    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_4, 0, __pyx_t_2) != (0)) __PYX_ERR(0, 1057, __pyx_L1_error);
+    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_4, 0, __pyx_t_2) != (0)) __PYX_ERR(0, 1080, __pyx_L1_error);
     __Pyx_GIVEREF(__pyx_t_3);
-    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_4, 1, __pyx_t_3) != (0)) __PYX_ERR(0, 1057, __pyx_L1_error);
+    if (__Pyx_PyTuple_SET_ITEM(__pyx_t_4, 1, __pyx_t_3) != (0)) __PYX_ERR(0, 1080, __pyx_L1_error);
     __pyx_t_2 = 0;
     __pyx_t_3 = 0;
     __pyx_r = ((PyObject*)__pyx_t_4);
     __pyx_t_4 = 0;
     goto __pyx_L0;
 
-    /* "src/_accelerators.pyx":1056
+    /* "src/_accelerators.pyx":1079
  *     # Motif reference is text_arr[seed_pos : seed_pos + period]
  *     # If seed_pos + period > n, clamp
  *     if seed_pos + period > n:             # <<<<<<<<<<<<<<
@@ -28655,7 +28803,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
 */
   }
 
-  /* "src/_accelerators.pyx":1060
+  /* "src/_accelerators.pyx":1083
  * 
  *     # --- Scan backward ---
  *     scan_start = seed_pos - period * max_backward_periods             # <<<<<<<<<<<<<<
@@ -28664,7 +28812,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
 */
   __pyx_v_scan_start = (__pyx_v_seed_pos - (__pyx_v_period * __pyx_v_max_backward_periods));
 
-  /* "src/_accelerators.pyx":1061
+  /* "src/_accelerators.pyx":1084
  *     # --- Scan backward ---
  *     scan_start = seed_pos - period * max_backward_periods
  *     if scan_start < 0:             # <<<<<<<<<<<<<<
@@ -28674,7 +28822,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
   __pyx_t_1 = (__pyx_v_scan_start < 0);
   if (__pyx_t_1) {
 
-    /* "src/_accelerators.pyx":1062
+    /* "src/_accelerators.pyx":1085
  *     scan_start = seed_pos - period * max_backward_periods
  *     if scan_start < 0:
  *         scan_start = 0             # <<<<<<<<<<<<<<
@@ -28683,7 +28831,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
 */
     __pyx_v_scan_start = 0;
 
-    /* "src/_accelerators.pyx":1061
+    /* "src/_accelerators.pyx":1084
  *     # --- Scan backward ---
  *     scan_start = seed_pos - period * max_backward_periods
  *     if scan_start < 0:             # <<<<<<<<<<<<<<
@@ -28692,7 +28840,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
 */
   }
 
-  /* "src/_accelerators.pyx":1064
+  /* "src/_accelerators.pyx":1087
  *         scan_start = 0
  * 
  *     pos = seed_pos - period             # <<<<<<<<<<<<<<
@@ -28701,7 +28849,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
 */
   __pyx_v_pos = (__pyx_v_seed_pos - __pyx_v_period);
 
-  /* "src/_accelerators.pyx":1065
+  /* "src/_accelerators.pyx":1088
  * 
  *     pos = seed_pos - period
  *     while pos >= scan_start:             # <<<<<<<<<<<<<<
@@ -28712,7 +28860,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
     __pyx_t_1 = (__pyx_v_pos >= __pyx_v_scan_start);
     if (!__pyx_t_1) break;
 
-    /* "src/_accelerators.pyx":1066
+    /* "src/_accelerators.pyx":1089
  *     pos = seed_pos - period
  *     while pos >= scan_start:
  *         if pos + period > n:             # <<<<<<<<<<<<<<
@@ -28722,7 +28870,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
     __pyx_t_1 = ((__pyx_v_pos + __pyx_v_period) > __pyx_v_n);
     if (__pyx_t_1) {
 
-      /* "src/_accelerators.pyx":1067
+      /* "src/_accelerators.pyx":1090
  *     while pos >= scan_start:
  *         if pos + period > n:
  *             break             # <<<<<<<<<<<<<<
@@ -28731,7 +28879,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
 */
       goto __pyx_L6_break;
 
-      /* "src/_accelerators.pyx":1066
+      /* "src/_accelerators.pyx":1089
  *     pos = seed_pos - period
  *     while pos >= scan_start:
  *         if pos + period > n:             # <<<<<<<<<<<<<<
@@ -28740,7 +28888,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
 */
     }
 
-    /* "src/_accelerators.pyx":1068
+    /* "src/_accelerators.pyx":1091
  *         if pos + period > n:
  *             break
  *         matches = 0             # <<<<<<<<<<<<<<
@@ -28749,7 +28897,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
 */
     __pyx_v_matches = 0;
 
-    /* "src/_accelerators.pyx":1069
+    /* "src/_accelerators.pyx":1092
  *             break
  *         matches = 0
  *         for i in range(period):             # <<<<<<<<<<<<<<
@@ -28761,7 +28909,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
     for (__pyx_t_7 = 0; __pyx_t_7 < __pyx_t_6; __pyx_t_7+=1) {
       __pyx_v_i = __pyx_t_7;
 
-      /* "src/_accelerators.pyx":1070
+      /* "src/_accelerators.pyx":1093
  *         matches = 0
  *         for i in range(period):
  *             if text_arr[pos + i] == text_arr[seed_pos + i]:             # <<<<<<<<<<<<<<
@@ -28773,7 +28921,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
       __pyx_t_1 = ((*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_text_arr.data + __pyx_t_8 * __pyx_v_text_arr.strides[0]) ))) == (*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_text_arr.data + __pyx_t_9 * __pyx_v_text_arr.strides[0]) ))));
       if (__pyx_t_1) {
 
-        /* "src/_accelerators.pyx":1071
+        /* "src/_accelerators.pyx":1094
  *         for i in range(period):
  *             if text_arr[pos + i] == text_arr[seed_pos + i]:
  *                 matches += 1             # <<<<<<<<<<<<<<
@@ -28782,7 +28930,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
 */
         __pyx_v_matches = (__pyx_v_matches + 1);
 
-        /* "src/_accelerators.pyx":1070
+        /* "src/_accelerators.pyx":1093
  *         matches = 0
  *         for i in range(period):
  *             if text_arr[pos + i] == text_arr[seed_pos + i]:             # <<<<<<<<<<<<<<
@@ -28792,7 +28940,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
       }
     }
 
-    /* "src/_accelerators.pyx":1072
+    /* "src/_accelerators.pyx":1095
  *             if text_arr[pos + i] == text_arr[seed_pos + i]:
  *                 matches += 1
  *         if <double>matches / <double>period >= match_threshold:             # <<<<<<<<<<<<<<
@@ -28802,7 +28950,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
     __pyx_t_1 = ((((double)__pyx_v_matches) / ((double)__pyx_v_period)) >= __pyx_v_match_threshold);
     if (__pyx_t_1) {
 
-      /* "src/_accelerators.pyx":1073
+      /* "src/_accelerators.pyx":1096
  *                 matches += 1
  *         if <double>matches / <double>period >= match_threshold:
  *             true_start = pos             # <<<<<<<<<<<<<<
@@ -28811,7 +28959,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
 */
       __pyx_v_true_start = __pyx_v_pos;
 
-      /* "src/_accelerators.pyx":1074
+      /* "src/_accelerators.pyx":1097
  *         if <double>matches / <double>period >= match_threshold:
  *             true_start = pos
  *             pos -= period             # <<<<<<<<<<<<<<
@@ -28820,7 +28968,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
 */
       __pyx_v_pos = (__pyx_v_pos - __pyx_v_period);
 
-      /* "src/_accelerators.pyx":1072
+      /* "src/_accelerators.pyx":1095
  *             if text_arr[pos + i] == text_arr[seed_pos + i]:
  *                 matches += 1
  *         if <double>matches / <double>period >= match_threshold:             # <<<<<<<<<<<<<<
@@ -28830,7 +28978,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
       goto __pyx_L11;
     }
 
-    /* "src/_accelerators.pyx":1076
+    /* "src/_accelerators.pyx":1099
  *             pos -= period
  *         else:
  *             break             # <<<<<<<<<<<<<<
@@ -28844,7 +28992,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
   }
   __pyx_L6_break:;
 
-  /* "src/_accelerators.pyx":1079
+  /* "src/_accelerators.pyx":1102
  * 
  *     # --- Scan forward ---
  *     scan_end = seed_pos + period * max_forward_periods             # <<<<<<<<<<<<<<
@@ -28853,7 +29001,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
 */
   __pyx_v_scan_end = (__pyx_v_seed_pos + (__pyx_v_period * __pyx_v_max_forward_periods));
 
-  /* "src/_accelerators.pyx":1080
+  /* "src/_accelerators.pyx":1103
  *     # --- Scan forward ---
  *     scan_end = seed_pos + period * max_forward_periods
  *     if scan_end > n:             # <<<<<<<<<<<<<<
@@ -28863,7 +29011,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
   __pyx_t_1 = (__pyx_v_scan_end > __pyx_v_n);
   if (__pyx_t_1) {
 
-    /* "src/_accelerators.pyx":1081
+    /* "src/_accelerators.pyx":1104
  *     scan_end = seed_pos + period * max_forward_periods
  *     if scan_end > n:
  *         scan_end = n             # <<<<<<<<<<<<<<
@@ -28872,7 +29020,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
 */
     __pyx_v_scan_end = __pyx_v_n;
 
-    /* "src/_accelerators.pyx":1080
+    /* "src/_accelerators.pyx":1103
  *     # --- Scan forward ---
  *     scan_end = seed_pos + period * max_forward_periods
  *     if scan_end > n:             # <<<<<<<<<<<<<<
@@ -28881,7 +29029,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
 */
   }
 
-  /* "src/_accelerators.pyx":1083
+  /* "src/_accelerators.pyx":1106
  *         scan_end = n
  * 
  *     pos = seed_pos + period             # <<<<<<<<<<<<<<
@@ -28890,7 +29038,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
 */
   __pyx_v_pos = (__pyx_v_seed_pos + __pyx_v_period);
 
-  /* "src/_accelerators.pyx":1084
+  /* "src/_accelerators.pyx":1107
  * 
  *     pos = seed_pos + period
  *     while pos + period <= scan_end:             # <<<<<<<<<<<<<<
@@ -28901,7 +29049,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
     __pyx_t_1 = ((__pyx_v_pos + __pyx_v_period) <= __pyx_v_scan_end);
     if (!__pyx_t_1) break;
 
-    /* "src/_accelerators.pyx":1085
+    /* "src/_accelerators.pyx":1108
  *     pos = seed_pos + period
  *     while pos + period <= scan_end:
  *         matches = 0             # <<<<<<<<<<<<<<
@@ -28910,7 +29058,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
 */
     __pyx_v_matches = 0;
 
-    /* "src/_accelerators.pyx":1086
+    /* "src/_accelerators.pyx":1109
  *     while pos + period <= scan_end:
  *         matches = 0
  *         for i in range(period):             # <<<<<<<<<<<<<<
@@ -28922,7 +29070,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
     for (__pyx_t_7 = 0; __pyx_t_7 < __pyx_t_6; __pyx_t_7+=1) {
       __pyx_v_i = __pyx_t_7;
 
-      /* "src/_accelerators.pyx":1087
+      /* "src/_accelerators.pyx":1110
  *         matches = 0
  *         for i in range(period):
  *             if text_arr[pos + i] == text_arr[seed_pos + i]:             # <<<<<<<<<<<<<<
@@ -28934,7 +29082,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
       __pyx_t_1 = ((*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_text_arr.data + __pyx_t_9 * __pyx_v_text_arr.strides[0]) ))) == (*((unsigned char const  *) ( /* dim=0 */ (__pyx_v_text_arr.data + __pyx_t_8 * __pyx_v_text_arr.strides[0]) ))));
       if (__pyx_t_1) {
 
-        /* "src/_accelerators.pyx":1088
+        /* "src/_accelerators.pyx":1111
  *         for i in range(period):
  *             if text_arr[pos + i] == text_arr[seed_pos + i]:
  *                 matches += 1             # <<<<<<<<<<<<<<
@@ -28943,7 +29091,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
 */
         __pyx_v_matches = (__pyx_v_matches + 1);
 
-        /* "src/_accelerators.pyx":1087
+        /* "src/_accelerators.pyx":1110
  *         matches = 0
  *         for i in range(period):
  *             if text_arr[pos + i] == text_arr[seed_pos + i]:             # <<<<<<<<<<<<<<
@@ -28953,7 +29101,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
       }
     }
 
-    /* "src/_accelerators.pyx":1089
+    /* "src/_accelerators.pyx":1112
  *             if text_arr[pos + i] == text_arr[seed_pos + i]:
  *                 matches += 1
  *         if <double>matches / <double>period >= match_threshold:             # <<<<<<<<<<<<<<
@@ -28963,7 +29111,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
     __pyx_t_1 = ((((double)__pyx_v_matches) / ((double)__pyx_v_period)) >= __pyx_v_match_threshold);
     if (__pyx_t_1) {
 
-      /* "src/_accelerators.pyx":1090
+      /* "src/_accelerators.pyx":1113
  *                 matches += 1
  *         if <double>matches / <double>period >= match_threshold:
  *             true_end = pos + period             # <<<<<<<<<<<<<<
@@ -28972,7 +29120,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
 */
       __pyx_v_true_end = (__pyx_v_pos + __pyx_v_period);
 
-      /* "src/_accelerators.pyx":1091
+      /* "src/_accelerators.pyx":1114
  *         if <double>matches / <double>period >= match_threshold:
  *             true_end = pos + period
  *             pos += period             # <<<<<<<<<<<<<<
@@ -28981,7 +29129,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
 */
       __pyx_v_pos = (__pyx_v_pos + __pyx_v_period);
 
-      /* "src/_accelerators.pyx":1089
+      /* "src/_accelerators.pyx":1112
  *             if text_arr[pos + i] == text_arr[seed_pos + i]:
  *                 matches += 1
  *         if <double>matches / <double>period >= match_threshold:             # <<<<<<<<<<<<<<
@@ -28991,7 +29139,7 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
       goto __pyx_L18;
     }
 
-    /* "src/_accelerators.pyx":1093
+    /* "src/_accelerators.pyx":1116
  *             pos += period
  *         else:
  *             break             # <<<<<<<<<<<<<<
@@ -29005,29 +29153,29 @@ static PyObject *__pyx_f_3src_13_accelerators_anchor_scan_boundaries(__Pyx_memvi
   }
   __pyx_L14_break:;
 
-  /* "src/_accelerators.pyx":1095
+  /* "src/_accelerators.pyx":1118
  *             break
  * 
  *     return (true_start, true_end)             # <<<<<<<<<<<<<<
 */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_4 = __Pyx_PyLong_From_int(__pyx_v_true_start); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1095, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyLong_From_int(__pyx_v_true_start); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1118, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
-  __pyx_t_3 = __Pyx_PyLong_From_int(__pyx_v_true_end); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 1095, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyLong_From_int(__pyx_v_true_end); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 1118, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_2 = PyTuple_New(2); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1095, __pyx_L1_error)
+  __pyx_t_2 = PyTuple_New(2); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1118, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_GIVEREF(__pyx_t_4);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_2, 0, __pyx_t_4) != (0)) __PYX_ERR(0, 1095, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_2, 0, __pyx_t_4) != (0)) __PYX_ERR(0, 1118, __pyx_L1_error);
   __Pyx_GIVEREF(__pyx_t_3);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_2, 1, __pyx_t_3) != (0)) __PYX_ERR(0, 1095, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_2, 1, __pyx_t_3) != (0)) __PYX_ERR(0, 1118, __pyx_L1_error);
   __pyx_t_4 = 0;
   __pyx_t_3 = 0;
   __pyx_r = ((PyObject*)__pyx_t_2);
   __pyx_t_2 = 0;
   goto __pyx_L0;
 
-  /* "src/_accelerators.pyx":1033
+  /* "src/_accelerators.pyx":1056
  * 
  * 
  * cpdef tuple anchor_scan_boundaries(             # <<<<<<<<<<<<<<
@@ -29094,74 +29242,74 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_text_arr,&__pyx_mstate_global->__pyx_n_u_seed_pos,&__pyx_mstate_global->__pyx_n_u_period,&__pyx_mstate_global->__pyx_n_u_n,&__pyx_mstate_global->__pyx_n_u_match_threshold,&__pyx_mstate_global->__pyx_n_u_max_backward_periods,&__pyx_mstate_global->__pyx_n_u_max_forward_periods,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 1033, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 1056, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  7:
         values[6] = __Pyx_ArgRef_FASTCALL(__pyx_args, 6);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[6])) __PYX_ERR(0, 1033, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[6])) __PYX_ERR(0, 1056, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  6:
         values[5] = __Pyx_ArgRef_FASTCALL(__pyx_args, 5);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 1033, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 1056, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  5:
         values[4] = __Pyx_ArgRef_FASTCALL(__pyx_args, 4);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 1033, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 1056, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  4:
         values[3] = __Pyx_ArgRef_FASTCALL(__pyx_args, 3);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 1033, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 1056, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  3:
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 1033, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 1056, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 1033, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 1056, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 1033, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 1056, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "anchor_scan_boundaries", 0) < (0)) __PYX_ERR(0, 1033, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "anchor_scan_boundaries", 0) < (0)) __PYX_ERR(0, 1056, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 7; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("anchor_scan_boundaries", 1, 7, 7, i); __PYX_ERR(0, 1033, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("anchor_scan_boundaries", 1, 7, 7, i); __PYX_ERR(0, 1056, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 7)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 1033, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 1056, __pyx_L3_error)
       values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 1033, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 1056, __pyx_L3_error)
       values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 1033, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 1056, __pyx_L3_error)
       values[3] = __Pyx_ArgRef_FASTCALL(__pyx_args, 3);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 1033, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[3])) __PYX_ERR(0, 1056, __pyx_L3_error)
       values[4] = __Pyx_ArgRef_FASTCALL(__pyx_args, 4);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 1033, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[4])) __PYX_ERR(0, 1056, __pyx_L3_error)
       values[5] = __Pyx_ArgRef_FASTCALL(__pyx_args, 5);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 1033, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[5])) __PYX_ERR(0, 1056, __pyx_L3_error)
       values[6] = __Pyx_ArgRef_FASTCALL(__pyx_args, 6);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[6])) __PYX_ERR(0, 1033, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[6])) __PYX_ERR(0, 1056, __pyx_L3_error)
     }
-    __pyx_v_text_arr = __Pyx_PyObject_to_MemoryviewSlice_ds_unsigned_char__const__(values[0], 0); if (unlikely(!__pyx_v_text_arr.memview)) __PYX_ERR(0, 1034, __pyx_L3_error)
-    __pyx_v_seed_pos = __Pyx_PyLong_As_int(values[1]); if (unlikely((__pyx_v_seed_pos == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 1035, __pyx_L3_error)
-    __pyx_v_period = __Pyx_PyLong_As_int(values[2]); if (unlikely((__pyx_v_period == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 1036, __pyx_L3_error)
-    __pyx_v_n = __Pyx_PyLong_As_int(values[3]); if (unlikely((__pyx_v_n == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 1037, __pyx_L3_error)
-    __pyx_v_match_threshold = __Pyx_PyFloat_AsDouble(values[4]); if (unlikely((__pyx_v_match_threshold == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 1038, __pyx_L3_error)
-    __pyx_v_max_backward_periods = __Pyx_PyLong_As_int(values[5]); if (unlikely((__pyx_v_max_backward_periods == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 1039, __pyx_L3_error)
-    __pyx_v_max_forward_periods = __Pyx_PyLong_As_int(values[6]); if (unlikely((__pyx_v_max_forward_periods == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 1040, __pyx_L3_error)
+    __pyx_v_text_arr = __Pyx_PyObject_to_MemoryviewSlice_ds_unsigned_char__const__(values[0], 0); if (unlikely(!__pyx_v_text_arr.memview)) __PYX_ERR(0, 1057, __pyx_L3_error)
+    __pyx_v_seed_pos = __Pyx_PyLong_As_int(values[1]); if (unlikely((__pyx_v_seed_pos == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 1058, __pyx_L3_error)
+    __pyx_v_period = __Pyx_PyLong_As_int(values[2]); if (unlikely((__pyx_v_period == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 1059, __pyx_L3_error)
+    __pyx_v_n = __Pyx_PyLong_As_int(values[3]); if (unlikely((__pyx_v_n == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 1060, __pyx_L3_error)
+    __pyx_v_match_threshold = __Pyx_PyFloat_AsDouble(values[4]); if (unlikely((__pyx_v_match_threshold == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 1061, __pyx_L3_error)
+    __pyx_v_max_backward_periods = __Pyx_PyLong_As_int(values[5]); if (unlikely((__pyx_v_max_backward_periods == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 1062, __pyx_L3_error)
+    __pyx_v_max_forward_periods = __Pyx_PyLong_As_int(values[6]); if (unlikely((__pyx_v_max_forward_periods == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 1063, __pyx_L3_error)
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("anchor_scan_boundaries", 1, 7, 7, __pyx_nargs); __PYX_ERR(0, 1033, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("anchor_scan_boundaries", 1, 7, 7, __pyx_nargs); __PYX_ERR(0, 1056, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -29193,7 +29341,7 @@ static PyObject *__pyx_pf_3src_13_accelerators_20anchor_scan_boundaries(CYTHON_U
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("anchor_scan_boundaries", 0);
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __pyx_f_3src_13_accelerators_anchor_scan_boundaries(__pyx_v_text_arr, __pyx_v_seed_pos, __pyx_v_period, __pyx_v_n, __pyx_v_match_threshold, __pyx_v_max_backward_periods, __pyx_v_max_forward_periods, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 1033, __pyx_L1_error)
+  __pyx_t_1 = __pyx_f_3src_13_accelerators_anchor_scan_boundaries(__pyx_v_text_arr, __pyx_v_seed_pos, __pyx_v_period, __pyx_v_n, __pyx_v_match_threshold, __pyx_v_max_backward_periods, __pyx_v_max_forward_periods, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 1056, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
@@ -31345,156 +31493,156 @@ __Pyx_RefNannySetupContext("PyInit__accelerators", 0);
   if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_hamming_distance, __pyx_t_4) < (0)) __PYX_ERR(0, 182, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "src/_accelerators.pyx":346
+  /* "src/_accelerators.pyx":369
  * 
  * 
  * cpdef tuple extend_with_mismatches(const unsigned char[:] s_arr,             # <<<<<<<<<<<<<<
  *                                    int start_pos, int period, int n,
  *                                    double allowed_mismatch_rate):
 */
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_3src_13_accelerators_5extend_with_mismatches, 0, __pyx_mstate_global->__pyx_n_u_extend_with_mismatches, NULL, __pyx_mstate_global->__pyx_n_u_src__accelerators, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[2])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 346, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_3src_13_accelerators_5extend_with_mismatches, 0, __pyx_mstate_global->__pyx_n_u_extend_with_mismatches, NULL, __pyx_mstate_global->__pyx_n_u_src__accelerators, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[2])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 369, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_extend_with_mismatches, __pyx_t_4) < (0)) __PYX_ERR(0, 346, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_extend_with_mismatches, __pyx_t_4) < (0)) __PYX_ERR(0, 369, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "src/_accelerators.pyx":437
+  /* "src/_accelerators.pyx":460
  *     return array_start, array_end, copies, full_start, full_end
  * 
  * cpdef list scan_unit_repeats(const unsigned char[:] text_arr, int n, int unit_len, int min_copies, int max_mismatch, const unsigned char[:] packed_arr=None):             # <<<<<<<<<<<<<<
  *     """Scan for repeats of a specific unit length."""
  *     cdef int i = 0
 */
-  __pyx_t_10 = __Pyx_PyObject_to_MemoryviewSlice_ds_unsigned_char__const__(Py_None, 0); if (unlikely(!__pyx_t_10.memview)) __PYX_ERR(0, 437, __pyx_L1_error)
+  __pyx_t_10 = __Pyx_PyObject_to_MemoryviewSlice_ds_unsigned_char__const__(Py_None, 0); if (unlikely(!__pyx_t_10.memview)) __PYX_ERR(0, 460, __pyx_L1_error)
   __pyx_mstate_global->__pyx_k__6 = __pyx_t_10;
   __pyx_t_10.memview = NULL;
   __pyx_t_10.data = NULL;
-  __pyx_t_10 = __Pyx_PyObject_to_MemoryviewSlice_ds_unsigned_char__const__(Py_None, 0); if (unlikely(!__pyx_t_10.memview)) __PYX_ERR(0, 437, __pyx_L1_error)
-  __pyx_t_4 = __pyx_memoryview_fromslice(__pyx_t_10, 1, (PyObject *(*)(char *)) __pyx_memview_get_unsigned_char__const__, (int (*)(char *, PyObject *)) NULL, 0);; if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 437, __pyx_L1_error)
+  __pyx_t_10 = __Pyx_PyObject_to_MemoryviewSlice_ds_unsigned_char__const__(Py_None, 0); if (unlikely(!__pyx_t_10.memview)) __PYX_ERR(0, 460, __pyx_L1_error)
+  __pyx_t_4 = __pyx_memoryview_fromslice(__pyx_t_10, 1, (PyObject *(*)(char *)) __pyx_memview_get_unsigned_char__const__, (int (*)(char *, PyObject *)) NULL, 0);; if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 460, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __PYX_XCLEAR_MEMVIEW(&__pyx_t_10, 1);
   __pyx_t_10.memview = NULL; __pyx_t_10.data = NULL;
-  __pyx_t_5 = PyTuple_Pack(1, __pyx_t_4); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 437, __pyx_L1_error)
+  __pyx_t_5 = PyTuple_Pack(1, __pyx_t_4); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 460, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_3src_13_accelerators_7scan_unit_repeats, 0, __pyx_mstate_global->__pyx_n_u_scan_unit_repeats, NULL, __pyx_mstate_global->__pyx_n_u_src__accelerators, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[3])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 437, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_3src_13_accelerators_7scan_unit_repeats, 0, __pyx_mstate_global->__pyx_n_u_scan_unit_repeats, NULL, __pyx_mstate_global->__pyx_n_u_src__accelerators, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[3])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 460, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
   __Pyx_CyFunction_SetDefaultsTuple(__pyx_t_4, __pyx_t_5);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_scan_unit_repeats, __pyx_t_4) < (0)) __PYX_ERR(0, 437, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_scan_unit_repeats, __pyx_t_4) < (0)) __PYX_ERR(0, 460, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "src/_accelerators.pyx":515
+  /* "src/_accelerators.pyx":538
  *     return results
  * 
  * cpdef list scan_simple_repeats(             # <<<<<<<<<<<<<<
  *     const unsigned char[:] text_arr,
  *     const unsigned char[:] tier1_mask,
 */
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_3src_13_accelerators_9scan_simple_repeats, 0, __pyx_mstate_global->__pyx_n_u_scan_simple_repeats, NULL, __pyx_mstate_global->__pyx_n_u_src__accelerators, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[4])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 515, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_3src_13_accelerators_9scan_simple_repeats, 0, __pyx_mstate_global->__pyx_n_u_scan_simple_repeats, NULL, __pyx_mstate_global->__pyx_n_u_src__accelerators, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[4])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 538, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_scan_simple_repeats, __pyx_t_4) < (0)) __PYX_ERR(0, 515, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_scan_simple_repeats, __pyx_t_4) < (0)) __PYX_ERR(0, 538, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "src/_accelerators.pyx":583
+  /* "src/_accelerators.pyx":606
  *     return results
  * 
  * cpdef list find_periodic_patterns(long[:] positions, int min_period, int max_period, int min_copies, double tolerance_ratio=0.01):             # <<<<<<<<<<<<<<
  *     """Find periodic patterns in a sorted list of positions."""
  *     cdef int n = positions.shape[0]
 */
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_3src_13_accelerators_11find_periodic_patterns, 0, __pyx_mstate_global->__pyx_n_u_find_periodic_patterns, NULL, __pyx_mstate_global->__pyx_n_u_src__accelerators, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[5])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 583, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_3src_13_accelerators_11find_periodic_patterns, 0, __pyx_mstate_global->__pyx_n_u_find_periodic_patterns, NULL, __pyx_mstate_global->__pyx_n_u_src__accelerators, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[5])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 606, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
   __Pyx_CyFunction_SetDefaultsTuple(__pyx_t_4, __pyx_mstate_global->__pyx_tuple[3]);
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_find_periodic_patterns, __pyx_t_4) < (0)) __PYX_ERR(0, 583, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_find_periodic_patterns, __pyx_t_4) < (0)) __PYX_ERR(0, 606, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "src/_accelerators.pyx":631
+  /* "src/_accelerators.pyx":654
  *     return results
  * 
  * cpdef list find_periodic_runs(long[:] positions, int min_period, int max_period, int min_copies, double tolerance_ratio=0.01):             # <<<<<<<<<<<<<<
  *     """Detect periodic runs using adjacent gaps only (O(k)).
  * 
 */
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_3src_13_accelerators_13find_periodic_runs, 0, __pyx_mstate_global->__pyx_n_u_find_periodic_runs, NULL, __pyx_mstate_global->__pyx_n_u_src__accelerators, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[6])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 631, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_3src_13_accelerators_13find_periodic_runs, 0, __pyx_mstate_global->__pyx_n_u_find_periodic_runs, NULL, __pyx_mstate_global->__pyx_n_u_src__accelerators, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[6])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 654, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
   __Pyx_CyFunction_SetDefaultsTuple(__pyx_t_4, __pyx_mstate_global->__pyx_tuple[4]);
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_find_periodic_runs, __pyx_t_4) < (0)) __PYX_ERR(0, 631, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_find_periodic_runs, __pyx_t_4) < (0)) __PYX_ERR(0, 654, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "src/_accelerators.pyx":706
+  /* "src/_accelerators.pyx":729
  * from libc.stdlib cimport malloc, free
  * 
  * cpdef tuple align_unit_to_window(             # <<<<<<<<<<<<<<
  *     const unsigned char[:] motif,
  *     const unsigned char[:] window,
 */
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_3src_13_accelerators_15align_unit_to_window, 0, __pyx_mstate_global->__pyx_n_u_align_unit_to_window, NULL, __pyx_mstate_global->__pyx_n_u_src__accelerators, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[7])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 706, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_3src_13_accelerators_15align_unit_to_window, 0, __pyx_mstate_global->__pyx_n_u_align_unit_to_window, NULL, __pyx_mstate_global->__pyx_n_u_src__accelerators, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[7])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 729, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_align_unit_to_window, __pyx_t_4) < (0)) __PYX_ERR(0, 706, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_align_unit_to_window, __pyx_t_4) < (0)) __PYX_ERR(0, 729, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "src/_accelerators.pyx":938
+  /* "src/_accelerators.pyx":961
  *         free(ptr)
  * 
  * cpdef list lcp_tandem_candidates(             # <<<<<<<<<<<<<<
  *     const int[:] sa,
  *     const int[:] lcp,
 */
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_3src_13_accelerators_17lcp_tandem_candidates, 0, __pyx_mstate_global->__pyx_n_u_lcp_tandem_candidates, NULL, __pyx_mstate_global->__pyx_n_u_src__accelerators, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[8])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 938, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_3src_13_accelerators_17lcp_tandem_candidates, 0, __pyx_mstate_global->__pyx_n_u_lcp_tandem_candidates, NULL, __pyx_mstate_global->__pyx_n_u_src__accelerators, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[8])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 961, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
   __Pyx_CyFunction_SetDefaultsTuple(__pyx_t_4, __pyx_mstate_global->__pyx_tuple[5]);
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_lcp_tandem_candidates, __pyx_t_4) < (0)) __PYX_ERR(0, 938, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_lcp_tandem_candidates, __pyx_t_4) < (0)) __PYX_ERR(0, 961, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "src/_accelerators.pyx":991
+  /* "src/_accelerators.pyx":1014
  * 
  * 
  * cpdef list find_tandem_runs(             # <<<<<<<<<<<<<<
  *     long[:] positions,
  *     int period,
 */
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_3src_13_accelerators_19find_tandem_runs, 0, __pyx_mstate_global->__pyx_n_u_find_tandem_runs, NULL, __pyx_mstate_global->__pyx_n_u_src__accelerators, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[9])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 991, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_3src_13_accelerators_19find_tandem_runs, 0, __pyx_mstate_global->__pyx_n_u_find_tandem_runs, NULL, __pyx_mstate_global->__pyx_n_u_src__accelerators, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[9])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1014, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_find_tandem_runs, __pyx_t_4) < (0)) __PYX_ERR(0, 991, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_find_tandem_runs, __pyx_t_4) < (0)) __PYX_ERR(0, 1014, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "src/_accelerators.pyx":1033
+  /* "src/_accelerators.pyx":1056
  * 
  * 
  * cpdef tuple anchor_scan_boundaries(             # <<<<<<<<<<<<<<
  *     const unsigned char[:] text_arr,
  *     int seed_pos,
 */
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_3src_13_accelerators_21anchor_scan_boundaries, 0, __pyx_mstate_global->__pyx_n_u_anchor_scan_boundaries, NULL, __pyx_mstate_global->__pyx_n_u_src__accelerators, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[10])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1033, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_3src_13_accelerators_21anchor_scan_boundaries, 0, __pyx_mstate_global->__pyx_n_u_anchor_scan_boundaries, NULL, __pyx_mstate_global->__pyx_n_u_src__accelerators, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[10])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1056, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_anchor_scan_boundaries, __pyx_t_4) < (0)) __PYX_ERR(0, 1033, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_anchor_scan_boundaries, __pyx_t_4) < (0)) __PYX_ERR(0, 1056, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
   /* "src/_accelerators.pyx":1
@@ -31615,36 +31763,36 @@ static int __Pyx_InitCachedConstants(__pyx_mstatetype *__pyx_mstate) {
   __Pyx_GOTREF(__pyx_mstate_global->__pyx_tuple[2]);
   __Pyx_GIVEREF(__pyx_mstate_global->__pyx_tuple[2]);
 
-  /* "src/_accelerators.pyx":583
+  /* "src/_accelerators.pyx":606
  *     return results
  * 
  * cpdef list find_periodic_patterns(long[:] positions, int min_period, int max_period, int min_copies, double tolerance_ratio=0.01):             # <<<<<<<<<<<<<<
  *     """Find periodic patterns in a sorted list of positions."""
  *     cdef int n = positions.shape[0]
 */
-  __pyx_mstate_global->__pyx_tuple[3] = PyTuple_Pack(1, __pyx_mstate_global->__pyx_float_0_01); if (unlikely(!__pyx_mstate_global->__pyx_tuple[3])) __PYX_ERR(0, 583, __pyx_L1_error)
+  __pyx_mstate_global->__pyx_tuple[3] = PyTuple_Pack(1, __pyx_mstate_global->__pyx_float_0_01); if (unlikely(!__pyx_mstate_global->__pyx_tuple[3])) __PYX_ERR(0, 606, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_mstate_global->__pyx_tuple[3]);
   __Pyx_GIVEREF(__pyx_mstate_global->__pyx_tuple[3]);
 
-  /* "src/_accelerators.pyx":631
+  /* "src/_accelerators.pyx":654
  *     return results
  * 
  * cpdef list find_periodic_runs(long[:] positions, int min_period, int max_period, int min_copies, double tolerance_ratio=0.01):             # <<<<<<<<<<<<<<
  *     """Detect periodic runs using adjacent gaps only (O(k)).
  * 
 */
-  __pyx_mstate_global->__pyx_tuple[4] = PyTuple_Pack(1, __pyx_mstate_global->__pyx_float_0_01); if (unlikely(!__pyx_mstate_global->__pyx_tuple[4])) __PYX_ERR(0, 631, __pyx_L1_error)
+  __pyx_mstate_global->__pyx_tuple[4] = PyTuple_Pack(1, __pyx_mstate_global->__pyx_float_0_01); if (unlikely(!__pyx_mstate_global->__pyx_tuple[4])) __PYX_ERR(0, 654, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_mstate_global->__pyx_tuple[4]);
   __Pyx_GIVEREF(__pyx_mstate_global->__pyx_tuple[4]);
 
-  /* "src/_accelerators.pyx":938
+  /* "src/_accelerators.pyx":961
  *         free(ptr)
  * 
  * cpdef list lcp_tandem_candidates(             # <<<<<<<<<<<<<<
  *     const int[:] sa,
  *     const int[:] lcp,
 */
-  __pyx_mstate_global->__pyx_tuple[5] = PyTuple_Pack(1, __pyx_mstate_global->__pyx_int_10); if (unlikely(!__pyx_mstate_global->__pyx_tuple[5])) __PYX_ERR(0, 938, __pyx_L1_error)
+  __pyx_mstate_global->__pyx_tuple[5] = PyTuple_Pack(1, __pyx_mstate_global->__pyx_int_10); if (unlikely(!__pyx_mstate_global->__pyx_tuple[5])) __PYX_ERR(0, 961, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_mstate_global->__pyx_tuple[5]);
   __Pyx_GIVEREF(__pyx_mstate_global->__pyx_tuple[5]);
   #if CYTHON_IMMORTAL_CONSTANTS
@@ -31842,47 +31990,47 @@ static int __Pyx_CreateCodeObjects(__pyx_mstatetype *__pyx_mstate) {
     __pyx_mstate_global->__pyx_codeobj_tab[1] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_src__accelerators_pyx, __pyx_mstate->__pyx_n_u_hamming_distance, __pyx_mstate->__pyx_kp_b_iso88591_fAQ_fAQ_s_Q_j_AV6, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[1])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {5, 0, 0, 5, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 346};
+    const __Pyx_PyCode_New_function_description descr = {5, 0, 0, 5, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 369};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_s_arr, __pyx_mstate->__pyx_n_u_start_pos, __pyx_mstate->__pyx_n_u_period, __pyx_mstate->__pyx_n_u_n, __pyx_mstate->__pyx_n_u_allowed_mismatch_rate};
     __pyx_mstate_global->__pyx_codeobj_tab[2] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_src__accelerators_pyx, __pyx_mstate->__pyx_n_u_extend_with_mismatches, __pyx_mstate->__pyx_kp_b_iso88591_wc_q_e6_r_Bc_2Q_A_z_2S_G2Q_q_q, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[2])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {6, 0, 0, 6, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 437};
+    const __Pyx_PyCode_New_function_description descr = {6, 0, 0, 6, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 460};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_text_arr, __pyx_mstate->__pyx_n_u_n, __pyx_mstate->__pyx_n_u_unit_len, __pyx_mstate->__pyx_n_u_min_copies, __pyx_mstate->__pyx_n_u_max_mismatch, __pyx_mstate->__pyx_n_u_packed_arr};
     __pyx_mstate_global->__pyx_codeobj_tab[3] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_src__accelerators_pyx, __pyx_mstate->__pyx_n_u_scan_unit_repeats, __pyx_mstate->__pyx_kp_b_iso88591_X_X_Y_Kwa_Q_fIRq_b_Bir_Cq_A_b_6, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[3])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {8, 0, 0, 8, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 515};
+    const __Pyx_PyCode_New_function_description descr = {8, 0, 0, 8, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 538};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_text_arr, __pyx_mstate->__pyx_n_u_tier1_mask, __pyx_mstate->__pyx_n_u_n, __pyx_mstate->__pyx_n_u_min_p, __pyx_mstate->__pyx_n_u_max_p, __pyx_mstate->__pyx_n_u_period_step, __pyx_mstate->__pyx_n_u_position_step, __pyx_mstate->__pyx_n_u_allowed_mismatch_rate};
     __pyx_mstate_global->__pyx_codeobj_tab[4] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_src__accelerators_pyx, __pyx_mstate->__pyx_n_u_scan_simple_repeats, __pyx_mstate->__pyx_kp_b_iso88591_U_7_Q_A_A_2Rq_b_Ba_z_Q_r_2Rz_A, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[4])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {5, 0, 0, 5, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 583};
+    const __Pyx_PyCode_New_function_description descr = {5, 0, 0, 5, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 606};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_positions, __pyx_mstate->__pyx_n_u_min_period, __pyx_mstate->__pyx_n_u_max_period, __pyx_mstate->__pyx_n_u_min_copies, __pyx_mstate->__pyx_n_u_tolerance_ratio};
     __pyx_mstate_global->__pyx_codeobj_tab[5] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_src__accelerators_pyx, __pyx_mstate->__pyx_n_u_find_periodic_patterns, __pyx_mstate->__pyx_kp_b_iso88591_r_1_q_r_1_A_U_1_Yaq_E_ar_3a_1_3, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[5])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {5, 0, 0, 5, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 631};
+    const __Pyx_PyCode_New_function_description descr = {5, 0, 0, 5, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 654};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_positions, __pyx_mstate->__pyx_n_u_min_period, __pyx_mstate->__pyx_n_u_max_period, __pyx_mstate->__pyx_n_u_min_copies, __pyx_mstate->__pyx_n_u_tolerance_ratio};
     __pyx_mstate_global->__pyx_codeobj_tab[6] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_src__accelerators_pyx, __pyx_mstate->__pyx_n_u_find_periodic_runs, __pyx_mstate->__pyx_kp_b_iso88591_xxy_r_1_q_1_A_Q_U_3a_1A_xr_1_5, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[6])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {4, 0, 0, 4, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 706};
+    const __Pyx_PyCode_New_function_description descr = {4, 0, 0, 4, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 729};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_motif, __pyx_mstate->__pyx_n_u_window, __pyx_mstate->__pyx_n_u_max_indel, __pyx_mstate->__pyx_n_u_mismatch_tolerance};
     __pyx_mstate_global->__pyx_codeobj_tab[7] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_src__accelerators_pyx, __pyx_mstate->__pyx_n_u_align_unit_to_window, __pyx_mstate->__pyx_kp_b_iso88591_fAQ_vQa_r_Bc_3a_q_z_3l_C_4A_Rr, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[7])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {6, 0, 0, 6, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 938};
+    const __Pyx_PyCode_New_function_description descr = {6, 0, 0, 6, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 961};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_sa, __pyx_mstate->__pyx_n_u_lcp, __pyx_mstate->__pyx_n_u_n, __pyx_mstate->__pyx_n_u_min_period, __pyx_mstate->__pyx_n_u_max_period, __pyx_mstate->__pyx_n_u_min_lcp_threshold};
     __pyx_mstate_global->__pyx_codeobj_tab[8] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_src__accelerators_pyx, __pyx_mstate->__pyx_n_u_lcp_tandem_candidates, __pyx_mstate->__pyx_kp_b_iso88591_b_aq_s_Q_xr_U_3a_Cq_2Rq_2Rq_1_6, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[8])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {3, 0, 0, 3, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 991};
+    const __Pyx_PyCode_New_function_description descr = {3, 0, 0, 3, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 1014};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_positions, __pyx_mstate->__pyx_n_u_period, __pyx_mstate->__pyx_n_u_min_copies};
     __pyx_mstate_global->__pyx_codeobj_tab[9] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_src__accelerators_pyx, __pyx_mstate->__pyx_n_u_find_tandem_runs, __pyx_mstate->__pyx_kp_b_iso88591_YfAQ_vRq_q_1A_iq_2Q_Q_U_3a_9AS, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[9])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {7, 0, 0, 7, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 1033};
+    const __Pyx_PyCode_New_function_description descr = {7, 0, 0, 7, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 1056};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_text_arr, __pyx_mstate->__pyx_n_u_seed_pos, __pyx_mstate->__pyx_n_u_period, __pyx_mstate->__pyx_n_u_n, __pyx_mstate->__pyx_n_u_match_threshold, __pyx_mstate->__pyx_n_u_max_backward_periods, __pyx_mstate->__pyx_n_u_max_forward_periods};
     __pyx_mstate_global->__pyx_codeobj_tab[10] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_src__accelerators_pyx, __pyx_mstate->__pyx_n_u_anchor_scan_boundaries, __pyx_mstate->__pyx_kp_b_iso88591_1_y_1_A_G2Q_A_Q_2Q_c_4r_E_aq_xq, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[10])) goto bad;
   }
