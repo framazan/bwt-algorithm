@@ -195,17 +195,38 @@ Note the base genome-wide recall (23.03%) is lower than filip's published
 65 KB curated subset; the **before/after delta on identical GT** is the valid
 comparison.
 
-### Memory (constraint NOT met — open item #5)
+### Memory (constraint MET — 149 GB → 30 GB)
 
-The full-genome run peaked at **~149 GB RSS** (`MaxRSS` 156,223,504 KB,
-`MaxVMSize` ~161 GB) at `--threads 4`, **above** the 41.98 GB reference in the
-problem statement. The footprint is dominated by the per-chromosome suffix
-array / FM-index held by **4 concurrent workers** (chr1 alone is ~249 Mbp), so
-it is largely thread-count-driven, not config-driven — the recall tuning adds
-little, since peak memory is index-bound, not output-bound. Practical levers:
-lower `--threads` (trades wall-time for memory) or implement the plan-item-#5
-reductions (`sa_sample_rate`, per-chromosome chunked indexing). **The memory
-goal is not yet achieved**; the recall result above stands independently of it.
+The first full-genome run peaked at **149.18 GB RSS** (`MaxRSS` 156,223,504 KB)
+at `--threads 4` — far above the 41.98 GB reference. Profiling traced almost all
+of it to two structures `BWTCore` built **per chromosome and never read**:
+
+- `kmer_hash` — a dict of per-position Python-int lists for every 8-mer; its
+  only consumer `get_kmer_positions()` is never called (and falls back to the
+  FM-index anyway).
+- `sampled_sa` — with the hardcoded `sa_sample_rate=1` this duplicated the
+  entire suffix array as a Python int→int dict; its only consumer
+  `_get_suffix_position()` is never called (`locate_positions()` reads the SA
+  array directly).
+
+Both grew O(n) in Python objects and dominated per-chromosome RAM. Setting them
+empty (commit `40d4f2d`) cut chr21 single-thread peak 8.60 GB → 1.37 GB (6.3×)
+and the full-genome peak **149.18 GB → 29.63 GB at `--threads 4` (5.0×), now
+well under the 41.98 GB target** — and ~7 min faster (no dict-build overhead).
+The result is unchanged: re-scoring the new output (`bwt_hg38_lowmem`) vs the
+full adotto catalog gives **identical** region recall 44.36%, precision 66.41%,
+bp recall 30.60%. (The tool's BED varies ~0.1% run-to-run regardless of this
+change — old-vs-old runs differ too — so metric stability, not byte-identity, is
+the correct oracle; it holds exactly.)
+
+| run | code | threads | peak RSS | adotto region recall |
+|---|---|---|---|---|
+| first full-genome | baseline | 4 | 149.18 GB | 44.36% |
+| re-run (`bwt_hg38_lowmem`) | +`40d4f2d` | 4 | **29.63 GB** | 44.36% |
+
+Plan item #5 is satisfied at the current operating point; the heavier
+`sa_sample_rate` / per-chromosome chunked-indexing options remain available if
+even lower memory is wanted later.
 
 ### Reproduce
 
