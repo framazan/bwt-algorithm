@@ -39,6 +39,30 @@ Rebuild scope: only edits to `_accelerators.pyx` require recompiling the `.so`.
 Edits to the pure-Python tier files (`tier1.py`, `tier2.py`, `tier3.py`,
 `finder.py`, `bwt_seed.py`, etc.) take effect immediately with no rebuild.
 
+## Testing
+
+`pytest`-based suite under `tests/`. Tests import `from src...`, so **run from
+the repo root** (no `conftest.py`/`pytest.ini` — discovery is root-relative).
+
+```bash
+python3 -m pytest tests/ -q                                              # whole suite
+python3 -m pytest tests/test_ground_truth.py -v                          # one file
+python3 -m pytest tests/test_ground_truth.py::TestTier1GroundTruth::test_sensitivity -v  # one test
+```
+
+- `tests/test_ground_truth.py` runs the full `TandemRepeatFinder` on synthetic
+  sequences in `tests/fixtures/` and asserts per-tier sensitivity/precision
+  floors. Tier 2/3 cases are marked `NEEDS_CYTHON` and **skip silently when the
+  compiled `_accelerators.so` is absent** — so a green run without the `.so`
+  does *not* exercise Tier 2/3; build the extension first to test those paths.
+- The dev environment with numpy + pydivsufsort + the compiled `.so` (and where
+  the benchmark harness runs) is the conda env
+  `/data/gpfs/assoc/pgl/bin/conda/conda_envs/bwtandem/bin/python`. `pytest` may
+  need installing into it (`python3 -m pip install pytest`).
+- `tests/test_satellite_gapfill.py` is the regression guard for the
+  divergent-alpha-satellite interior gap-fill (see the env-var section below);
+  it self-generates its sequences (no fixture files).
+
 ## Tuning detection sensitivity (env vars)
 
 The tier detection thresholds are hardcoded constants exposed as environment-
@@ -75,6 +99,21 @@ means baseline. Set them on the command line, e.g.
 - **Tier 2** (`tier2.py`, period 10-20 simple scan): `TIER2_MIN_COPIES`,
   `TIER2_MIN_ARRAY_LEN`, `TIER2_SHORT_REQ_COPIES` (copies required for periods
   <20 bp), `TIER2_MISMATCH`.
+- **Satellite interior gap-fill** (`finder.py` `_fill_satellite_gaps`, the
+  post-tier backstop for divergent alpha-satellite arrays): `SAT_FILL_MIN_IDENTITY`
+  (default 0.45 — min gap autocorrelation identity to accept as satellite; ~2.5x
+  above the ~0.18 floor of non-repetitive DNA), `SAT_FILL_MIN_PERIOD`/
+  `SAT_FILL_MAX_PERIOD` (default 100/360 — autocorrelation period window, covers
+  the 171bp monomer and the dimeric 342bp HOR period), `SAT_ANCHOR_MIN_MOTIF`/
+  `SAT_ANCHOR_MAX_MOTIF` (default 100/0 — motif-length window for a repeat to
+  anchor gap scanning; MAX=0 = no upper bound so large HOR-unit calls also
+  anchor). These recover the interior gaps the 3-tier pipeline leaves uncovered
+  *between* large-HOR-motif calls, where divergence is too high for perfect-seed
+  extension. Measured on 6 CHM13 centromeric HOR arrays: mean bp-recall
+  **92.5%→99.8%** with mean bp-precision held/improved (94.2%→94.6%); per-array
+  bp-recall now 99.5-99.99% (was 90.6-95.8%). Defaults reproduce this operating
+  point; raising the identity floor back toward 0.55 re-opens the gaps. Regression
+  coverage: `tests/test_satellite_gapfill.py`.
 
 The dominant short-STR recall levers are `TIER1_MIN_ARRAY_LEN` + `TIER1_MIN_SCORE`
 (copy-count knobs have little effect); lowering them raises recall but drops

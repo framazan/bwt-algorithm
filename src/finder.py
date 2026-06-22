@@ -1,3 +1,4 @@
+import os    # Standard library for environment-variable overrides
 import time  # Standard library for measuring execution time
 import numpy as np  # NumPy for numerical operations and array processing
 from typing import List, Tuple, Set, Optional, Dict  # typing module for type hints
@@ -79,6 +80,27 @@ class TandemRepeatFinder:
 
         # Only create Tier 3 instance if enabled, otherwise None
         self.tier3 = Tier3LongReadFinder(self.bwt, mode=tier3_mode) if "tier3" in self.enabled_tiers else None
+
+        # Satellite gap-fill tuning (env-overridable). Defaults are the improved
+        # operating point that recovers divergent-alpha-sat interior gaps which
+        # the 3-tier pipeline leaves uncovered between large-HOR-motif calls.
+        # SAT_FILL_MIN_IDENTITY: min autocorrelation identity to accept a gap as
+        #   satellite (0.45 captures ~46%-identity divergent alpha-sat; ~2.5x
+        #   above the ~0.18 autocorrelation floor of non-repetitive DNA).
+        # SAT_ANCHOR_MIN_MOTIF / SAT_ANCHOR_MAX_MOTIF: motif-length window for a
+        #   repeat to count as a satellite anchor whose neighbourhood is scanned
+        #   for uncovered gaps. MAX=0 means no upper bound, so large HOR-unit
+        #   calls (motif >> 300bp) also anchor gap scanning.
+        self.sat_fill_min_identity = float(os.environ.get("SAT_FILL_MIN_IDENTITY", "0.45"))
+        self.sat_anchor_min_motif = int(os.environ.get("SAT_ANCHOR_MIN_MOTIF", "100"))
+        self.sat_anchor_max_motif = int(os.environ.get("SAT_ANCHOR_MAX_MOTIF", "0"))
+        # Period window for the gap autocorrelation scan. Default 100-360 covers
+        # the alpha-satellite monomer (171bp) and the dimeric HOR period
+        # (2x171=342) where highly divergent arrays (e.g. chr3, ~46% monomer
+        # identity) carry their strongest periodic signal. The 0.45 identity
+        # floor stays ~2.5x above the ~0.18 autocorrelation of non-repetitive DNA.
+        self.sat_fill_min_period = int(os.environ.get("SAT_FILL_MIN_PERIOD", "100"))
+        self.sat_fill_max_period = int(os.environ.get("SAT_FILL_MAX_PERIOD", "360"))
 
     def find_all(self) -> List[TandemRepeat]:
         """Execute the full 3-tier finding pipeline."""
@@ -434,8 +456,11 @@ class TandemRepeatFinder:
         satellite_positions = []
         for r in repeats:
             m = r.consensus_motif or r.motif
-            if m and 100 <= len(m) <= 300:
-                satellite_positions.append((r.start, r.end))
+            if not m or len(m) < self.sat_anchor_min_motif:
+                continue
+            if self.sat_anchor_max_motif and len(m) > self.sat_anchor_max_motif:
+                continue
+            satellite_positions.append((r.start, r.end))
 
         # Build a proximity mask: only scan blocks near satellite regions
         # This avoids scanning the entire non-centromeric sequence
@@ -472,7 +497,7 @@ class TandemRepeatFinder:
                 if w_size < 300:
                     continue
 
-                for p in range(100, min(301, w_size // 2)):
+                for p in range(self.sat_fill_min_period, min(self.sat_fill_max_period + 1, w_size // 2)):
                     total = w_size - p
                     if total <= 0:
                         continue
@@ -487,7 +512,7 @@ class TandemRepeatFinder:
                 if best_identity > 0.80:
                     break
 
-            if best_identity < 0.55 or best_period < 50:
+            if best_identity < self.sat_fill_min_identity or best_period < 50:
                 continue
 
             use_motif = text_arr[best_w_start:best_w_start + best_period].tobytes().decode('ascii', errors='replace')
