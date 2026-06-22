@@ -51,11 +51,11 @@ class Tier1STRFinder:
         # relaxed ONLY for short motifs while keeping longer motifs strict.
         # Defaults reproduce baseline exactly: short_period_max=0 disables the
         # stratification, and the short thresholds inherit the global ones.
-        self.short_period_max = int(os.environ.get("TIER1_SHORT_PERIOD_MAX", "0"))
+        self.short_period_max = int(os.environ.get("TIER1_SHORT_PERIOD_MAX") or "0")
         self.short_min_array_length = int(
-            os.environ.get("TIER1_SHORT_MIN_ARRAY_LEN", str(self.min_array_length)))
+            os.environ.get("TIER1_SHORT_MIN_ARRAY_LEN") or str(self.min_array_length))
         self.short_min_score = float(
-            os.environ.get("TIER1_SHORT_MIN_SCORE", str(self.min_score)))
+            os.environ.get("TIER1_SHORT_MIN_SCORE") or str(self.min_score))
         # dynamic_min_copies = max(min_copies, copy_base // motif_len + copy_add)
         self.copy_base = int(os.environ.get("TIER1_COPYBASE", "12"))
         self.copy_add = int(os.environ.get("TIER1_COPYADD", "3"))
@@ -79,34 +79,34 @@ class Tier1STRFinder:
         #   0 = off (baseline)
         #   1 = run as an ADDITIONAL source merged with the sliding-window scan
         #   2 = run as a REPLACEMENT for the sliding-window scan
-        self.fmscan_mode = int(os.environ.get("TIER1_FMSCAN", "0"))
+        self.fmscan_mode = int(os.environ.get("TIER1_FMSCAN") or "0")
         # Period range for the FM-index detector (independent of the global
         # tier1 range so it can be restricted for proof-of-concept / speed).
-        self.fmscan_min_p = int(os.environ.get("TIER1_FMSCAN_MIN_P", "1"))
-        self.fmscan_max_p = int(os.environ.get("TIER1_FMSCAN_MAX_P", "6"))
+        self.fmscan_min_p = int(os.environ.get("TIER1_FMSCAN_MIN_P") or "1")
+        self.fmscan_max_p = int(os.environ.get("TIER1_FMSCAN_MAX_P") or "6")
         # Gap tolerance: a periodic run may skip up to this many consecutive
         # expected copies (each skip = a diverged/mismatched copy) and still be
         # treated as one array.
-        self.fmscan_max_gap_copies = int(os.environ.get("TIER1_FMSCAN_MAX_GAP", "2"))
+        self.fmscan_max_gap_copies = int(os.environ.get("TIER1_FMSCAN_MAX_GAP") or "2")
         # Minimum observed perfect-motif occurrences (anchors) in a run.
-        self.fmscan_min_occ = int(os.environ.get("TIER1_FMSCAN_MIN_OCC", "3"))
+        self.fmscan_min_occ = int(os.environ.get("TIER1_FMSCAN_MIN_OCC") or "3")
         # Minimum reported array span (bp) for an accepted run.
-        self.fmscan_min_span = int(os.environ.get("TIER1_FMSCAN_MIN_SPAN", "20"))
+        self.fmscan_min_span = int(os.environ.get("TIER1_FMSCAN_MIN_SPAN") or "20")
         # Density floor: observed occurrences / expected copies (span/p). A
         # perfect array -> 1.0; diverged arrays sit a bit below 1.0; random
         # low-complexity stretches sit well below. THIS is the discriminator.
         # Default 0.50 = the validated operating point (see docstring / docs):
         # additive mode at density=0.50, llr=8 dominates the gate-tuning OP1 on
         # chr21 AND chr22 (more recall at equal adjusted precision).
-        self.fmscan_min_density = float(os.environ.get("TIER1_FMSCAN_MIN_DENSITY", "0.50"))
+        self.fmscan_min_density = float(os.environ.get("TIER1_FMSCAN_MIN_DENSITY") or "0.50")
         # Significance floor: Poisson log-likelihood ratio of the observed
         # perfect-copy count vs the i.i.d. background expectation. Accept only
         # runs whose LLR exceeds this. Higher = stricter / higher precision.
         # Default 8.0 = the validated operating point.
-        self.fmscan_min_llr = float(os.environ.get("TIER1_FMSCAN_MIN_LLR", "8.0"))
+        self.fmscan_min_llr = float(os.environ.get("TIER1_FMSCAN_MIN_LLR") or "8.0")
         # Skip motifs with more than this many genome-wide occurrences (pure
         # low-complexity floods, e.g. poly-A); they cannot be localized cheaply.
-        self.fmscan_max_occ_total = int(os.environ.get("TIER1_FMSCAN_MAX_OCC_TOTAL", "20000000"))
+        self.fmscan_max_occ_total = int(os.environ.get("TIER1_FMSCAN_MAX_OCC_TOTAL") or "20000000")
 
     def _build_repeat(self, chromosome: str, refined, tier: int = 1) -> TandemRepeat:
         return MotifUtils.refined_to_repeat(chromosome, refined, tier, self.text_arr, strand='+')
