@@ -125,6 +125,11 @@ recall/precision frontier and the chosen operating point.
 - **Required**: numpy, pydivsufsort (fast suffix array construction; falls back to NumPy prefix-doubling if unavailable)
 - **Optional performance**: numba (JIT for rank queries and LCP), Cython (compiled `_accelerators`)
 - **Container**: Singularity definition file at repo root builds a complete environment
+- **Environment**: `environment.yml` defines the `bwt` conda env (python, numpy/numba/cython, pytest,
+  plus the competitor tools used for benchmarking: trf, tantan, tidehunter, ncrf, mreps). `pydivsufsort`
+  is pip-only and needs `--no-build-isolation` (see README "Installation"). Note the env in `environment.yml`
+  is not always the interpreter the benchmark scripts call — those hardcode a separate prebuilt env (see
+  the path in "Testing"); when adding deps, update whichever env you actually run.
 
 ## Architecture
 
