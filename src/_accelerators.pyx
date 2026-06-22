@@ -753,11 +753,25 @@ cpdef tuple align_unit_to_window(
     cdef int inf = m + n + 10
     cdef int rows = m + 1
     cdef int cols = n + 1
-    
-    # Allocate flattened arrays
-    cdef int* dp = <int*> malloc(rows * cols * sizeof(int))
-    cdef char* ptr = <char*> malloc(rows * cols * sizeof(char))
-    
+
+    # Guard against pathological sizes.  This full O(rows*cols) DP table is
+    # indexed as i*cols + j using 32-bit ints; for a spurious large pseudo-motif
+    # (e.g. an LCP candidate with period ~1e5, giving rows≈1e5 and cols≈1.1e5)
+    # the product ~1e10 overflows both the malloc size and the i*cols index,
+    # leading to an undersized buffer and out-of-bounds access -> SIGSEGV.  Real
+    # tandem-repeat units are at most a few kb, so 256 M cells (motif/window
+    # ~16 kb each) is far above any legitimate input.  Above that we bail out
+    # (return None -> the caller skips this candidate); below it, rows*cols stays
+    # well within INT32_MAX so the existing int indexing is safe. Compute the
+    # cell count in 64-bit to avoid overflowing the comparison itself.
+    cdef long n_cells = (<long>rows) * (<long>cols)
+    if n_cells > <long>(256 * 1024 * 1024):
+        return None
+
+    # Allocate flattened arrays (64-bit size math)
+    cdef int* dp = <int*> malloc(<size_t>n_cells * sizeof(int))
+    cdef char* ptr = <char*> malloc(<size_t>n_cells * sizeof(char))
+
     if not dp or not ptr:
         if dp: free(dp)
         if ptr: free(ptr)

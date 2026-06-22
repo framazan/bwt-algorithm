@@ -77,6 +77,19 @@ class Tier2LCPFinder:
         _mm = os.environ.get("TIER2_MISMATCH")
         self.allowed_mismatch_rate = max(0.0, float(_mm) if _mm else allowed_mismatch_rate)
         self.allowed_indel_rate = max(0.0, allowed_indel_rate)
+        # Maximum period for Phase A's per-copy seed-and-extend + banded-DP
+        # refinement.  Phase A's aligner is O(period^2) per copy; on dense
+        # satellite arrays the LCP scan emits huge spurious periods (integer
+        # multiples of the true unit, up to ~max_period) that never yield a valid
+        # repeat yet dominate runtime/memory (observed ~30 GB / OOM on a 3 Mb
+        # alpha-HOR array).  Periods above this bound are skipped in Phase A —
+        # genuine long units are recovered by Phase B (BWT k-mer seeding) and
+        # Tier 3 (anchor-based), which scale to long periods.  Tunable; the
+        # default comfortably covers real tandem units (e.g. the ~2 kb alpha HOR)
+        # with several-fold margin.
+        self.long_unit_dp_max_period = int(
+            os.environ.get("TIER2_LONGUNIT_DP_MAX_PERIOD", "8192")
+        )
         self.sequence_str = self.bwt.text_arr.tobytes().decode('ascii', errors='replace')
         self._lcp_cache = None  # Lazily computed LCP array
         self._bwt_call_count = 0  # Track BWT usage for diagnostics
@@ -166,6 +179,12 @@ class Tier2LCPFinder:
 
         # Process each period (longest first for proper nesting)
         for period in sorted(period_seeds.keys(), reverse=True):
+            # Skip pathologically large periods: Phase A's per-copy banded DP is
+            # O(period^2) and such periods (spurious LCP multiples on satellite
+            # arrays) blow up runtime/memory without producing valid repeats.
+            # Long real units are handled by Phase B and Tier 3.
+            if period > self.long_unit_dp_max_period:
+                continue
             seeds = sorted(set(period_seeds[period]))
 
             for seed_pos in seeds:

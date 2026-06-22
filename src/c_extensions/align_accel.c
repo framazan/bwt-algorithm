@@ -46,6 +46,26 @@ static int align_one(
     /* Flatten DP into 1D rolling arrays to avoid malloc for large tables */
     /* We need (m+1) x (w+1) but use banded approach with two rows */
     int cols = w + 1;
+    /* The full traceback table is (m+1)*cols bytes and the table is indexed by
+     * i*cols + j.  Both quantities MUST be computed in 64-bit: for a large
+     * pseudo-motif (e.g. an LCP candidate with period ~1e5, giving m≈1e5 and
+     * w≈1.1e5) the product (m+1)*cols ≈ 1e10 overflows 32-bit int, wraps to a
+     * small/negative value, malloc returns an undersized buffer, and the DP fill
+     * then writes far out of bounds -> heap corruption / SIGSEGV.  Using size_t
+     * for the size and every i*cols index keeps the math correct; an honestly
+     * huge table simply fails to allocate and we return 0 gracefully. */
+    size_t cols_sz = (size_t)cols;
+
+    /* Guard against pathological per-copy alignments.  The traceback table is
+     * O(m*w); real tandem motifs are at most a few kb, but a spurious LCP
+     * candidate can carry a period of ~1e5, which would demand a ~10 GB table
+     * and ~1e10-cell fill.  Refuse such cases up front (return 0 -> the caller
+     * simply skips this candidate) rather than thrashing memory.  256 M cells
+     * (~256 MB) corresponds to motif/window ~16 kb each — far above any genuine
+     * tandem-repeat unit, so legitimate inputs are never affected. */
+    if (((size_t)m + 1) * cols_sz > (size_t)256 * 1024 * 1024) {
+        return 0;
+    }
 
     /* Stack-allocate for small problems, heap for large */
     int *prev_row, *curr_row;
@@ -58,15 +78,19 @@ static int align_one(
         prev_ptr = (char *)__builtin_alloca(cols * sizeof(char));
         curr_ptr = (char *)__builtin_alloca(cols * sizeof(char));
     } else {
-        prev_row = (int *)malloc(cols * sizeof(int));
-        curr_row = (int *)malloc(cols * sizeof(int));
-        prev_ptr = (char *)malloc(cols * sizeof(char));
-        curr_ptr = (char *)malloc(cols * sizeof(char));
+        prev_row = (int *)malloc(cols_sz * sizeof(int));
+        curr_row = (int *)malloc(cols_sz * sizeof(int));
+        prev_ptr = (char *)malloc(cols_sz * sizeof(char));
+        curr_ptr = (char *)malloc(cols_sz * sizeof(char));
         on_heap = 1;
+        if (!prev_row || !curr_row || !prev_ptr || !curr_ptr) {
+            free(prev_row); free(curr_row); free(prev_ptr); free(curr_ptr);
+            return 0;
+        }
     }
 
-    /* Full ptr table needed for traceback — allocate on heap */
-    char *ptr_table = (char *)malloc((m + 1) * cols * sizeof(char));
+    /* Full ptr table needed for traceback — allocate on heap (64-bit size). */
+    char *ptr_table = (char *)malloc(((size_t)m + 1) * cols_sz * sizeof(char));
     if (!ptr_table) {
         if (on_heap) { free(prev_row); free(curr_row); free(prev_ptr); free(curr_ptr); }
         return 0;
@@ -106,7 +130,7 @@ static int align_one(
             if (ins_cost < best) { best = ins_cost; bp = 'I'; }
 
             curr_row[j] = best;
-            ptr_table[i * cols + j] = bp;
+            ptr_table[(size_t)i * cols_sz + j] = bp;
         }
 
         /* Swap rows */
@@ -135,7 +159,7 @@ static int align_one(
 
     int i = m, j = best_j;
     while (i > 0 || j > 0) {
-        char op = ptr_table[i * cols + j];
+        char op = ptr_table[(size_t)i * cols_sz + j];
         if (op == 'M' || op == 'S') {
             obs_bases[i - 1] = window[j - 1];
             obs_valid[i - 1] = 1;
