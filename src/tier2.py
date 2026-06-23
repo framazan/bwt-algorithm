@@ -71,6 +71,14 @@ class Tier2LCPFinder:
         self.min_entropy = 1.0  # Minimum Shannon entropy
         # required copies for short (<20bp) periods in the simple scan
         self.short_req_copies = int(os.environ.get("TIER2_SHORT_REQ_COPIES", "3"))
+        # Approximate (autocorrelation) seeding for the diverged period-10-20
+        # notch — opt-in; default off reproduces baseline exactly. Detects local
+        # periodicity directly instead of requiring an exact seed (LCP plateau or
+        # exact k-mer recurrence), which diverged arrays never form.
+        self.approx_seed = int(os.environ.get("TIER2_APPROX_SEED") or "0")
+        self.approx_min_identity = float(os.environ.get("TIER2_APPROX_MIN_IDENTITY") or "0.78")
+        self.approx_max_period = int(os.environ.get("TIER2_APPROX_MAX_P") or "20")
+        self.approx_min_copies = int(os.environ.get("TIER2_APPROX_MIN_COPIES") or "2")
         self.allow_mismatches = allow_mismatches
         self.show_progress = show_progress
         self.period_step = 1  # Step size for period scanning (increase to speed up)
@@ -461,4 +469,121 @@ class Tier2LCPFinder:
             print(f"  [{chromosome}] Tier 2 simple scan: Phase B found {fallback_found} additional repeats "
                   f"in {time.time() - start_time:.2f}s total", flush=True)
 
+        # ===== Phase C: autocorrelation seeding for the diverged period 10-20 notch =====
+        # (opt-in via TIER2_APPROX_SEED). Phases A/B require an exact seed, so an
+        # array with a substitution in every copy yields zero seeds. Here we detect
+        # local periodicity directly (vectorized identity between offset-p windows),
+        # recovering diverged short/medium STRs that the exact paths cannot find.
+        if self.approx_seed:
+            ac_min_p = max(min_p, 10)
+            ac_max_p = min(self.approx_max_period, max_p)
+            if ac_max_p >= ac_min_p:
+                # Pass the original tier1 mask (not covered_mask): Phase B marks
+                # covered_mask for candidates it *speculatively* seeds even when
+                # they are then rejected, which would wrongly hide whole diverged
+                # arrays from Phase C. Phase C rebuilds exclusion from tier1 +
+                # the actually-accepted results.
+                approx_found = self._autocorr_seed(
+                    s_arr, n, ac_min_p, ac_max_p, tier1_mask,
+                    chromosome, results, covered,
+                )
+                if self.show_progress:
+                    print(f"  [{chromosome}] Tier 2 simple scan: Phase C (autocorr) "
+                          f"found {approx_found} repeats in {time.time() - start_time:.2f}s total",
+                          flush=True)
+
         return results
+
+    def _autocorr_seed(self, s_arr, n, min_p, max_p, protect_mask,
+                       chromosome, results, covered) -> int:
+        """Vectorized autocorrelation seeding for periods [min_p, max_p].
+
+        For each period p, identity[i] = fraction of matching bases between the
+        window s[i:i+W] and s[i+p:i+p+W] (W = 4*p), computed in O(n) via a cumsum
+        sliding window. Positions whose local identity clears
+        ``approx_min_identity`` (well above the 0.25 random-DNA expectation) and
+        that are not already covered seed ``extend_with_mismatches`` for real
+        boundaries; coverage marking keeps one call per array.
+
+        ``protect_mask`` marks positions claimed by earlier tiers; this method
+        rebuilds its own exclusion mask from it plus the already-accepted
+        ``covered`` repeats, so speculative (and rejected) Phase-B marks do not
+        hide diverged arrays.
+        """
+        found = 0
+        min_id = self.approx_min_identity
+        s = s_arr[:n]
+        # Exclusion mask = other-tier regions + accepted results only.
+        seen = protect_mask.copy()
+        for cs_, ce_ in covered:
+            if 0 <= cs_ < n:
+                seen[cs_:min(ce_, n)] = True
+        for period in range(min_p, max_p + 1):
+            window = 4 * period
+            if n <= period + window:
+                continue
+            eq = (s[:n - period] == s[period:n]).astype(np.int32)  # length n-period
+            cs = np.empty(eq.size + 1, dtype=np.int64)
+            cs[0] = 0
+            np.cumsum(eq, out=cs[1:])
+            m = eq.size - window  # number of valid window starts
+            if m <= 0:
+                continue
+            winsum = cs[window:window + m] - cs[:m]      # matches in [i, i+window)
+            ident = winsum.astype(np.float64) / window
+            cand = np.nonzero(ident >= min_id)[0]
+            if cand.size == 0:
+                continue
+            # Split candidates into contiguous runs and seed each run at its
+            # maximum-identity position — a clean fully-periodic window interior,
+            # not a boundary where the seed window straddles flank/array and the
+            # extender's consensus is corrupted. extend_with_mismatches then
+            # recovers the true boundaries in both directions.
+            runs = np.split(cand, np.nonzero(np.diff(cand) > 1)[0] + 1)
+            for run in runs:
+                seed = int(run[int(np.argmax(ident[run]))])
+                if seen[seed]:
+                    continue
+                res = extend_with_mismatches(
+                    s_arr, seed, period, n, self.allowed_mismatch_rate
+                )
+                if res is None:
+                    continue
+                arr_start, arr_end, copies, full_start, full_end = res
+                req = 2 if period >= 20 else self.short_req_copies
+                if copies < max(req, self.approx_min_copies):
+                    continue
+                cand_span = full_end - full_start
+                if cand_span <= 0:
+                    continue
+                cov = int(np.sum(seen[full_start:min(full_end, n)]))
+                if cov / cand_span > 0.5:
+                    continue
+                # Derive the motif from the clean interior seed copy, NOT from
+                # full_start: the extender may over-run a few bp into flanking
+                # non-repetitive DNA, which would corrupt a full_start-derived
+                # motif and make refine_repeat reject the whole array.
+                motif = _reduce_to_primitive(
+                    s_arr[seed:seed + period].tobytes()
+                )
+                # The extender can creep a few bp into non-repetitive flank; a
+                # dirty leading/trailing partial copy makes refine_repeat reject
+                # the whole array. Retry with the edges trimmed inward by one
+                # period so refine sees clean copy boundaries.
+                repeat = None
+                for ss, ee in ((full_start, full_end),
+                               (full_start + period, full_end),
+                               (full_start + period, full_end - period)):
+                    if ee - ss < 2 * period:
+                        continue
+                    repeat = self._refine_and_create_repeat(
+                        chromosome, ss, ee, motif, tier=2
+                    )
+                    if repeat:
+                        break
+                if repeat:
+                    results.append(repeat)
+                    covered.add((repeat.start, repeat.end))
+                    seen[repeat.start:min(repeat.end, n)] = True
+                    found += 1
+        return found
