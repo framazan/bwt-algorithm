@@ -99,6 +99,18 @@ means baseline. Set them on the command line, e.g.
 - **Tier 2** (`tier2.py`, period 10-20 simple scan): `TIER2_MIN_COPIES`,
   `TIER2_MIN_ARRAY_LEN`, `TIER2_SHORT_REQ_COPIES` (copies required for periods
   <20 bp), `TIER2_MISMATCH`.
+  - **Period-10-20 autocorrelation seeder** (`_autocorr_seed`, opt-in
+    `TIER2_APPROX_SEED`, default 0 = off → baseline unchanged): a Phase C in the
+    simple scan that detects local periodicity directly (vectorized identity
+    between offset-p windows) so *diverged* arrays — a substitution in every copy,
+    which the exact LCP/k-mer seeds never catch — still get seeded. Knobs:
+    `TIER2_APPROX_MIN_IDENTITY` (default 0.78), `TIER2_APPROX_MAX_P` (default 20),
+    `TIER2_APPROX_MIN_COPIES` (default 2), `TIER2_APPROX_MAX_SEEDS` (default
+    200000). On chr21 it recovers 1688 arrays in ~30 s. **Left OFF for adotto
+    (Exp1):** the recovered arrays sit in already-touched GT regions so region
+    recall is flat, and it over-calls low-complexity DNA so bp precision drops
+    (31→13.5%). May help centromere/satellite at identity ≥0.88 (untested).
+    Test: `tests/test_loop_p1020.py`.
 - **Satellite interior gap-fill** (`finder.py` `_fill_satellite_gaps`, the
   post-tier backstop for divergent alpha-satellite arrays): `SAT_FILL_MIN_IDENTITY`
   (default 0.45 — min gap autocorrelation identity to accept as satellite; ~2.5x
@@ -119,6 +131,18 @@ The dominant short-STR recall levers are `TIER1_MIN_ARRAY_LEN` + `TIER1_MIN_SCOR
 (copy-count knobs have little effect); lowering them raises recall but drops
 precision. See `docs/2026-06-20-exp1-human-sensitivity.md` for the measured
 recall/precision frontier and the chosen operating point.
+
+**Exp1 recall op-point (v2.1, 2026-06-23 maximization loop):** on top of the
+comboChi base, `TIER2_MISMATCH=0.30` + `TIER1_FMSCAN_MIN_DENSITY=0.45` +
+`TIER1_FMSCAN_MIN_LLR=6.0` lifts full-genome adotto region recall **57.62%→59.04%
+and bp recall 35.11%→39.42%**, holding region precision at **58.98%** (still above
+tantan's 57.66% floor — bwtandem stays the de-novo precision leader). The FM-scan
+relaxation is the genome-wide lever; `TIER2_MISMATCH=0.30` alone is ≈neutral
+genome-wide (helps bp recall). **82% region recall is unreachable at ≥57.66%
+precision** — the env-lever ceiling is ~65% proxy recall at the floor; gate
+lowering buys recall but collapses precision (ULTRA hits 82% only at 53.65%).
+Loop design/plan: `docs/superpowers/specs|plans/2026-06-23-exp1-recall-loop*.md`;
+harness + ledger under `exp1_human/loop/` (`resume.md` = state).
 
 ## Dependencies
 
