@@ -518,62 +518,65 @@ class Tier2LCPFinder:
         for cs_, ce_ in covered:
             if 0 <= cs_ < n:
                 seen[cs_:min(ce_, n)] = True
+        # Per-period cap on seed attempts (safety bound for pathological
+        # low-complexity input; real arrays are far fewer).
+        max_attempts = int(os.environ.get("TIER2_APPROX_MAX_SEEDS") or "200000")
         for period in range(min_p, max_p + 1):
             window = 4 * period
             if n <= period + window:
                 continue
-            eq = (s[:n - period] == s[period:n]).astype(np.int32)  # length n-period
+            # A real array's periodicity persists over many window starts; require
+            # the high-identity stretch to span at least one period of window
+            # starts. This filters the single-window noise that low-complexity DNA
+            # produces in bulk (the cause of the naive version's O(millions) seeds).
+            min_run = max(period, 8)
+            eq = (s[:n - period] == s[period:n])          # bool, length n-period
             cs = np.empty(eq.size + 1, dtype=np.int64)
             cs[0] = 0
             np.cumsum(eq, out=cs[1:])
             m = eq.size - window  # number of valid window starts
             if m <= 0:
                 continue
-            winsum = cs[window:window + m] - cs[:m]      # matches in [i, i+window)
-            ident = winsum.astype(np.float64) / window
-            cand = np.nonzero(ident >= min_id)[0]
-            if cand.size == 0:
+            winsum = cs[window:window + m] - cs[:m]       # matches in [i, i+window)
+            hit = winsum >= (min_id * window)             # bool mask over window starts
+            if not hit.any():
                 continue
-            # Split candidates into contiguous runs and seed each run at its
-            # maximum-identity position — a clean fully-periodic window interior,
-            # not a boundary where the seed window straddles flank/array and the
-            # extender's consensus is corrupted. extend_with_mismatches then
-            # recovers the true boundaries in both directions.
-            runs = np.split(cand, np.nonzero(np.diff(cand) > 1)[0] + 1)
-            for run in runs:
-                seed = int(run[int(np.argmax(ident[run]))])
-                if seen[seed]:
+            # Contiguous high-identity runs (vectorized, no per-index Python).
+            d = np.diff(hit.view(np.int8))
+            run_s = np.nonzero(d == 1)[0] + 1
+            run_e = np.nonzero(d == -1)[0] + 1            # exclusive end
+            if hit[0]:
+                run_s = np.concatenate(([0], run_s))
+            if hit[-1]:
+                run_e = np.concatenate((run_e, [hit.size]))
+            attempts = 0
+            for rs, re_ in zip(run_s.tolist(), run_e.tolist()):
+                if re_ - rs < min_run:
                     continue
-                res = extend_with_mismatches(
-                    s_arr, seed, period, n, self.allowed_mismatch_rate
-                )
-                if res is None:
+                if seen[rs]:
                     continue
-                arr_start, arr_end, copies, full_start, full_end = res
-                req = 2 if period >= 20 else self.short_req_copies
-                if copies < max(req, self.approx_min_copies):
-                    continue
-                cand_span = full_end - full_start
-                if cand_span <= 0:
-                    continue
-                cov = int(np.sum(seen[full_start:min(full_end, n)]))
-                if cov / cand_span > 0.5:
-                    continue
-                # Derive the motif from the clean interior seed copy, NOT from
-                # full_start: the extender may over-run a few bp into flanking
-                # non-repetitive DNA, which would corrupt a full_start-derived
-                # motif and make refine_repeat reject the whole array.
+                attempts += 1
+                if attempts > max_attempts:
+                    break
+                # Seed motif from the max-identity window start (clean interior).
+                seed = rs + int(np.argmax(winsum[rs:re_]))
+                # Array end comes directly from the run extent (the last window
+                # starting at re_-1 covers up to re_-1+window; +period margin), so
+                # no per-seed extender call is needed.
+                a_end = min(re_ + window + period, n)
                 motif = _reduce_to_primitive(
                     s_arr[seed:seed + period].tobytes()
                 )
-                # The extender can creep a few bp into non-repetitive flank; a
-                # dirty leading/trailing partial copy makes refine_repeat reject
-                # the whole array. Retry with the edges trimmed inward by one
-                # period so refine sees clean copy boundaries.
+                # Phase-align the refine start to the seed copy (the motif's
+                # source) by stepping whole periods back toward the run start: an
+                # unaligned start lands mid-copy and refine_repeat fails to lock
+                # onto the motif. Trim inward by one period on retry to shed any
+                # partial copy the run picked up at a flank.
+                ref_start = seed - ((seed - rs) // period) * period
                 repeat = None
-                for ss, ee in ((full_start, full_end),
-                               (full_start + period, full_end),
-                               (full_start + period, full_end - period)):
+                for ss, ee in ((ref_start, a_end),
+                               (ref_start + period, a_end),
+                               (ref_start, a_end - period)):
                     if ee - ss < 2 * period:
                         continue
                     repeat = self._refine_and_create_repeat(
