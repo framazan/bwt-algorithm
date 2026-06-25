@@ -237,6 +237,20 @@ class TandemRepeatFinder:
             if len(final_repeats) == prev_count:
                 break
 
+        # Catch-all periodicity scan (opt-in CATCHALL_SCAN, default off): a
+        # low-stringency autocorrelation sweep over short periods in the regions
+        # NO tier/satellite pass covered, to recover entirely-missed diverged STRs
+        # (the dominant region-recall gap). Trades precision for recall; the
+        # identity/length knobs set the operating point.
+        if int(os.environ.get("CATCHALL_SCAN") or "0"):
+            t0 = time.time()
+            prev_count = len(final_repeats)
+            final_repeats = self._catchall_periodicity_fill(final_repeats)
+            final_repeats = self._merge_adjacent_repeats(final_repeats)
+            if self.show_progress:
+                print(f"  [{self.chromosome}] Catch-all scan: {time.time() - t0:.2f}s, "
+                      f"{len(final_repeats)} repeats (+{len(final_repeats) - prev_count})", flush=True)
+
         final_repeats = [r for r in final_repeats if self._repeat_within_bounds(r)]  # Filter to only results within user-specified bounds
 
         return final_repeats  # Return the final list of repeats
@@ -533,6 +547,91 @@ class TandemRepeatFinder:
             return filled
 
         return repeats
+
+    def _catchall_periodicity_fill(self, repeats: List[TandemRepeat]) -> List[TandemRepeat]:
+        """Low-stringency autocorrelation sweep over short periods (default 1-20)
+        in regions NO tier/satellite pass covered.
+
+        The 3-tier pipeline only emits where it can form a seed; diverged short
+        STRs (a substitution in most copies) form none and are missed entirely —
+        the dominant region-recall gap vs ULTRA/tantan. This pass detects local
+        periodicity directly (vectorized identity between offset-p windows) and
+        emits a call wherever an uncovered region is periodic above
+        ``CATCHALL_MIN_IDENTITY``. It deliberately trades precision for recall;
+        the identity/length knobs set the operating point. Opt-in (CATCHALL_SCAN).
+        """
+        text_arr = self.bwt.text_arr
+        n = len(text_arr)
+        if n > 0 and text_arr[n - 1] == 36:  # exclude sentinel
+            n -= 1
+        if n < 8:
+            return repeats
+
+        min_p = max(1, int(os.environ.get("CATCHALL_MIN_P") or "1"))
+        max_p = int(os.environ.get("CATCHALL_MAX_P") or "20")
+        min_id = float(os.environ.get("CATCHALL_MIN_IDENTITY") or "0.72")
+        min_len = int(os.environ.get("CATCHALL_MIN_LEN") or "20")
+
+        covered = np.zeros(n, dtype=bool)
+        for r in repeats:
+            if r.start < n:
+                covered[r.start:min(r.end, n)] = True
+
+        s = text_arr[:n]
+        new_repeats: List[TandemRepeat] = []
+        # Longest period first so a genuine k-mer STR claims its region before a
+        # shorter sub-period grabs a fragment of it.
+        for period in range(min(max_p, n // 2), min_p - 1, -1):
+            window = max(2 * period, 12)
+            if n <= period + window:
+                continue
+            eq = (s[:n - period] == s[period:n])
+            cs = np.empty(eq.size + 1, dtype=np.int64)
+            cs[0] = 0
+            np.cumsum(eq, out=cs[1:])
+            m = eq.size - window
+            if m <= 0:
+                continue
+            winsum = cs[window:window + m] - cs[:m]
+            hit = (winsum >= (min_id * window)) & (~covered[:m])
+            if not hit.any():
+                continue
+            d = np.diff(hit.view(np.int8))
+            run_s = np.nonzero(d == 1)[0] + 1
+            run_e = np.nonzero(d == -1)[0] + 1
+            if hit[0]:
+                run_s = np.concatenate(([0], run_s))
+            if hit[-1]:
+                run_e = np.concatenate((run_e, [hit.size]))
+            for a, b in zip(run_s.tolist(), run_e.tolist()):
+                start = a
+                end = min(b + window, n)
+                if end - start < min_len:
+                    continue
+                seg = covered[start:end]
+                if seg.size and seg.mean() > 0.3:
+                    continue
+                # identity (for mismatch_rate); seed motif from the run start
+                local = winsum[a:b]
+                ident = float(local.max()) / window if local.size else min_id
+                motif_raw = text_arr[start:start + period].tobytes().decode('ascii', errors='replace')
+                if not motif_raw or any(c not in 'ACGT' for c in motif_raw):
+                    continue
+                canon, strand = MotifUtils.get_canonical_motif_stranded(motif_raw)
+                new_repeats.append(TandemRepeat(
+                    chrom=self.chromosome, start=start, end=end,
+                    motif=canon, copies=(end - start) / period,
+                    length=end - start, tier="catchall",
+                    consensus_motif=canon, mismatch_rate=max(0.0, 1.0 - ident),
+                    strand=strand,
+                ))
+                covered[start:end] = True
+
+        if not new_repeats:
+            return repeats
+        out = list(repeats) + new_repeats
+        out.sort(key=lambda x: x.start)
+        return out
 
     def cleanup(self):
         """Release resources."""
