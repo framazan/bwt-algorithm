@@ -151,8 +151,20 @@ recall / 52.72% precision** (≈ULTRA precision, +15pp recall over v2); **identi
 → 82.35% recall / 47.99% precision (beats ULTRA's 81.62% recall)**; identity 0.68 →
 84.42% / 42.61%. Knobs: `CATCHALL_MIN_IDENTITY` (default 0.72), `CATCHALL_MIN_P`/
 `CATCHALL_MAX_P` (1/20), `CATCHALL_MIN_LEN` (20), `CATCHALL_MAX_SEEDS` (200000). bp
-precision (~32%) is the cost (over-call in low-complexity); a post-call quality
-filter is the next precision lever. Default OFF (baseline unchanged).
+precision (~32%) is the cost (over-call in low-complexity). Default OFF (baseline
+unchanged).
+
+- **Precision-recovery gates** (the next precision lever, 2026-06-25): two intrinsic
+  filters inside the catch-all drop the unsupported over-calls without re-running —
+  `CATCHALL_MIN_COPIES` (default 2 = no-op, since `window=2*period` already forces
+  copies≥2; raising to 3 drops the shortest 2-copy arrays) and `CATCHALL_MIN_ENTROPY`
+  (default 0 = off; per-base Shannon entropy, drops homopolymer-ish low-complexity
+  calls). Both default to baseline. **Chosen op-point: `CATCHALL_MIN_COPIES=3`** — a
+  chr21+chr22 proxy sweep (`f_*` variants) measured it lifting pool precision
+  **50.00%→51.57% (+1.57pp)** while holding pool recall **84.05%→82.73%** (still ≥82%);
+  the entropy gate gave ~0 precision gain (the low-complexity calls it removes don't
+  move region precision) so it is left off. The copies≥3 op-point is the
+  precision-recovered 82%-recall regime (catchH base id0.72 + `CATCHALL_MIN_COPIES=3`).
 Loop design/plan: `docs/superpowers/specs|plans/2026-06-23-exp1-recall-loop*.md`;
 harness + ledger under `exp1_human/loop/` (`resume.md` = state).
 

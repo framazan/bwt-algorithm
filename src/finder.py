@@ -9,6 +9,23 @@ from .tier2 import Tier2LCPFinder  # Tier 2: Medium-length imperfect repeat find
 from .tier3 import Tier3LongReadFinder  # Tier 3: Long repeat sequence finder
 from .motif_utils import MotifUtils  # Motif canonicalization and statistics utilities
 
+
+def _seq_shannon_entropy(arr) -> float:
+    """Per-base Shannon entropy (bits, 0-2) of a uint8 ACGT slice.
+
+    Low entropy (homopolymer / near-homopolymer) flags the low-complexity DNA
+    that the catch-all over-calls but adotto/ULTRA/tantan do not corroborate.
+    """
+    if arr.size == 0:
+        return 0.0
+    counts = np.bincount(arr, minlength=1).astype(np.float64)
+    counts = counts[counts > 0]
+    if counts.size <= 1:
+        return 0.0
+    p = counts / counts.sum()
+    return float(-(p * np.log2(p)).sum())
+
+
 class TandemRepeatFinder:
     """Main coordinator for multi-tier tandem repeat finding."""
 
@@ -571,6 +588,11 @@ class TandemRepeatFinder:
         max_p = int(os.environ.get("CATCHALL_MAX_P") or "20")
         min_id = float(os.environ.get("CATCHALL_MIN_IDENTITY") or "0.72")
         min_len = int(os.environ.get("CATCHALL_MIN_LEN") or "20")
+        # Precision-recovery gates (drop the unsupported low-complexity calls that
+        # over-extend bp precision; defaults are permissive so the recall frontier
+        # is unchanged unless these are raised).
+        min_copies = float(os.environ.get("CATCHALL_MIN_COPIES") or "2")
+        min_entropy = float(os.environ.get("CATCHALL_MIN_ENTROPY") or "0")
 
         covered = np.zeros(n, dtype=bool)
         for r in repeats:
@@ -608,8 +630,12 @@ class TandemRepeatFinder:
                 end = min(b + window, n)
                 if end - start < min_len:
                     continue
+                if (end - start) / period < min_copies:
+                    continue
                 seg = covered[start:end]
                 if seg.size and seg.mean() > 0.3:
+                    continue
+                if min_entropy > 0.0 and _seq_shannon_entropy(text_arr[start:end]) < min_entropy:
                     continue
                 # identity (for mismatch_rate); seed motif from the run start
                 local = winsum[a:b]
