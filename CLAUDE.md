@@ -132,15 +132,27 @@ The dominant short-STR recall levers are `TIER1_MIN_ARRAY_LEN` + `TIER1_MIN_SCOR
 precision. See `docs/2026-06-20-exp1-human-sensitivity.md` for the measured
 recall/precision frontier and the chosen operating point.
 
-**Exp1 recall op-point (v2.1, 2026-06-23 maximization loop):** on top of the
-comboChi base, `TIER2_MISMATCH=0.30` + `TIER1_FMSCAN_MIN_DENSITY=0.45` +
-`TIER1_FMSCAN_MIN_LLR=6.0` lifts full-genome adotto region recall **57.62%→59.04%
-and bp recall 35.11%→39.42%**, holding region precision at **58.98%** (still above
-tantan's 57.66% floor — bwtandem stays the de-novo precision leader). The FM-scan
-relaxation is the genome-wide lever; `TIER2_MISMATCH=0.30` alone is ≈neutral
-genome-wide (helps bp recall). **82% region recall is unreachable at ≥57.66%
-precision** — the env-lever ceiling is ~65% proxy recall at the floor; gate
-lowering buys recall but collapses precision (ULTRA hits 82% only at 53.65%).
+**Exp1 recall op-point (v2.1, precision-leader):** on top of the comboChi base,
+`TIER2_MISMATCH=0.30` + `TIER1_FMSCAN_MIN_DENSITY=0.45` + `TIER1_FMSCAN_MIN_LLR=6.0`
+lifts full-genome adotto region recall **57.62%→59.04%, bp recall 35.11%→39.42%**,
+holding region precision at **58.98%** (above tantan's 57.66% floor — the de-novo
+precision leader). Within the ≥57.66% precision floor this is near the ceiling
+(env-lever knobs top out ~65% proxy recall; gate lowering collapses precision).
+
+**Exp1 catch-all recall regime (v2.2, 2026-06-25 — `CATCHALL_SCAN`):** to push recall
+to ULTRA's level the precision floor must be relaxed to ~ULTRA's 53.65%. The
+**catch-all periodicity pass** (`finder.py _catchall_periodicity_fill`) detects
+local periodicity directly in uncovered DNA — recovering entirely-missed diverged
+STRs the seed-based tiers can't — trading precision for recall via
+`CATCHALL_MIN_IDENTITY`. On the v2.2 gate base (v2.1 env + `TIER1_SHORT_PERIOD_MAX=9`
++ `TIER1_SHORT_MIN_ARRAY_LEN=17` + `TIER1_SHORT_MIN_SCORE=17` + `CATCHALL_SCAN=1`),
+measured full-genome adotto frontier: **identity 0.76 (+`CATCHALL_MAX_P=50`) → 72.88%
+recall / 52.72% precision** (≈ULTRA precision, +15pp recall over v2); **identity 0.72
+→ 82.35% recall / 47.99% precision (beats ULTRA's 81.62% recall)**; identity 0.68 →
+84.42% / 42.61%. Knobs: `CATCHALL_MIN_IDENTITY` (default 0.72), `CATCHALL_MIN_P`/
+`CATCHALL_MAX_P` (1/20), `CATCHALL_MIN_LEN` (20), `CATCHALL_MAX_SEEDS` (200000). bp
+precision (~32%) is the cost (over-call in low-complexity); a post-call quality
+filter is the next precision lever. Default OFF (baseline unchanged).
 Loop design/plan: `docs/superpowers/specs|plans/2026-06-23-exp1-recall-loop*.md`;
 harness + ledger under `exp1_human/loop/` (`resume.md` = state).
 
