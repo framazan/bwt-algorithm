@@ -10,6 +10,7 @@ from .motif_utils import MotifUtils
 from .bwt_core import BWTCore, _kasai_lcp_uint8
 from .accelerators import extend_with_mismatches, lcp_tandem_candidates, find_tandem_runs
 from .bwt_seed import bwt_kmer_seed_scan
+from .autocorr import windowed_match_counts, contiguous_true_runs  # shared periodicity primitives
 
 # Load Tier 2 C acceleration library
 try:
@@ -530,25 +531,14 @@ class Tier2LCPFinder:
             # starts. This filters the single-window noise that low-complexity DNA
             # produces in bulk (the cause of the naive version's O(millions) seeds).
             min_run = max(period, 8)
-            eq = (s[:n - period] == s[period:n])          # bool, length n-period
-            cs = np.empty(eq.size + 1, dtype=np.int64)
-            cs[0] = 0
-            np.cumsum(eq, out=cs[1:])
-            m = eq.size - window  # number of valid window starts
-            if m <= 0:
+            winsum = windowed_match_counts(s, period, window)  # matches in [i, i+window)
+            if winsum is None:
                 continue
-            winsum = cs[window:window + m] - cs[:m]       # matches in [i, i+window)
             hit = winsum >= (min_id * window)             # bool mask over window starts
             if not hit.any():
                 continue
             # Contiguous high-identity runs (vectorized, no per-index Python).
-            d = np.diff(hit.view(np.int8))
-            run_s = np.nonzero(d == 1)[0] + 1
-            run_e = np.nonzero(d == -1)[0] + 1            # exclusive end
-            if hit[0]:
-                run_s = np.concatenate(([0], run_s))
-            if hit[-1]:
-                run_e = np.concatenate((run_e, [hit.size]))
+            run_s, run_e = contiguous_true_runs(hit)      # exclusive ends
             attempts = 0
             for rs, re_ in zip(run_s.tolist(), run_e.tolist()):
                 if re_ - rs < min_run:

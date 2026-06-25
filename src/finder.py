@@ -8,6 +8,7 @@ from .tier1 import Tier1STRFinder  # Tier 1: Short perfect repeat finder
 from .tier2 import Tier2LCPFinder  # Tier 2: Medium-length imperfect repeat finder
 from .tier3 import Tier3LongReadFinder  # Tier 3: Long repeat sequence finder
 from .motif_utils import MotifUtils  # Motif canonicalization and statistics utilities
+from .autocorr import autocorr_identity, windowed_match_counts, contiguous_true_runs  # shared periodicity primitives
 
 
 def _seq_shannon_entropy(arr) -> float:
@@ -529,11 +530,7 @@ class TandemRepeatFinder:
                     continue
 
                 for p in range(self.sat_fill_min_period, min(self.sat_fill_max_period + 1, w_size // 2)):
-                    total = w_size - p
-                    if total <= 0:
-                        continue
-                    matches = int(np.sum(w_region[:total] == w_region[p:p + total]))
-                    identity = matches / total
+                    identity = autocorr_identity(w_region, p)
                     if identity > best_identity:
                         best_identity = identity
                         best_period = p
@@ -607,24 +604,14 @@ class TandemRepeatFinder:
             window = max(2 * period, 12)
             if n <= period + window:
                 continue
-            eq = (s[:n - period] == s[period:n])
-            cs = np.empty(eq.size + 1, dtype=np.int64)
-            cs[0] = 0
-            np.cumsum(eq, out=cs[1:])
-            m = eq.size - window
-            if m <= 0:
+            winsum = windowed_match_counts(s, period, window)
+            if winsum is None:
                 continue
-            winsum = cs[window:window + m] - cs[:m]
+            m = winsum.size
             hit = (winsum >= (min_id * window)) & (~covered[:m])
             if not hit.any():
                 continue
-            d = np.diff(hit.view(np.int8))
-            run_s = np.nonzero(d == 1)[0] + 1
-            run_e = np.nonzero(d == -1)[0] + 1
-            if hit[0]:
-                run_s = np.concatenate(([0], run_s))
-            if hit[-1]:
-                run_e = np.concatenate((run_e, [hit.size]))
+            run_s, run_e = contiguous_true_runs(hit)
             for a, b in zip(run_s.tolist(), run_e.tolist()):
                 start = a
                 end = min(b + window, n)
