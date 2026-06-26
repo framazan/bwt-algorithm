@@ -236,3 +236,33 @@ even lower memory is wanted later.
 # Score all tools vs full adotto (primary chr):
 bash /data/gpfs/assoc/pgl/devel/exp1_human/final_score.sh   # -> score_result.txt
 ```
+
+## Catch-all 3-species benchmark (2026-06-25 — v2.2 + precision filter)
+
+The **catch-all periodicity pass** (`finder._catchall_periodicity_fill`, opt-in
+`CATCHALL_SCAN`, commit `15d4273`) detects local periodicity directly in DNA no tier
+covered, recovering entirely-missed diverged short STRs. A **precision-recovery gate**
+(`CATCHALL_MIN_COPIES`/`CATCHALL_MIN_ENTROPY`, commit `d3dca3c`) trims its over-calls;
+the three duplicated autocorrelation routines were consolidated into `src/autocorr.py`
+(commit `748b3f6`, behavior-preserving — catch-all chr21 output byte-identical).
+
+Filip's cross-tool benchmark was re-run on all 3 species with catch-all ENABLED
+(`CATCHALL_SCAN=1 CATCHALL_MIN_IDENTITY=0.72 CATCHALL_MIN_COPIES=3`); full detail in
+`exp1_human/filip_repro/catchall_experiment_results.md` and `benchmarking_results_updated.md`.
+
+| species | metric | catch-all OFF | catch-all ON | verdict |
+|---|---|--:|--:|---|
+| **Human GRCh38** (adotto) | region recall / raw prec / **adj prec** | 57.62 % / 61.0 % / — (v2) | **80.69 % / 50.2 % / 79.1 %** (catchF) | **headline win** |
+| **Arabidopsis Col-CEN** | CEN180 monomer recall / bp prec | 99.67 % / 65.5 % | 99.68 % / 60.7 % | neutral→neg (saturated) |
+| **Maize Mo17** | 3A microsat bp | 11.58 M | **22.72 M (+96 %)** | win (microsat) |
+| **Maize Mo17** | 3B/3C satellite | 25/25, 17/17, 17/17 | 25/25, 17/17, 17/17 | unchanged |
+
+**Conclusion: the catch-all is a short-STR / microsatellite recovery mechanism
+(period ≤ 20 bp).** It is the headline win where STRs dominate (human region recall
+57.6 → 80.7 % at adjusted precision 79.1 %; maize microsatellite bp +96 %) and
+neutral-to-negative where satellites dominate (Col-CEN CEN180 already saturated;
+maize 3B/3C unchanged) — those use periods 156–360 bp, outside its range. So:
+**catch-all ON for STR/microsatellite-focused runs, OFF for satellite/centromere runs.**
+The full-genome runs used 64 GB (MaxRSS human 37.6 GB / maize 23.7 GB); the original
+190 GB request stalled ~12 days in the full PGL partition (SLURM allocates by request,
+not usage) — 64 GB scheduled instantly.
