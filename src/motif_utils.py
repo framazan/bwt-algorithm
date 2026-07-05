@@ -67,6 +67,17 @@ class MotifUtils:
         return result
 
     @staticmethod
+    def _min_rotation_int(val: int, length: int) -> int:
+        """Return the smallest (as integer) of all rotations of a 2-bit encoded motif."""
+        best = val
+        current = val
+        for _ in range(length - 1):
+            current = MotifUtils._rotate_int(current, length)
+            if current < best:
+                best = current
+        return best
+
+    @staticmethod
     def get_canonical_motif(motif: str) -> str:
         """Get lexicographically smallest rotation of motif.
 
@@ -79,12 +90,7 @@ class MotifUtils:
         # Use integer encoding for short motifs (up to 32bp fits in 64-bit int)
         if n <= 32 and all(c in 'ACGT' for c in motif):
             val = MotifUtils._motif_to_int(motif)
-            best = val
-            current = val
-            for _ in range(n - 1):
-                current = MotifUtils._rotate_int(current, n)
-                if current < best:
-                    best = current
+            best = MotifUtils._min_rotation_int(val, n)
             return MotifUtils._int_to_motif(best, n)
 
         # Fallback for long or non-standard motifs
@@ -115,22 +121,9 @@ class MotifUtils:
         if n <= 32 and all(c in 'ACGT' for c in motif):
             val = MotifUtils._motif_to_int(motif)
 
-            # Find min rotation of forward strand
-            fwd_best = val
-            current = val
-            for _ in range(n - 1):
-                current = MotifUtils._rotate_int(current, n)
-                if current < fwd_best:
-                    fwd_best = current
-
-            # Find min rotation of reverse complement
-            rc_val = MotifUtils._revcomp_int(val, n)
-            rc_best = rc_val
-            current = rc_val
-            for _ in range(n - 1):
-                current = MotifUtils._rotate_int(current, n)
-                if current < rc_best:
-                    rc_best = current
+            # Min rotation of the forward strand and of the reverse complement
+            fwd_best = MotifUtils._min_rotation_int(val, n)
+            rc_best = MotifUtils._min_rotation_int(MotifUtils._revcomp_int(val, n), n)
 
             if fwd_best <= rc_best:
                 return MotifUtils._int_to_motif(fwd_best, n), '+'
@@ -167,7 +160,6 @@ class MotifUtils:
         if not seq:
             return 0.0
 
-        from collections import Counter
         counts = Counter(seq)
         n = len(seq)
         entropy = 0.0
@@ -556,15 +548,9 @@ class MotifUtils:
         if c_result is not None:
             return c_result
 
-        motif_len = len(motif_template)
-        if motif_len == 0:
-            return None
-
         tolerance = max(1, int(math.floor(motif_len * mismatch_fraction)))
-        if max_indel is None:
-            max_indel = max(1, min(10, motif_len // 2 if motif_len >= 4 else 1))
-        else:
-            max_indel = max(0, max_indel)
+        # Python fallback reuses the indel bound already resolved for the C path.
+        max_indel = computed_indel
 
         position_counts: List[Counter] = [Counter() for _ in range(motif_len)]
         copy_sequences: List[str] = []
@@ -919,7 +905,6 @@ class MotifUtils:
                 continue
 
             # Majority vote
-            from collections import Counter
             counts = Counter(bases)
             most_common = counts.most_common(1)[0][0]
             consensus.append(most_common)
@@ -1025,7 +1010,6 @@ class MotifUtils:
         if not sequence:
             return {'A': 0.0, 'C': 0.0, 'G': 0.0, 'T': 0.0}
 
-        from collections import Counter
         counts = Counter(sequence.upper())
         total = len(sequence)
 

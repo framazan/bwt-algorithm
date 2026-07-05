@@ -1,4 +1,3 @@
-import math
 import ctypes
 import os
 
@@ -8,7 +7,7 @@ import time
 from .models import TandemRepeat
 from .motif_utils import MotifUtils
 from .bwt_core import BWTCore, _kasai_lcp_uint8
-from .accelerators import extend_with_mismatches, lcp_tandem_candidates, find_tandem_runs
+from .accelerators import extend_with_mismatches, lcp_tandem_candidates
 from .bwt_seed import bwt_kmer_seed_scan
 from .autocorr import windowed_match_counts, contiguous_true_runs  # shared periodicity primitives
 
@@ -69,7 +68,6 @@ class Tier2LCPFinder:
         # Defaults reproduce the original hardcoded behaviour exactly.
         self.min_copies = int(os.environ.get("TIER2_MIN_COPIES", "3"))  # Require at least 3 copies
         self.min_array_length = int(os.environ.get("TIER2_MIN_ARRAY_LEN", "6"))
-        self.min_entropy = 1.0  # Minimum Shannon entropy
         # required copies for short (<20bp) periods in the simple scan
         self.short_req_copies = int(os.environ.get("TIER2_SHORT_REQ_COPIES", "3"))
         # Approximate (autocorrelation) seeding for the diverged period-10-20
@@ -82,7 +80,6 @@ class Tier2LCPFinder:
         self.approx_min_copies = int(os.environ.get("TIER2_APPROX_MIN_COPIES") or "2")
         self.allow_mismatches = allow_mismatches
         self.show_progress = show_progress
-        self.period_step = 1  # Step size for period scanning (increase to speed up)
         _mm = os.environ.get("TIER2_MISMATCH")
         self.allowed_mismatch_rate = max(0.0, float(_mm) if _mm else allowed_mismatch_rate)
         self.allowed_indel_rate = max(0.0, allowed_indel_rate)
@@ -101,7 +98,6 @@ class Tier2LCPFinder:
         )
         self.sequence_str = self.bwt.text_arr.tobytes().decode('ascii', errors='replace')
         self._lcp_cache = None  # Lazily computed LCP array
-        self._bwt_call_count = 0  # Track BWT usage for diagnostics
 
     def _get_lcp_array(self) -> np.ndarray:
         """Get (or compute and cache) the LCP array."""
@@ -129,6 +125,21 @@ class Tier2LCPFinder:
             return None
 
         return MotifUtils.refined_to_repeat(chromosome, refined, tier, self.bwt.text_arr, strand=strand)
+
+    @staticmethod
+    def _record_repeat(repeat: TandemRepeat, out: List[TandemRepeat],
+                       covered: Set[Tuple[int, int]], covered_mask: np.ndarray,
+                       n: int) -> None:
+        """Append an accepted repeat and mark its span in the coverage structures.
+
+        Centralizes the "append to the result list + record (start, end) in
+        ``covered`` + set the coverage mask over [start, end)" invariant shared by
+        every detection phase (Phase A/B of both scans and the autocorr seeder),
+        so the three side effects always stay in lockstep.
+        """
+        out.append(repeat)
+        covered.add((repeat.start, repeat.end))
+        covered_mask[repeat.start:min(repeat.end, n)] = True
 
     def find_long_unit_repeats_strict(self, chromosome: str, min_unit_len: int = 20,
                                       max_unit_len: int = 120, max_mismatch: int = 2,
@@ -224,9 +235,7 @@ class Tier2LCPFinder:
                     tier=2, min_copies=max(2, min_copies)
                 )
                 if repeat:
-                    repeats.append(repeat)
-                    covered.add((repeat.start, repeat.end))
-                    covered_mask[repeat.start:min(repeat.end, n)] = True
+                    self._record_repeat(repeat, repeats, covered, covered_mask, n)
                     bwt_found += 1
 
         if self.show_progress:
@@ -260,33 +269,13 @@ class Tier2LCPFinder:
                 tier=2, min_copies=max(2, min_copies)
             )
             if repeat:
-                repeats.append(repeat)
-                covered.add((repeat.start, repeat.end))
-                covered_mask[repeat.start:min(repeat.end, n)] = True
+                self._record_repeat(repeat, repeats, covered, covered_mask, n)
                 fallback_found += 1
 
         if self.show_progress:
             print(f"  [{chromosome}] Tier 2 long-unit: Phase B found {fallback_found} additional repeats", flush=True)
 
         return repeats
-
-    def _get_max_mismatches_for_array(self, motif_len: int, n_copies: int) -> int:
-        """Calculate maximum allowed mismatches for full array.
-
-        Args:
-            motif_len: Length of the motif/period
-            n_copies: Number of tandem copies
-
-        Returns:
-            Maximum allowed mismatches across entire repeat array
-        """
-        total_length = motif_len * n_copies
-
-        if motif_len == 1:
-            return 0
-
-        allowed_rate = max(0.01, min(0.5, self.allowed_mismatch_rate))
-        return max(1, int(np.ceil(allowed_rate * total_length)))
     
     def find_long_repeats(self, chromosome: str, tier1_seen: Optional[Set[Tuple[int, int]]] = None,
                          max_scan_period: Optional[int] = None) -> List[TandemRepeat]:
@@ -347,7 +336,6 @@ class Tier2LCPFinder:
 
         min_p = min(self.min_period, max_p)
         results: List[TandemRepeat] = []
-        seen: Set[Tuple[int, int, str]] = set()
         covered: Set[Tuple[int, int]] = set()
 
         # Build tier1 mask
@@ -417,9 +405,7 @@ class Tier2LCPFinder:
                     chromosome, full_start, full_end, motif, tier=2
                 )
                 if repeat:
-                    results.append(repeat)
-                    covered.add((repeat.start, repeat.end))
-                    covered_mask[repeat.start:min(repeat.end, n)] = True
+                    self._record_repeat(repeat, results, covered, covered_mask, n)
                     bwt_found += 1
 
         if self.show_progress:
@@ -461,9 +447,7 @@ class Tier2LCPFinder:
                 chromosome, cand.start, cand.end, motif, tier=2
             )
             if repeat:
-                results.append(repeat)
-                covered.add((repeat.start, repeat.end))
-                covered_mask[repeat.start:min(repeat.end, n)] = True
+                self._record_repeat(repeat, results, covered, covered_mask, n)
                 fallback_found += 1
 
         if self.show_progress:
@@ -575,8 +559,6 @@ class Tier2LCPFinder:
                     if repeat:
                         break
                 if repeat:
-                    results.append(repeat)
-                    covered.add((repeat.start, repeat.end))
-                    seen[repeat.start:min(repeat.end, n)] = True
+                    self._record_repeat(repeat, results, covered, seen, n)
                     found += 1
         return found

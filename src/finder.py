@@ -1,7 +1,7 @@
 import os    # Standard library for environment-variable overrides
 import time  # Standard library for measuring execution time
 import numpy as np  # NumPy for numerical operations and array processing
-from typing import List, Tuple, Set, Optional, Dict  # typing module for type hints
+from typing import List, Tuple, Set, Optional  # typing module for type hints
 from .bwt_core import BWTCore  # BWT/FM-index core data structure
 from .models import TandemRepeat  # Tandem repeat data class
 from .tier1 import Tier1STRFinder  # Tier 1: Short perfect repeat finder
@@ -50,8 +50,7 @@ class TandemRepeatFinder:
         self.min_array_bp = max(0, min_array_bp) if min_array_bp else None
         self.max_array_bp = max(0, max_array_bp) if max_array_bp else None
         if self.min_array_bp and self.max_array_bp and self.min_array_bp > self.max_array_bp:
-            # Swap to keep bounds consistent
-            # If lower bound exceeds upper bound, swap them for consistency
+            # If lower bound exceeds upper bound, swap them to keep bounds consistent
             self.min_array_bp, self.max_array_bp = self.max_array_bp, self.min_array_bp
 
         # Initialize BWT Core
@@ -288,22 +287,18 @@ class TandemRepeatFinder:
 
             # Check overlap
             if current.start < prev.end:
-                # Two repeats overlap; calculate overlap amount
-                # Calculate overlap amount
+                # Two repeats overlap; calculate the overlap amount
                 overlap = min(prev.end, current.end) - max(prev.start, current.start)  # Actual overlapping bp count
                 overlap_ratio = overlap / min(prev.length, current.length)  # Overlap ratio relative to the shorter one
 
                 if overlap_ratio > 0.5:  # Significant overlap
-                    # If overlap exceeds 50%, select the one with the higher score
-                    # Keep the better one
-                    # Criteria: Length * (1 - mismatch_rate)
+                    # Keep the higher-scoring repeat. Score = length * (1 - mismatch_rate)
                     prev_score = prev.length * (1.0 - prev.mismatch_rate)   # Calculate score for previous repeat
                     curr_score = current.length * (1.0 - current.mismatch_rate)  # Calculate score for current repeat
 
                     if curr_score > prev_score:
                         filtered[-1] = current  # If current is better, replace previous with current
                 else:
-                    # Small overlap, keep both (maybe compound?)
                     # Small overlap; keep both repeats (may be a compound repeat)
                     filtered.append(current)
             else:
@@ -332,8 +327,8 @@ class TandemRepeatFinder:
             motif1 = prev.consensus_motif or prev.motif    # Consensus motif or original motif of the previous item
             motif2 = current.consensus_motif or current.motif  # Consensus motif or original motif of the current item
 
-            canon1, strand1 = MotifUtils.get_canonical_motif_stranded(motif1)  # Canonical form and strand direction of previous motif
-            canon2, strand2 = MotifUtils.get_canonical_motif_stranded(motif2)  # Canonical form and strand direction of current motif
+            canon1, _ = MotifUtils.get_canonical_motif_stranded(motif1)  # Canonical form of previous motif (strand unused here)
+            canon2, _ = MotifUtils.get_canonical_motif_stranded(motif2)  # Canonical form of current motif (strand unused here)
 
             # Allow merge if canonical motifs match and gap is small
             # For long-period repeats (satellite DNA), allow larger gaps
@@ -414,8 +409,7 @@ class TandemRepeatFinder:
         if motif_len == 0:
             return  # Cannot compute statistics with zero-length motif; return immediately
 
-        # Re-derive consensus and mismatch rate from the full merged region
-        # Recompute consensus and mismatch rate from the entire merged region
+        # Re-derive consensus and mismatch rate from the entire merged region
         consensus_arr, mm_rate, max_mm = MotifUtils.build_consensus_motif_array(
             text_arr, repeat.start, motif_len, int(repeat.copies)
         )
@@ -428,7 +422,6 @@ class TandemRepeatFinder:
             repeat.mismatch_rate = mm_rate  # Update mismatch rate
             repeat.max_mismatches_per_copy = max_mm  # Update maximum mismatches per copy
 
-            # Recalculate TRF stats
             # Recalculate TRF-compatible statistics
             (percent_matches, percent_indels, score, composition,
              entropy, actual_sequence) = MotifUtils.calculate_trf_statistics(
@@ -442,7 +435,6 @@ class TandemRepeatFinder:
             repeat.entropy = entropy                  # Update Shannon entropy
             repeat.actual_sequence = actual_sequence  # Update actual sequence string
 
-            # Update variations
             # Update per-copy variation summary
             variations = MotifUtils.summarize_variations_array(
                 text_arr, repeat.start, repeat.end, motif_len, consensus_arr
@@ -457,7 +449,6 @@ class TandemRepeatFinder:
         high inter-copy divergence.
         """
         text_arr = self.bwt.text_arr
-        text_str = self.sequence
         n = len(text_arr)
 
         if n < 1000:

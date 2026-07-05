@@ -167,7 +167,6 @@ class Tier1STRFinder:
         #            diverged STRs the exact-seed scanner missed. Running on the
         #            residual keeps the candidate count (and the downstream merge
         #            cost) low and avoids double-reporting the same array.
-        fmscan_repeats: List[TandemRepeat] = []
         if self.fmscan_mode == 2:
             fmscan_repeats = self._fmscan_strs(chromosome, sequence_str, n)
             if self.show_progress:
@@ -190,7 +189,6 @@ class Tier1STRFinder:
             # Dynamic min copies: shorter motifs need more copies
             dynamic_min_copies = max(self.min_copies, self.copy_base // motif_len + self.copy_add)
             required_threshold = max(eff_min_array_length, motif_len * dynamic_min_copies)
-            min_run = required_threshold // motif_len  # minimum consecutive matching positions
 
             seed_min_copies = 2
             max_candidates = min(n // motif_len + 1, 1_000_000)
@@ -265,7 +263,7 @@ class Tier1STRFinder:
                         self.allowed_mismatch_rate
                     )
                     if ext_res is not None:
-                        arr_s, arr_e, ec, full_s, full_e = ext_res
+                        _arr_s, _arr_e, ec, full_s, full_e = ext_res
                         if full_e - full_s > seed_length:
                             ext_start = full_s
                             ext_end = full_e
@@ -276,12 +274,12 @@ class Tier1STRFinder:
                 if ext_length < required_threshold or ext_copies < dynamic_min_copies:
                     continue
 
-                entropy = MotifUtils.calculate_entropy(motif)
-
                 # Optional low-complexity quality gate (opt-in; default off so
                 # baseline behaviour is preserved). Suppresses spurious calls on
                 # low-entropy motifs when aggressive length/score thresholds are used.
-                if self.entropy_gate and entropy < self.min_entropy:
+                # Entropy is only consulted when the gate is on, so compute it lazily
+                # (short-circuit keeps the default off-path free of the entropy calc).
+                if self.entropy_gate and MotifUtils.calculate_entropy(motif) < self.min_entropy:
                     continue
 
                 refined = MotifUtils.refine_repeat(
