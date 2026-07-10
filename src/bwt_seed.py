@@ -14,8 +14,7 @@ from typing import List, Optional, Set, Tuple  # Generic types for type hints
 
 import numpy as np  # NumPy for array operations and numerical computation
 
-from .accelerators import extend_with_mismatches, find_periodic_runs, find_tandem_runs
-# Cython/Python accelerated functions: mismatch-tolerant extension, periodic run detection, tandem run detection
+from .accelerators import extend_with_mismatches, find_periodic_runs
 from .bwt_core import BWTCore  # FM-index core module (BWT, backward_search, locate_positions, etc.)
 
 

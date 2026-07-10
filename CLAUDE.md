@@ -22,7 +22,9 @@ python3 -m src.main input.fa -t 4 --mask soft -v  # 4 threads, skip soft-masked 
 
 ## Building Cython Extensions
 
-The Cython extension `_accelerators.pyx` provides critical performance functions. Without it, pure-Python fallbacks in `accelerators.py` are used (some return empty results, effectively disabling those code paths).
+The Cython extension `_accelerators.pyx` provides the performance-critical hot paths. Without it, the pure-Python fallbacks in `accelerators.py` take over: they are **faithful** — the same repeats are detected, just far more slowly — and `tests/test_accel_parity.py` pins the two paths to byte-identical BED/TRF output. Build the extension for any real run. Set `BWT_DISABLE_NATIVE=1` to force the pure-Python path (used by the parity test; also handy for isolating a suspected accelerator bug).
+
+The one exception is `TIER1_EXT_ROLLING=1`, an experimental rolling-consensus extender that exists only in the `.pyx`; requesting it without the compiled extension raises rather than silently running the default algorithm.
 
 ```bash
 # Compile Cython extensions (requires numpy, Cython)
@@ -52,9 +54,13 @@ python3 -m pytest tests/test_ground_truth.py::TestTier1GroundTruth::test_sensiti
 
 - `tests/test_ground_truth.py` runs the full `TandemRepeatFinder` on synthetic
   sequences in `tests/fixtures/` and asserts per-tier sensitivity/precision
-  floors. Tier 2/3 cases are marked `NEEDS_CYTHON` and **skip silently when the
-  compiled `_accelerators.so` is absent** — so a green run without the `.so`
-  does *not* exercise Tier 2/3; build the extension first to test those paths.
+  floors. All tiers run in both builds (the Tier-2/3 `NEEDS_CYTHON` skips are
+  gone, since the fallbacks are no longer degenerate).
+- `tests/test_accel_parity.py` is the guard for that: it runs the pipeline once
+  per accelerator path and requires byte-identical output. It skips its
+  comparisons when the `.so` is absent (nothing to compare against), so run it
+  **with** the extension built. Baseline: 57 passed with the `.so`, 46 passed +
+  11 parity-skips without it.
 - The dev environment with numpy + pydivsufsort + the compiled `.so` (and where
   the benchmark harness runs) is the conda env
   `/data/gpfs/assoc/pgl/bin/conda/conda_envs/bwtandem/bin/python`. `pytest` may
@@ -201,7 +207,7 @@ The coordinator builds a `BWTCore` FM-index once per chromosome, then runs enabl
 
 - **`motif_utils.py` — `MotifUtils`**: Canonical motif rotation (strand-aware), primitive period detection (exact and approximate), DP alignment of repeat copies (`align_repeat_region` with banded Smith-Waterman), consensus building, TRF-compatible statistics, and the `refine_repeat()` entry point used by all tiers.
 
-- **`accelerators.py` / `_accelerators.pyx`**: Cython-accelerated hot paths (hamming distance, mismatch extension, unit repeat scanning, LCP candidate detection, periodic run finding, DP alignment). The Python module transparently falls back to pure-Python stubs (some no-ops) when the `.so` is absent.
+- **`accelerators.py` / `_accelerators.pyx`**: Cython-accelerated hot paths. Five symbols are consumed by the tiers — `extend_with_mismatches`, `find_periodic_runs`, `lcp_tandem_candidates`, `align_unit_to_window`, `anchor_scan_boundaries` — each aliased to the extension when present and to a faithful pure-Python implementation otherwise. A fallback that cannot reproduce the C result must raise, never return a degenerate value.
 
 - **`models.py`**: Data classes — `TandemRepeat` (output record with BED/VCF/TRF/STRfinder formatters), `AlignmentResult`, `RepeatAlignmentSummary`, `RefinedRepeat`.
 

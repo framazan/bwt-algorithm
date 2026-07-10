@@ -1,0 +1,115 @@
+"""The compiled and pure-Python accelerator paths must agree, byte for byte.
+
+`src/accelerators.py` binds `extend_with_mismatches`, `find_periodic_runs` and
+friends to the Cython extension when it is importable and to Python fallbacks
+otherwise. Those fallbacks used to be degenerate stubs — `return None` and
+`return []` — so a build without the extension detected zero Tier-2 and zero
+Tier-3 repeats and exited 0. Nothing caught it: the Tier-2/3 ground-truth cases
+were skipped precisely when the extension was missing.
+
+These tests run the whole pipeline twice over the fixtures, once per path, and
+require the emitted BED and TRF output to be identical. Each run needs its own
+process because `accelerators` binds its symbols at import time.
+"""
+import os
+import subprocess
+import sys
+
+import pytest
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FIXTURES = os.path.join(REPO_ROOT, "tests", "fixtures")
+FIXTURE_NAMES = ["tier1", "tier2", "tier3", "mixed", "adjacent"]
+
+try:
+    from src import _accelerators as _native  # noqa: F401
+    NATIVE_BUILT = True
+except Exception:
+    NATIVE_BUILT = False
+
+needs_native = pytest.mark.skipif(
+    not NATIVE_BUILT,
+    reason="compiled src/_accelerators is absent, so there is only one path to compare; "
+           "build it (see CLAUDE.md) to run the parity check",
+)
+
+
+def run_pipeline(fasta: str, out_prefix: str, fmt: str, disable_native: bool) -> str:
+    """Run src.main in a subprocess and return the contents of its output file."""
+    env = dict(os.environ)
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    if disable_native:
+        env["BWT_DISABLE_NATIVE"] = "1"
+    else:
+        env.pop("BWT_DISABLE_NATIVE", None)
+
+    proc = subprocess.run(
+        [sys.executable, "-m", "src.main", fasta, "--format", fmt, "-o", out_prefix],
+        cwd=REPO_ROOT, env=env, capture_output=True, text=True, timeout=900,
+    )
+    assert proc.returncode == 0, f"src.main failed: {proc.stderr}"
+
+    ext = {"bed": ".bed", "trf": ".dat"}[fmt]
+    with open(out_prefix + ext) as fh:
+        return fh.read()
+
+
+@needs_native
+@pytest.mark.parametrize("fixture", FIXTURE_NAMES)
+@pytest.mark.parametrize("fmt", ["bed", "trf"])
+def test_native_and_fallback_agree(tmp_path, fixture, fmt):
+    """The two accelerator paths detect exactly the same repeats."""
+    fasta = os.path.join(FIXTURES, f"synth_{fixture}.fa")
+
+    native = run_pipeline(fasta, str(tmp_path / "native"), fmt, disable_native=False)
+    fallback = run_pipeline(fasta, str(tmp_path / "fallback"), fmt, disable_native=True)
+
+    assert native == fallback, (
+        f"synth_{fixture} .{fmt}: compiled and pure-Python paths disagree "
+        f"({len(native.splitlines())} vs {len(fallback.splitlines())} records)"
+    )
+
+
+def test_fallback_is_not_empty(tmp_path):
+    """Guard the original defect: the fallback must not silently find nothing.
+
+    A parity test alone would still pass if BOTH paths regressed to empty, and
+    this one is meaningful even where the extension was never built.
+    """
+    fasta = os.path.join(FIXTURES, "synth_mixed.fa")
+    fallback = run_pipeline(fasta, str(tmp_path / "fallback"), "bed", disable_native=True)
+    assert len(fallback.splitlines()) >= 5, "pure-Python path detected almost nothing"
+
+
+def test_rolling_extender_refuses_to_run_without_the_extension():
+    """TIER1_EXT_ROLLING=1 exists only in the .pyx; the fallback must not pretend."""
+    env = dict(os.environ)
+    env["BWT_DISABLE_NATIVE"] = "1"
+    env["TIER1_EXT_ROLLING"] = "1"
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+
+    proc = subprocess.run(
+        [sys.executable, "-c",
+         "import numpy as np;"
+         "from src.accelerators import extend_with_mismatches as e;"
+         "e(np.zeros(10, dtype=np.uint8), 0, 2, 10, 0.1)"],
+        cwd=REPO_ROOT, env=env, capture_output=True, text=True, timeout=120,
+    )
+    assert proc.returncode != 0
+    assert "TIER1_EXT_ROLLING" in proc.stderr
+
+
+def test_all_public_accelerators_are_bound_in_both_modes():
+    """Every symbol the tiers import must exist on both paths."""
+    consumed = ["extend_with_mismatches", "find_periodic_runs", "lcp_tandem_candidates",
+                "align_unit_to_window", "anchor_scan_boundaries"]
+    for disable in ("0", "1"):
+        env = dict(os.environ)
+        env["BWT_DISABLE_NATIVE"] = disable
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        proc = subprocess.run(
+            [sys.executable, "-c",
+             f"import src.accelerators as a; [getattr(a, n) for n in {consumed!r}]"],
+            cwd=REPO_ROOT, env=env, capture_output=True, text=True, timeout=120,
+        )
+        assert proc.returncode == 0, f"BWT_DISABLE_NATIVE={disable}: {proc.stderr}"
