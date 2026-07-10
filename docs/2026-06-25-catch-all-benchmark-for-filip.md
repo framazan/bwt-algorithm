@@ -3,16 +3,16 @@
 **For: Filip.**  Branch: `perf/exp1-human-sensitivity` (origin = github.com/wyim-pgl/bwt-algorithm).
 Date: 2026-06-25. Author: Won (with Claude Code).
 
-> **Numbers below predate `706fb76` (2026-07-09) and will shift slightly.** Every
-> figure on this page was measured with a build of `libalign_accel` that read
-> uninitialised heap memory in its alignment traceback, so the caller was not
-> reproducible: two runs of the same commit gave different calls. That is fixed;
-> the run-to-run variation is gone. Re-measured on chr22 against the adotto GT,
-> the fix moves region recall **84.50 % → 84.38 %** and region precision
-> **52.34 % → 52.74 %** (53 fewer calls, mostly ones the garbage traceback
-> invented). The genome-scale figures on this page have **not** been re-run. The
-> operating points, run commands and the shape of every conclusion are unchanged.
-> See `docs/2026-07-09-nondeterminism-uninitialised-ptr-table.md`.
+> **The original tables predate `706fb76` (2026-07-09); a full re-measurement is
+> below each.** Every original figure was measured with a build of `libalign_accel`
+> that read uninitialised heap in its alignment traceback, so the caller was not
+> reproducible — two runs of the same commit gave different calls. That is fixed
+> (see `docs/2026-07-09-nondeterminism-uninitialised-ptr-table.md`), and all three
+> species were re-run on the fixed, reproducible build `d52a4ff` (2026-07-10).
+> **Every conclusion holds.** The fix trades ~0.1 pp of region recall for ~0.4 pp
+> of region precision on human, the maize catch-all still ~doubles microsatellite
+> yield, and all satellite/centromere numbers are unchanged. The re-measured rows
+> are marked **(d52a4ff)**; the original rows are kept for provenance.
 
 ---
 
@@ -21,11 +21,13 @@ Date: 2026-06-25. Author: Won (with Claude Code).
 A new **catch-all periodicity pass** lets BWTandem find the diverged short STRs the
 3-tier pipeline structurally cannot seed, closing the recall gap to ULTRA/tantan:
 
-- **Human GRCh38 (adotto):** region recall **57.6 % → 80.7 %** at **79.1 % adjusted
+- **Human GRCh38 (adotto):** region recall **57.6 % → 80.5 %** at **79.5 % adjusted
   precision** (de-novo recall now on par with ULTRA, 81.6 %).
-- **Maize Mo17:** 3A microsatellite yield **+96 %** (11.6 M → 22.7 M bp); satellite
+- **Maize Mo17:** 3A microsatellite yield **+100 %** (11.1 M → 22.3 M bp); satellite
   families (knob180/TR-1/CentC) **unchanged at max**.
-- **Arabidopsis Col-CEN:** **no change** (CEN180 already at 99.7 %) — expected.
+- **Arabidopsis Col-CEN:** **no change** (CEN180 at 99.68 %) — expected.
+
+_(Figures are the reproducible re-measurement on `d52a4ff`; see the note below.)_
 
 **One rule:** the catch-all is a *short-STR / microsatellite* mechanism (period ≤ 20 bp).
 Turn it **ON for STR / microsatellite runs, OFF for satellite / centromere runs.**
@@ -145,6 +147,20 @@ Ready-to-submit SLURM scripts live in the benchmark workspace:
 | tantan | 3,319,523 | 78.00 | 57.66 | 23.54 | 70.22 | 3,374 | 0.27 |
 | trf | 962,837 | 31.88 | **94.86** | 30.26 | 52.40 | 121,514 | 1.45 |
 
+**Re-measured on the fixed build (`d52a4ff`, 2026-07-10):**
+
+| Tool | Regions | Region Recall % | Region Prec % | Adj Prec % | BP Recall % | BP Prec % | Runtime | Mem GB |
+|:--|--:|--:|--:|--:|--:|--:|--:|--:|
+| **bwtandem catchF (d52a4ff)** | 4,009,261 | 80.54 | 50.52 | **79.5** | 43.42 | 31.51 | 6 h 55 m | 36.3 |
+| bwtandem catchH (d52a4ff) | 4,368,203 | 82.23 | 48.35 | 77.8 | 44.26 | 31.35 | 7 h 28 m | 36.9 |
+
+vs the pre-fix rows: catchF **80.69 → 80.54 %** recall, **50.15 → 50.52 %** precision,
+**79.1 → 79.5 %** adjusted; catchH **82.35 → 82.23 %** / **47.99 → 48.35 %** / **77.4 → 77.8 %**.
+Same trade the fix makes everywhere — a little recall for a little precision — and
+the adjusted-precision story (≈58 % of the raw "FP" are ULTRA/tantan-supported
+repeats adotto lacks) is unchanged. These two runs are byte-reproducible;
+`MALLOC_PERTURB_` no longer changes them.
+
 **catchF adjusted precision = 79.1 %** (adotto OR ULTRA/tantan): 58 % of catchF's raw
 "FP" are real repeats supported by ULTRA/tantan that the adotto catalog simply lacks —
 so the raw 50 % is mostly a ground-truth-incompleteness artifact, true precision ≈ 79 %.
@@ -167,6 +183,20 @@ Catch-all ON leaves monomer recall flat (already saturated) and only costs CEN18
 precision (65.5 → 60.7 %). **Use catch-all OFF here.** ULTRA/tantan fail outright on
 satellite — BWTandem (99.7 %) is the best de-novo tool, matching TRF.
 
+**Re-measured on the fixed build (`d52a4ff`, 2026-07-10):**
+
+| Config | CEN180 monomer recall % | Centromere Cov % | CEN180 bp prec % | Runtime | Mem GB |
+|:--|--:|--:|--:|--:|--:|
+| bwtandem (catch-all OFF) | **99.68** | 84.33 | 65.98 | 6 m 26 s | 4.4 |
+| bwtandem (catch-all ON, catchF) | 99.69 | 84.54 | 61.08 | 6 m 57 s | 4.6 |
+
+Unchanged vs the pre-fix rows (99.7 % / 84.36 % / 65.5 %); bp precision is even
+marginally better (65.5 → 65.98 %), consistent with fewer fabricated calls. The
+scorer was validated by reproducing the published 84.36 % coverage exactly on the
+old bed. (The published *calls/cen* = 779 is not reproducible from the raw
+bwtandem BED — it came from a standardised bed — so it is omitted here rather than
+guessed.)
+
 ### Exp3 — Maize Mo17
 
 **3A. Microsatellite (SSR yield)**
@@ -184,6 +214,18 @@ satellite — BWTandem (99.7 %) is the best de-novo tool, matching TRF.
 Catch-all nearly doubles microsatellite yield (no microsatellite GT exists, so this is a
 sensitivity gain mixing real diverged microsatellites with some low-complexity over-call,
 consistent with the ~32 % human bp precision).
+
+**Re-measured on the fixed build (`d52a4ff`, 2026-07-10):**
+
+| Config | 3A SSR bp | 3A regions | 3B knob180 | 3B TR-1 | 3C CentC | Runtime | Mem GB |
+|:--|--:|--:|:--:|:--:|:--:|--:|--:|
+| **bwtandem catchF (ON)** | 22,331,721 | 866,914 | 25/25 | 17/17 | 17/17 | 11 h 19 m | 22.7 |
+| bwtandem v2 (OFF) | 11,140,024 | 353,823 | 25/25 | 17/17 | 17/17 | 11 h 10 m | 17.9 |
+
+The catch-all still ~doubles 3A yield (11.14 M → 22.33 M bp, **+100 %**; pre-fix
+was +96 %), and every satellite family stays maxed. The absolute 3A bp is ~2 %
+lower than the pre-fix numbers — the fix removes the calls the garbage traceback
+invented — but the conclusion is identical.
 
 **3B / 3C. Satellite — identical with catch-all ON or OFF**
 

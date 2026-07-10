@@ -146,12 +146,14 @@ The dominant short-STR recall levers are `TIER1_MIN_ARRAY_LEN` + `TIER1_MIN_SCOR
 precision. See `docs/2026-06-20-exp1-human-sensitivity.md` for the measured
 recall/precision frontier and the chosen operating point.
 
-**All recall/precision figures below predate `706fb76`.** They were measured with a
-`libalign_accel` that read uninitialised heap in its alignment traceback, so the
-caller was not reproducible (two runs of one commit differed). Fixed 2026-07-09;
-on chr22 the fix moves region recall −0.12 pp and region precision +0.40 pp. The
-operating points and their ordering are unchanged; the genome-scale numbers have
-not been re-run. See `docs/2026-07-09-nondeterminism-uninitialised-ptr-table.md`.
+**The recall/precision figures below are from the pre-`706fb76` build** (which read
+uninitialised heap in its alignment traceback and was not reproducible). All three
+species were re-measured on the fixed build `d52a4ff` (2026-07-10, in
+`docs/2026-06-25-catch-all-benchmark-for-filip.md`): the fix trades ~0.1 pp region
+recall for ~0.4 pp region precision and leaves every satellite/centromere number
+unchanged, so the op-points and their ordering hold. Refreshed genome figures:
+human catchF **80.54 % / 50.52 %** (adj 79.5 %), catchH **82.23 % / 48.35 %**.
+See `docs/2026-07-09-nondeterminism-uninitialised-ptr-table.md`.
 
 **Exp1 recall op-point (v2.1, precision-leader):** on top of the comboChi base,
 `TIER2_MISMATCH=0.30` + `TIER1_FMSCAN_MIN_DENSITY=0.45` + `TIER1_FMSCAN_MIN_LLR=6.0`
