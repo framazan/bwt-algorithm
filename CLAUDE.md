@@ -201,11 +201,15 @@ The coordinator builds a `BWTCore` FM-index once per chromosome, then runs enabl
 
 ### Core Modules
 
-- **`bwt_core.py` — `BWTCore`**: FM-index construction (suffix array via pydivsufsort, BWT, checkpointed occurrence arrays, sampled SA). Provides `backward_search()`, `count_occurrences()`, `locate_positions()`, and 8-mer hash for O(1) short k-mer lookup.
+- **`bwt_core.py` — `BWTCore`**: FM-index construction (suffix array via pydivsufsort, BWT, checkpointed occurrence arrays). Provides `backward_search()`, `count_occurrences()`, `locate_positions()`. Also the module-level `SENTINEL` and `effective_length()` (sequence length minus a trailing `$`). Suffix-array sampling and the 8-mer hash were removed — both were unreachable and cost tens of GB per chromosome; the `sa_sample_rate` constructor arg is retained but inert.
 
 - **`bwt_seed.py`**: Shared BWT k-mer seeding for Tier 2 and Tier 3. Samples k-mers at configurable stride, finds all occurrences via FM-index, detects arithmetic progressions (periodic runs) in positions, extends with mismatch tolerance.
 
 - **`motif_utils.py` — `MotifUtils`**: Canonical motif rotation (strand-aware), primitive period detection (exact and approximate), DP alignment of repeat copies (`align_repeat_region` with banded Smith-Waterman), consensus building, TRF-compatible statistics, and the `refine_repeat()` entry point used by all tiers.
+
+- **`autocorr.py`**: The "how self-similar is this sequence at offset `p`" math, in one place — `autocorr_identity` (scalar), `windowed_match_counts` (O(n) cumsum), `contiguous_true_runs`. Used by the satellite gap-fill, the catch-all pass, and the Tier-2 seeder. `MotifUtils._str_autocorr_identity` is the string twin.
+
+- **`coverage.py`**: `intervals_to_mask` / `mask_from_repeats` — the boolean coverage mask that Tier 2, Tier 3, the satellite gap-fill, and the catch-all all build over previously-claimed regions.
 
 - **`accelerators.py` / `_accelerators.pyx`**: Cython-accelerated hot paths. Five symbols are consumed by the tiers — `extend_with_mismatches`, `find_periodic_runs`, `lcp_tandem_candidates`, `align_unit_to_window`, `anchor_scan_boundaries` — each aliased to the extension when present and to a faithful pure-Python implementation otherwise. A fallback that cannot reproduce the C result must raise, never return a degenerate value.
 

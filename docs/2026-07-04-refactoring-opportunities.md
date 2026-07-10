@@ -1,12 +1,29 @@
 # Refactoring Opportunities — BWT Tandem Repeat Finder (`src/`)
 
 _Compiled 2026-07-04. Read-only audit of the whole `src/` tree by four parallel
-surveys (cross-cutting, core files, tier files, support modules). This document is
-a **plan**, not a changelog — nothing here has been applied. It follows the
+surveys (cross-cutting, core files, tier files, support modules). It follows the
 per-file mechanical cleanup already landed in the working tree on
 `finder.py` / `motif_utils.py` / `tier1.py` / `tier2.py` (dead locals/imports/
 attributes/methods, `_min_rotation_int`, `align_repeat_region` redundant-recompute
 removal, `tier2._record_repeat` consolidation, entropy short-circuit inline)._
+
+> **Status 2026-07-09 — Bands A, B, C and F0 are LANDED.** See
+> `docs/superpowers/specs/2026-07-09-accelerator-fallback-parity-design.md`.
+> F0 turned out to be far more serious than the LOW/Effort-S rating below: the
+> two degenerate stubs made a build without the `.so` detect **zero** Tier-2 and
+> Tier-3 repeats while exiting 0. They were replaced with faithful ports rather
+> than a warning, and `tests/test_accel_parity.py` now pins the two accelerator
+> paths to byte-identical output — which is what made Bands A/B/C safe to land.
+>
+> | Band | Items | Commit |
+> |------|-------|--------|
+> | F0 + A2 | faithful fallbacks, dead wrappers, stdout→stderr, `BWT_DISABLE_NATIVE` | `71704fe` |
+> | A | A1, A3–A10 | `f341151` |
+> | B, C | B1, B2, C1–C4 (C5 skipped: marginal) | `b2bf5c4` |
+>
+> **Remaining:** Band D (needs the empty-string decision), Bands E and F.
+> The `src/` tree is 645 lines lighter and every claim below about A/B/C is now
+> historical. Bands D/E/F are still live plans.
 
 ---
 
