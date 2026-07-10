@@ -1,0 +1,33 @@
+diff --git a/src/c_extensions/align_accel.c b/src/c_extensions/align_accel.c
+index e07618b..3137f50 100644
+--- a/src/c_extensions/align_accel.c
++++ b/src/c_extensions/align_accel.c
+@@ -90,7 +90,12 @@ static int align_one(
+     }
+ 
+     /* Full ptr table needed for traceback — allocate on heap (64-bit size). */
+-    char *ptr_table = (char *)malloc(((size_t)m + 1) * cols_sz * sizeof(char));
++    /* calloc, not malloc. The fill loop writes only [j_min..j_max] of each row, so
++     * the out-of-band columns were never assigned, yet the traceback reads
++     * ptr_table[i*cols_sz + j]. Reading heap garbage there made every caller
++     * nondeterministic. 0 is the Stop code, matching _accelerators.pyx, which
++     * zero-fills its whole ptr table. */
++    char *ptr_table = (char *)calloc(((size_t)m + 1) * cols_sz, sizeof(char));
+     if (!ptr_table) {
+         if (on_heap) { free(prev_row); free(curr_row); free(prev_ptr); free(curr_ptr); }
+         return 0;
+@@ -111,9 +116,13 @@ static int align_one(
+         int j_max = i + band;
+         if (j_max > w) j_max = w;
+ 
+-        /* Init column 0 for this row */
++        /* Init column 0 for this row. ptr_table (not just curr_ptr) must carry it:
++         * the traceback reads ptr_table, and _accelerators.pyx sets ptr[i*cols] = D
++         * here. Leaving it unwritten is what let the traceback read uninitialised
++         * memory when an alignment walked off the left edge. */
+         curr_row[0] = i;
+         curr_ptr[0] = 'D';
++        ptr_table[(size_t)i * cols_sz] = 'D';
+         /* Set out-of-band to inf */
+         for (int j = 1; j < j_min; j++) curr_row[j] = inf;
+         for (int j = j_max + 1; j <= w; j++) curr_row[j] = inf;
