@@ -2,6 +2,22 @@ import numpy as np
 import ctypes
 from typing import List, Tuple, Dict, Union
 
+SENTINEL = ord('$')  # appended before BWT construction; never a repeat base
+
+
+def effective_length(text_arr: np.ndarray) -> int:
+    """Length of `text_arr` with any trailing '$' sentinel excluded.
+
+    Note Tier 1 and Tier 3 deliberately do *not* strip: they keep the sentinel in
+    `n` and rely on `min(end, n)` clamping plus downstream '$' checks. Only call
+    this where the caller means the sentinel-free length.
+    """
+    n = int(text_arr.size)
+    if n > 0 and text_arr[n - 1] == SENTINEL:
+        n -= 1
+    return n
+
+
 # Optional: JIT acceleration with numba when available
 HAVE_NUMBA = False
 try:

@@ -2,29 +2,14 @@ import os    # Standard library for environment-variable overrides
 import time  # Standard library for measuring execution time
 import numpy as np  # NumPy for numerical operations and array processing
 from typing import List, Tuple, Set, Optional  # typing module for type hints
-from .bwt_core import BWTCore  # BWT/FM-index core data structure
+from .bwt_core import BWTCore, effective_length  # BWT/FM-index core data structure
+from .coverage import mask_from_repeats  # shared interval -> boolean mask
 from .models import TandemRepeat  # Tandem repeat data class
 from .tier1 import Tier1STRFinder  # Tier 1: Short perfect repeat finder
 from .tier2 import Tier2LCPFinder  # Tier 2: Medium-length imperfect repeat finder
 from .tier3 import Tier3LongReadFinder  # Tier 3: Long repeat sequence finder
 from .motif_utils import MotifUtils  # Motif canonicalization and statistics utilities
 from .autocorr import autocorr_identity, windowed_match_counts, contiguous_true_runs  # shared periodicity primitives
-
-
-def _seq_shannon_entropy(arr) -> float:
-    """Per-base Shannon entropy (bits, 0-2) of a uint8 ACGT slice.
-
-    Low entropy (homopolymer / near-homopolymer) flags the low-complexity DNA
-    that the catch-all over-calls but adotto/ULTRA/tantan do not corroborate.
-    """
-    if arr.size == 0:
-        return 0.0
-    counts = np.bincount(arr, minlength=1).astype(np.float64)
-    counts = counts[counts > 0]
-    if counts.size <= 1:
-        return 0.0
-    p = counts / counts.sum()
-    return float(-(p * np.log2(p)).sum())
 
 
 class TandemRepeatFinder:
@@ -363,12 +348,8 @@ class TandemRepeatFinder:
                     gap_start_pos = prev.end
                     gap_end_pos = current.start
                     gap_seq = text_arr[gap_start_pos:gap_end_pos]
-                    gap_len = len(gap_seq)
-                    if gap_len >= mlen * 2:
-                        total = gap_len - mlen
-                        matches = int(np.sum(gap_seq[:total] == gap_seq[mlen:mlen + total]))
-                        identity = matches / total if total > 0 else 0
-                        merge_ok = identity >= 0.55
+                    if len(gap_seq) >= mlen * 2:
+                        merge_ok = autocorr_identity(gap_seq, mlen) >= 0.55
                 else:
                     # Short repeats: use direct motif comparison
                     motif_arr = np.frombuffer(actual_motif.encode('ascii'), dtype=np.uint8)
@@ -454,22 +435,10 @@ class TandemRepeatFinder:
         if n < 1000:
             return repeats
 
-        # Build coverage mask from existing repeats
-        covered = np.zeros(n, dtype=bool)
-        for r in repeats:
-            covered[r.start:min(r.end, n)] = True
+        covered = mask_from_repeats(repeats, n)
 
-        # Find uncovered blocks >= 300bp using numpy
-        transitions = np.diff(covered.astype(np.int8))
-        # Starts of uncovered regions: transition from True(1) to False(0) = -1
-        # Ends of uncovered regions: transition from False(0) to True(1) = +1
-        gap_starts = np.where(transitions == -1)[0] + 1  # Position after last covered
-        gap_ends = np.where(transitions == 1)[0] + 1     # First covered position
-        # Handle boundaries
-        if not covered[0]:
-            gap_starts = np.concatenate(([0], gap_starts))
-        if not covered[-1]:
-            gap_ends = np.concatenate((gap_ends, [n]))
+        # Find uncovered blocks >= 300bp
+        gap_starts, gap_ends = contiguous_true_runs(~covered)
         uncovered_blocks = [(int(s), int(e)) for s, e in zip(gap_starts, gap_ends) if e - s >= 300]
 
         if not uncovered_blocks:
@@ -566,9 +535,7 @@ class TandemRepeatFinder:
         the identity/length knobs set the operating point. Opt-in (CATCHALL_SCAN).
         """
         text_arr = self.bwt.text_arr
-        n = len(text_arr)
-        if n > 0 and text_arr[n - 1] == 36:  # exclude sentinel
-            n -= 1
+        n = effective_length(text_arr)
         if n < 8:
             return repeats
 
@@ -582,10 +549,7 @@ class TandemRepeatFinder:
         min_copies = float(os.environ.get("CATCHALL_MIN_COPIES") or "2")
         min_entropy = float(os.environ.get("CATCHALL_MIN_ENTROPY") or "0")
 
-        covered = np.zeros(n, dtype=bool)
-        for r in repeats:
-            if r.start < n:
-                covered[r.start:min(r.end, n)] = True
+        covered = mask_from_repeats(repeats, n)
 
         s = text_arr[:n]
         new_repeats: List[TandemRepeat] = []
@@ -613,7 +577,7 @@ class TandemRepeatFinder:
                 seg = covered[start:end]
                 if seg.size and seg.mean() > 0.3:
                     continue
-                if min_entropy > 0.0 and _seq_shannon_entropy(text_arr[start:end]) < min_entropy:
+                if min_entropy > 0.0 and MotifUtils.calculate_entropy_array(text_arr[start:end]) < min_entropy:
                     continue
                 # identity (for mismatch_rate); seed motif from the run start
                 local = winsum[a:b]

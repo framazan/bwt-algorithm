@@ -6,7 +6,8 @@ from typing import List, Tuple, Set, Optional
 import time
 from .models import TandemRepeat
 from .motif_utils import MotifUtils
-from .bwt_core import BWTCore, _kasai_lcp_uint8
+from .bwt_core import BWTCore, _kasai_lcp_uint8, effective_length
+from .coverage import intervals_to_mask
 from .accelerators import extend_with_mismatches, lcp_tandem_candidates
 from .bwt_seed import bwt_kmer_seed_scan
 from .autocorr import windowed_match_counts, contiguous_true_runs  # shared periodicity primitives
@@ -164,11 +165,7 @@ class Tier2LCPFinder:
         """
         repeats = []
         text_arr = self.bwt.text_arr
-        n = int(text_arr.size)
-
-        # Exclude sentinel
-        if n > 0 and text_arr[n - 1] == 36:  # '$' = 36
-            n -= 1
+        n = effective_length(text_arr)
 
         covered: Set[Tuple[int, int]] = set()
 
@@ -315,10 +312,7 @@ class Tier2LCPFinder:
             max_scan_period: Optional maximum period to scan
         """
         s_arr = self.bwt.text_arr
-        n = int(s_arr.size)
-        # Exclude trailing sentinel if present ('$' == 36)
-        if n > 0 and s_arr[n - 1] == 36:
-            n -= 1
+        n = effective_length(s_arr)
 
         # Determine max period
         if max_scan_period is not None:
@@ -338,10 +332,7 @@ class Tier2LCPFinder:
         results: List[TandemRepeat] = []
         covered: Set[Tuple[int, int]] = set()
 
-        # Build tier1 mask
-        tier1_mask = np.zeros(n, dtype=bool)
-        for start, end in tier1_seen:
-            tier1_mask[start:min(end, n)] = True
+        tier1_mask = intervals_to_mask(tier1_seen, n)
 
         start_time = time.time()
 

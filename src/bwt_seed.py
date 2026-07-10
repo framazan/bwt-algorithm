@@ -15,7 +15,7 @@ from typing import List, Optional, Set, Tuple  # Generic types for type hints
 import numpy as np  # NumPy for array operations and numerical computation
 
 from .accelerators import extend_with_mismatches, find_periodic_runs
-from .bwt_core import BWTCore  # FM-index core module (BWT, backward_search, locate_positions, etc.)
+from .bwt_core import BWTCore, effective_length  # FM-index core module (BWT, backward_search, locate_positions, etc.)
 
 
 @dataclass
@@ -83,11 +83,7 @@ def bwt_kmer_seed_scan(
         (primitive period reduction, HOR detection, DP refinement, etc.).
     """
     text_arr = bwt.text_arr  # Original sequence used for BWT (numpy uint8 array)
-    n = int(text_arr.size)   # Total sequence length (may include sentinel '$')
-
-    # Exclude the sentinel character ('$', ASCII 36) used for BWT construction
-    if n > 0 and text_arr[n - 1] == 36:   # '$'
-        n -= 1  # Use actual sequence length excluding sentinel
+    n = effective_length(text_arr)
 
     # Return immediately if sequence is too short to contain repeats meeting minimum copy count
     if n < min_period * min_copies:

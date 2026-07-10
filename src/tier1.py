@@ -10,6 +10,16 @@ from .motif_utils import MotifUtils
 from .bwt_core import BWTCore
 from .accelerators import extend_with_mismatches
 
+
+def _has_invalid_char(motif: str) -> bool:
+    """True if a candidate motif spans the BWT sentinel or an ambiguous base.
+
+    Deliberately looser than the ACGT-only check in `finder` / `bwt_seed`: this
+    one accepts lowercase and other bytes. Do not merge the two.
+    """
+    return '$' in motif or 'N' in motif
+
+
 # Try to load C extension for fast run detection
 _c_lib = None
 try:
@@ -229,8 +239,7 @@ class Tier1STRFinder:
                     mid = (array_start + array_end) // 2
                     if seen_mask[array_start] or seen_mask[min(mid, n - 1)]:
                         continue
-                    motif_check = sequence_str[array_start:array_start + motif_len]
-                    if '$' in motif_check or 'N' in motif_check:
+                    if _has_invalid_char(sequence_str[array_start:array_start + motif_len]):
                         continue
                     candidates.append((array_start, array_end, seed_copies))
 
@@ -520,8 +529,7 @@ class Tier1STRFinder:
                     if full_e - full_s >= arr_end - arr_start:
                         arr_start, arr_end = full_s, full_e
 
-                motif_check = sequence_str[arr_start:arr_start + p]
-                if "$" in motif_check or "N" in motif_check:
+                if _has_invalid_char(sequence_str[arr_start:arr_start + p]):
                     continue
 
                 refined = MotifUtils.refine_repeat(

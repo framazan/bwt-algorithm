@@ -172,6 +172,36 @@ class MotifUtils:
         return entropy
 
     @staticmethod
+    def calculate_entropy_array(arr: np.ndarray) -> float:
+        """Per-base Shannon entropy (bits, 0-2) of a uint8 ACGT slice.
+
+        The array twin of `calculate_entropy`. Low entropy (homopolymer or
+        near-homopolymer) flags the low-complexity DNA that the catch-all
+        over-calls but adotto/ULTRA/tantan do not corroborate.
+        """
+        if arr.size == 0:
+            return 0.0
+        counts = np.bincount(arr, minlength=1).astype(np.float64)
+        counts = counts[counts > 0]
+        if counts.size <= 1:
+            return 0.0
+        p = counts / counts.sum()
+        return float(-(p * np.log2(p)).sum())
+
+    @staticmethod
+    def _str_autocorr_identity(s: str, p: int) -> float:
+        """Fraction of positions i where ``s[i] == s[i + p]``.
+
+        The string twin of `autocorr.autocorr_identity`. Kept allocation-free
+        (no encode to uint8) because `refine_repeat` calls it in a hot loop.
+        Returns 0.0 when `p` leaves no overlap.
+        """
+        total = len(s) - p
+        if total <= 0:
+            return 0.0
+        return sum(1 for i in range(total) if s[i] == s[i + p]) / total
+
+    @staticmethod
     def hamming_distance(s1: str, s2: str) -> int:
         """Calculate Hamming distance between two strings of equal length."""
         if len(s1) != len(s2):
@@ -645,9 +675,7 @@ class MotifUtils:
                 best_sub_p = primitive_len
                 best_score = 0.0
                 for p in range(max(1, primitive_len - 2), primitive_len):
-                    matches = sum(1 for i in range(region_len - p)
-                                  if region[i] == region[i + p])
-                    score = matches / (region_len - p)
+                    score = MotifUtils._str_autocorr_identity(region, p)
                     if score > 0.85 and score > best_score:
                         best_score = score
                         best_sub_p = p
@@ -718,11 +746,9 @@ class MotifUtils:
         # Search periods from small to large, looking for the smallest
         # period with high autocorrelation
         for p in range(50, min(n // 2 + 1, 500)):
-            total = n - p
-            if total <= 0:
+            if n - p <= 0:
                 continue
-            matches = sum(1 for i in range(total) if s[i] == s[i + p])
-            if matches / total >= min_identity:
+            if MotifUtils._str_autocorr_identity(s, p) >= min_identity:
                 best_p = p
                 break
 
@@ -738,12 +764,9 @@ class MotifUtils:
         for sub_p in range(max(10, best_p // 20), best_p):
             if best_p % sub_p != 0:
                 continue
-            total = n - sub_p
-            if total <= 0:
+            if n - sub_p <= 0:
                 continue
-            matches = sum(1 for i in range(total) if s[i] == s[i + sub_p])
-            identity = matches / total
-            if identity >= min_identity:
+            if MotifUtils._str_autocorr_identity(s, sub_p) >= min_identity:
                 return sub_p
 
         return best_p
