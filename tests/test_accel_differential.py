@@ -7,6 +7,16 @@ random inputs — including the degenerate ones (period longer than the array, `
 past the array end, mismatch rates outside the clamp, runs that never close) —
 and requires exact agreement.
 
+Both layers are needed. Mutation-checked 2026-07-09: regressing
+`find_periodic_runs` back to `return []` — the original defect — leaves the
+end-to-end parity test GREEN, because Tier 2's LCP phase re-finds those arrays on
+the fixtures. Only the differential test catches it.
+
+The input ranges are load-bearing, not decorative. `period * copies` must exceed
+100 often, or the `max(rate, 0.01)` clamp in `_max_mismatch_threshold` never
+changes the budget (below that, `ceil` and the floor-at-1 agree regardless) and a
+dropped clamp goes unnoticed.
+
 Skipped when the compiled extension is absent, since there is nothing to compare.
 """
 import numpy as np
@@ -41,13 +51,14 @@ def tandem_sequence(rng, period, copies, mismatches):
 
 def test_extend_with_mismatches_matches_cython():
     rng = np.random.default_rng(20260709)
-    for trial in range(400):
-        period = int(rng.integers(1, 12))
-        copies = int(rng.integers(1, 14))
+    for trial in range(600):
+        # period * copies routinely > 100 so the rate clamp actually bites
+        period = int(rng.integers(1, 40))
+        copies = int(rng.integers(1, 30))
         pad = int(rng.integers(0, 25))
         arr = np.concatenate([
             random_sequence(rng, pad),
-            tandem_sequence(rng, period, copies, int(rng.integers(0, 5))),
+            tandem_sequence(rng, period, copies, int(rng.integers(0, 6))),
             random_sequence(rng, pad),
         ])
         start_pos = int(rng.integers(0, max(1, arr.size)))
@@ -59,6 +70,44 @@ def test_extend_with_mismatches_matches_cython():
         assert got == expected, (
             f"trial {trial}: start={start_pos} period={period} n={n} rate={rate} "
             f"size={arr.size}\n  cython={expected}\n  python={got}"
+        )
+
+
+def test_extend_with_mismatches_partial_flanks_match_cython():
+    """Aim at the partial exact-extension loops on both flanks.
+
+    The generic test rarely lands a flank that matches the consensus prefix (or
+    suffix) for several bases before diverging, which is exactly where an
+    off-by-one in the partial extension would show up.
+    """
+    rng = np.random.default_rng(90210)
+    for trial in range(600):
+        period = int(rng.integers(2, 30))
+        copies = int(rng.integers(2, 16))
+        unit = random_sequence(rng, period)
+
+        # left flank ends with a suffix of the unit; right flank starts with a prefix
+        lk = int(rng.integers(0, period))
+        rk = int(rng.integers(0, period))
+        left = np.concatenate([random_sequence(rng, int(rng.integers(1, 6))), unit[period - lk:]])
+        right = np.concatenate([unit[:rk], random_sequence(rng, int(rng.integers(1, 6)))])
+
+        core = np.tile(unit, copies)
+        nm = int(rng.integers(0, 5))
+        if nm:
+            idx = rng.choice(core.size, size=min(nm, core.size), replace=False)
+            core[idx] = ACGT[rng.integers(0, 4, size=idx.size)]
+
+        arr = np.concatenate([left, core, right]).astype(np.uint8)
+        start_pos = left.size
+        n = arr.size
+        rate = float(rng.choice([0.0, 0.01, 0.1, 0.35]))
+
+        expected = native.extend_with_mismatches(arr, start_pos, period, n, rate)
+        got = acc._extend_with_mismatches_py(arr, start_pos, period, n, rate)
+        assert got == expected, (
+            f"trial {trial}: start={start_pos} period={period} lk={lk} rk={rk} "
+            f"n={n} rate={rate}\n  cython={expected}\n  python={got}"
         )
 
 
