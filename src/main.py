@@ -113,7 +113,6 @@ def main():
         sys.exit(1)
 
     output_prefix = args.output if args.output else os.path.splitext(args.fasta_file)[0]  # Output prefix: use input filename (without extension) if not specified
-    out_file = _resolve_output_file(output_prefix, args.format)  # Determine final output file path
 
     print(f"Processing {args.fasta_file}...")  # Notify processing start
     start_total = time.time()  # Record overall processing start time
@@ -190,7 +189,7 @@ def main():
 
     if profiler is not None:
         import pstats  # Dynamic import of pstats for profile statistics output
-        profile_path = f"{output_prefix}.tier2_profile.prof"  # Profile result file path
+        profile_path = f"{output_prefix}.profile.prof"  # Profile result file path (covers all tiers, not just Tier 2)
         profiler.dump_stats(profile_path)  # Save profile data to file
         print(f"Profile written to {profile_path}")  # Print save path
         print("Top 20 cumulative time hotspots:")  # Heading for top 20 cumulative time hotspots

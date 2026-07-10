@@ -172,23 +172,6 @@ class MotifUtils:
         return entropy
 
     @staticmethod
-    def is_transition(base1: str, base2: str) -> bool:
-        """Check if a base change is a transition (A↔G or C↔T).
-
-        Transitions are more common than transversions in biology.
-        Purines: A, G (transitions within purines: A↔G)
-        Pyrimidines: C, T (transitions within pyrimidines: C↔T)
-        """
-        if base1 == base2:
-            return True  # No change
-
-        transitions = {
-            ('A', 'G'), ('G', 'A'),  # Purine transitions
-            ('C', 'T'), ('T', 'C')   # Pyrimidine transitions
-        }
-        return (base1, base2) in transitions
-
-    @staticmethod
     def hamming_distance(s1: str, s2: str) -> int:
         """Calculate Hamming distance between two strings of equal length."""
         if len(s1) != len(s2):
@@ -203,28 +186,6 @@ class MotifUtils:
             return max(arr1.size, arr2.size)
 
         return int(np.count_nonzero(arr1 != arr2))
-
-    @staticmethod
-    def count_transversions_array(arr1: np.ndarray, arr2: np.ndarray) -> int:
-        """Count transversions (non-transition mismatches) between two uint8 arrays.
-
-        Returns number of transversion changes (A↔C, A↔T, G↔C, G↔T).
-        """
-        if arr1.size != arr2.size:
-            return max(arr1.size, arr2.size)
-
-        # ASCII codes: A=65, C=67, G=71, T=84
-        transversions = 0
-        for i in range(arr1.size):
-            b1, b2 = arr1[i], arr2[i]
-            if b1 != b2:
-                # Convert to characters for transition check
-                c1 = chr(b1) if 65 <= b1 <= 84 else 'N'
-                c2 = chr(b2) if 65 <= b2 <= 84 else 'N'
-                if not MotifUtils.is_transition(c1, c2):
-                    transversions += 1
-
-        return transversions
 
     @staticmethod
     def edit_distance(a: str, b: str) -> int:
@@ -717,26 +678,6 @@ class MotifUtils:
         )
 
     @staticmethod
-    def is_insertion_variant(candidate: str, consensus: str) -> bool:
-        """Return True if removing a single base from candidate yields consensus."""
-        if len(candidate) != len(consensus) + 1:
-            return False
-        for i in range(len(candidate)):
-            if candidate[:i] + candidate[i + 1:] == consensus:
-                return True
-        return False
-
-    @staticmethod
-    def is_deletion_variant(candidate: str, consensus: str) -> bool:
-        """Return True if inserting a single base into candidate yields consensus."""
-        if len(candidate) + 1 != len(consensus):
-            return False
-        for i in range(len(consensus)):
-            if consensus[:i] + consensus[i + 1:] == candidate:
-                return True
-        return False
-
-    @staticmethod
     def smallest_period_str(s: str) -> int:
         """Return length of the smallest period of string s."""
         if not s:
@@ -760,8 +701,9 @@ class MotifUtils:
         """Detect the primitive period of highly divergent satellite DNA.
 
         Uses autocorrelation: for each candidate period p, count how many
-        positions i have s[i] == s[i+p]. The period with the highest
-        autocorrelation peak (above a threshold) is the primitive period.
+        positions i have s[i] == s[i+p]. Returns the *smallest* p in
+        [50, min(n//2, 500)) whose identity clears 0.60, then the smallest
+        divisor of p that also clears it.
 
         Designed for satellite DNA like CEN180 with 20-30% inter-copy divergence.
         Only called for motifs >= 200bp.
@@ -771,7 +713,6 @@ class MotifUtils:
             return n
 
         best_p = n
-        best_score = 0.0
         min_identity = 0.60  # 60% identity threshold for satellite DNA
 
         # Search periods from small to large, looking for the smallest
@@ -781,13 +722,8 @@ class MotifUtils:
             if total <= 0:
                 continue
             matches = sum(1 for i in range(total) if s[i] == s[i + p])
-            identity = matches / total
-
-            if identity >= min_identity and identity > best_score:
-                best_score = identity
+            if matches / total >= min_identity:
                 best_p = p
-                # Found a good period; check if there's an even smaller
-                # sub-period that also works
                 break
 
         if best_p == n:
@@ -846,77 +782,6 @@ class MotifUtils:
                 return p
 
         return n
-
-    @staticmethod
-    def normalize_variant(candidate: str, consensus: str) -> str:
-        """Rotate variant to best align with consensus (minimal edit distance)."""
-        if not candidate:
-            return candidate
-
-        best = candidate
-        best_cost = MotifUtils.edit_distance(candidate, consensus)
-
-        if len(candidate) == 1:
-            return candidate
-
-        for shift in range(1, len(candidate)):
-            rotated = candidate[shift:] + candidate[:shift]
-            cost = MotifUtils.edit_distance(rotated, consensus)
-            if cost < best_cost or (cost == best_cost and rotated < best):
-                best = rotated
-                best_cost = cost
-
-        return best
-
-    @staticmethod
-    def rotate_deletion_variant(candidate: str, consensus: str) -> str:
-        """Rotate shorter variant so it no longer begins with the consensus prefix."""
-        if not candidate:
-            return candidate
-
-        rotated = candidate
-        for _ in range(len(candidate)):
-            if rotated[0] != consensus[0]:
-                return rotated
-            rotated = rotated[1:] + rotated[:1]
-        return rotated
-
-    @staticmethod
-    def build_consensus_motif(sequences: List[str]) -> Tuple[str, float]:
-        """Build consensus motif from multiple aligned sequences using majority vote.
-
-        Returns:
-            (consensus, avg_mismatch_rate) - consensus sequence and average mismatch rate
-        """
-        if not sequences:
-            return "", 0.0
-
-        if len(sequences) == 1:
-            return sequences[0], 0.0
-
-        motif_len = len(sequences[0])
-        consensus = []
-        total_mismatches = 0
-
-        for pos in range(motif_len):
-            bases = [seq[pos] for seq in sequences if pos < len(seq)]
-            if not bases:
-                consensus.append('N')
-                continue
-
-            # Majority vote
-            counts = Counter(bases)
-            most_common = counts.most_common(1)[0][0]
-            consensus.append(most_common)
-
-            # Count mismatches at this position
-            mismatches = len(bases) - counts[most_common]
-            total_mismatches += mismatches
-
-        total_bases = len(sequences) * motif_len
-        avg_mismatch_rate = total_mismatches / total_bases if total_bases > 0 else 0.0
-
-        return ''.join(consensus), avg_mismatch_rate
 
     @staticmethod
     def build_consensus_motif_array(text_arr: np.ndarray, start: int, motif_len: int,

@@ -251,7 +251,6 @@ class Tier1STRFinder:
                     continue
 
                 # Extend with mismatch tolerance to capture imperfect copies
-                perfect_length = seed_length
                 ext_start = array_start
                 ext_end = array_end
                 ext_length = seed_length
@@ -297,7 +296,7 @@ class Tier1STRFinder:
                     refined = MotifUtils.refine_repeat(
                         sequence_str,
                         array_start,
-                        array_start + perfect_length,
+                        array_start + seed_length,
                         motif,
                         mismatch_fraction=self.allowed_mismatch_rate,
                         indel_fraction=self.allowed_indel_rate,
@@ -311,7 +310,7 @@ class Tier1STRFinder:
                     if rep_score < eff_min_score:
                         continue
                     repeats.append(rep)
-                    seed_end = min(array_start + perfect_length, n)
+                    seed_end = min(array_start + seed_length, n)
                     seen_mask[array_start:seed_end] = True
 
         # Additive mode: run the FM-index detector on the residual (regions the

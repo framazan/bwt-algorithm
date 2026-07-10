@@ -137,13 +137,12 @@ def bwt_kmer_seed_scan(
             continue
 
         positions = bwt.suffix_array[sp:ep + 1].tolist()  # Reuse the SA interval from backward_search
-        positions.sort()
         if len(positions) < min_copies:  # Skip if actual position count is below minimum copies
             i += stride
             continue
 
         # --- Detect arithmetic progressions (periodic runs) in occurrence position array ---
-        pos_arr = np.array(sorted(positions), dtype=np.int64)  # Convert positions to sorted int64 array
+        pos_arr = np.array(sorted(positions), dtype=np.int64)
         # (Sorting is required for accurate arithmetic progression detection)
 
         # find_periodic_runs: detect evenly-spaced groups within tolerance_ratio in position array
