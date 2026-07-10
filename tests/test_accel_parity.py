@@ -21,6 +21,11 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURES = os.path.join(REPO_ROOT, "tests", "fixtures")
 FIXTURE_NAMES = ["tier1", "tier2", "tier3", "mixed", "adjacent"]
 
+# Every emitted format, because each formatter reads different fields off
+# TandemRepeat: bed the span, trf the consensus/variations/percent-match, vcf the
+# derived REF, strfinder the allele coverage.
+FORMAT_EXTENSIONS = {"bed": ".bed", "trf": ".dat", "vcf": ".vcf", "strfinder": ".csv"}
+
 try:
     from src import _accelerators as _native  # noqa: F401
     NATIVE_BUILT = True
@@ -49,16 +54,15 @@ def run_pipeline(fasta: str, out_prefix: str, fmt: str, disable_native: bool) ->
     )
     assert proc.returncode == 0, f"src.main failed: {proc.stderr}"
 
-    ext = {"bed": ".bed", "trf": ".dat"}[fmt]
-    with open(out_prefix + ext) as fh:
+    with open(out_prefix + FORMAT_EXTENSIONS[fmt]) as fh:
         return fh.read()
 
 
 @needs_native
 @pytest.mark.parametrize("fixture", FIXTURE_NAMES)
-@pytest.mark.parametrize("fmt", ["bed", "trf"])
+@pytest.mark.parametrize("fmt", sorted(FORMAT_EXTENSIONS))
 def test_native_and_fallback_agree(tmp_path, fixture, fmt):
-    """The two accelerator paths detect exactly the same repeats."""
+    """The two accelerator paths detect exactly the same repeats, in every format."""
     fasta = os.path.join(FIXTURES, f"synth_{fixture}.fa")
 
     native = run_pipeline(fasta, str(tmp_path / "native"), fmt, disable_native=False)
