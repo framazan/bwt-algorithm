@@ -37,9 +37,12 @@ setup(script_args=['build_ext', '--inplace'], ext_modules=cythonize(ext_modules,
 "
 ```
 
-Rebuild scope: only edits to `_accelerators.pyx` require recompiling the `.so`.
-Edits to the pure-Python tier files (`tier1.py`, `tier2.py`, `tier3.py`,
-`finder.py`, `bwt_seed.py`, etc.) take effect immediately with no rebuild.
+Rebuild scope: only edits to `_accelerators.pyx` require running the command
+above by hand. The four `src/c_extensions/*.c` libraries rebuild themselves on
+import when their source is newer than their `.so` (`build.py` checks mtimes), so
+editing `align_accel.c` and friends needs no manual step. Edits to the
+pure-Python tier files (`tier1.py`, `tier2.py`, `tier3.py`, `finder.py`,
+`bwt_seed.py`, etc.) take effect immediately.
 
 ## Testing
 
@@ -57,10 +60,15 @@ python3 -m pytest tests/test_ground_truth.py::TestTier1GroundTruth::test_sensiti
   floors. All tiers run in both builds (the Tier-2/3 `NEEDS_CYTHON` skips are
   gone, since the fallbacks are no longer degenerate).
 - `tests/test_accel_parity.py` is the guard for that: it runs the pipeline once
-  per accelerator path and requires byte-identical output. It skips its
-  comparisons when the `.so` is absent (nothing to compare against), so run it
-  **with** the extension built. Baseline: 57 passed with the `.so`, 46 passed +
-  11 parity-skips without it.
+  per accelerator path and requires byte-identical output in all four formats. It
+  skips its comparisons when the `.so` is absent (nothing to compare against), so
+  run it **with** the extension built.
+- `tests/test_align_parity.py` does the same for the *other* pair of duplicate
+  implementations: `MotifUtils.align_repeat_region` runs the `libalign_accel` C
+  loop when it loads and its own Python loop otherwise. They must return the same
+  summary on random repeat regions. (They disagreed on 31% of them until
+  2026-07-09; see `docs/2026-07-09-nondeterminism-uninitialised-ptr-table.md`.)
+- Baseline: **84 passed** with the `.so`, ~50 passed + native-only skips without it.
 - The dev environment with numpy + pydivsufsort + the compiled `.so` (and where
   the benchmark harness runs) is the conda env
   `/data/gpfs/assoc/pgl/bin/conda/conda_envs/bwtandem/bin/python`. `pytest` may

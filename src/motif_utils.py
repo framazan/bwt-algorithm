@@ -425,12 +425,22 @@ class MotifUtils:
 
     @staticmethod
     def _consensus_from_counts(counts: List[Counter], fallback: str) -> str:
-        """Build consensus string from per-position base counts."""
+        """Build consensus string from per-position base counts.
+
+        Ties go to the lexicographically smallest base. `Counter.most_common`
+        would instead break them by insertion order, which is the one place in
+        this codebase that did so: the C accelerator scans A, C, G, T with a
+        strict `>` and `build_consensus_motif_array` takes `np.argmax` over
+        `np.unique`'s sorted values — both pick the smallest base. Disagreeing
+        here made `align_repeat_region` return a different consensus depending on
+        whether libalign_accel was loaded, and the divergence then cascaded into
+        every later copy's alignment.
+        """
         consensus = []
         for idx, counter in enumerate(counts):
             if counter:
-                base, _ = counter.most_common(1)[0]
-                consensus.append(base)
+                best = max(counter.values())
+                consensus.append(min(b for b, c in counter.items() if c == best))
             else:
                 consensus.append(fallback[idx] if idx < len(fallback) else 'N')
         return ''.join(consensus)

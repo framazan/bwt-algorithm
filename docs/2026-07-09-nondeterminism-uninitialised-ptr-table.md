@@ -1,9 +1,16 @@
 # The caller is not reproducible: `align_accel.c` reads uninitialised memory
 
-_Measured 2026-07-09, on `perf/exp1-human-sensitivity`. This is a **pre-existing**
-defect, unrelated to the accelerator-fallback work landed the same day. It is
-**not fixed** — fixing it changes detection results, so it needs its own
-measured PR. The evidence and a candidate patch are below._
+_Measured 2026-07-09, on `perf/exp1-human-sensitivity`. A **pre-existing** defect,
+unrelated to the accelerator-fallback work landed the same day._
+
+> **RESOLVED.** The first draft of this document said the fix "changes detection
+> results, so it needs its own measured PR." That turned out to be half right:
+> the uninitialised read was masking **two further divergences** between the C
+> accelerator and the Python loop it is supposed to accelerate. Correcting the
+> memory bug alone made a fixture regress; correcting all three made the two
+> implementations agree **exactly** — 0 disagreements over 5000 random regions,
+> where the shipped code disagreed on 31%. Section 5 records the remediation.
+> `tests/test_align_parity.py` now pins it.
 
 ---
 
@@ -98,56 +105,98 @@ the odd one out:
 is `memset` to zero first. `bwt_accel.c`'s `rank` buffer is fully written before
 use. `ptr_table` is the only unguarded uninitialised read found.
 
-## 3. Why it is not fixed here
+## 3. The memory bug was hiding two more
 
-The obvious patch is two lines — `calloc` the table, and store the column-0
-backpointer where the traceback will actually find it:
+Fixing only the uninitialised read makes things *worse* on the fixtures, which is
+how the other two divergences surfaced. Built and tested each step (worktree,
+`gcc` from the `bwtandem` conda env):
 
-```c
--    char *ptr_table = (char *)malloc(((size_t)m + 1) * cols_sz * sizeof(char));
-+    char *ptr_table = (char *)calloc(((size_t)m + 1) * cols_sz, sizeof(char));
-...
-     curr_row[0] = i;
-     curr_ptr[0] = 'D';
-+    ptr_table[(size_t)i * cols_sz] = 'D';
-```
+| build | `tests/` | Adjacent sensitivity | C-vs-Python disagreement¹ |
+|-------|----------|---------------------|---------------------------|
+| shipped (`malloc`, no column-0 write) | 81 passed | 100 % (by accident) | **31 %** |
+| `calloc` only | 1 failed | 81.8 % | — |
+| `calloc` + column-0 `'D'` | 1 failed | 90.9 % | 15 % |
+| + matching extension bound | 81 passed | 100 % | 15 % |
+| + matching consensus tie-break | **84 passed** | 100 % | **0 %** |
 
-Built and tested (worktree, `gcc` from the `bwtandem` conda env):
+¹ fraction of 1500 random repeat regions where `align_repeat_region` returns a
+different summary with and without `libalign_accel` loaded. At 5000 trials the
+final build still disagrees on **zero**.
 
-| build | `tests/` result |
-|-------|-----------------|
-| current (`malloc`, no column-0 write) | 81 passed |
-| `calloc` only | **1 failed** — `TestAdjacentGroundTruth::test_sensitivity` 81.8 % < 95 % |
-| `calloc` + column-0 `'D'` | **1 failed** — same test, 90.9 % < 95 % |
+**(a) The uninitialised read.** `calloc` alone turns column 0 into the Stop code,
+so a traceback that should walk up the left edge halts and deletions go
+uncounted. Writing the `'D'` backpointer into `ptr_table` — where the traceback
+looks, rather than into the `curr_ptr` scratch row nothing reads — restores it.
+The counting is now arithmetically checkable: 17 copies of a 3-mer consuming 44
+bases must have 7 deletions. The shipped code reported **0**.
 
-`calloc` alone turns column 0 into the Stop code, so tracebacks that should have
-walked up the left edge terminate early and deletions are undercounted — that is
-the 81.8 %. Restoring the `'D'` backpointer recovers most of it. The residual
-gap means the C DP still diverges from the `.pyx` somewhere else (`best_j`
-selection range and the traceback termination condition are the next places to
-look).
+**(b) The extension bound.** `align_repeat_region_c` stopped at
+`end + 3*motif_len + 4*max_indel`; `MotifUtils.align_repeat_region` stops at
+`max(end, start + motif_len*min_copies) + max(3*motif_len, 4*max_indel)`. On the
+`ACG` array of `synth_adjacent` that let the C run four bases further and claim
+two extra copies (17/44 vs the Python loop's 15/40). With deletions now counted,
+the longer C call tripped `_filter_overlaps`' `overlap / min(length) > 0.5` rule
+against its neighbour and the `ACG` repeat was dropped — the 90.9 %.
 
-So: the current output is undefined, and the *correct* output is not what the
-current code produces. Replacing one with the other is a **detection change**,
-not a refactor, and it moves a ground-truth sensitivity floor. It needs its own
-PR with a chr21/chr22 measurement and a decision about the published operating
-points, not a drive-by commit. The patch is preserved at
-`scratchpad/align_accel_ub.patch` and reproduced above.
+**(c) The consensus tie-break.** `_consensus_from_counts` used
+`Counter.most_common`, which breaks ties by insertion order. The C scans `A, C,
+G, T` with a strict `>`, and `build_consensus_motif_array` takes `np.argmax` over
+`np.unique`'s sorted values — both pick the lexicographically smallest base. So
+the Python loop was the odd one out, and a single tied position produced a
+different consensus, which then cascaded into every subsequent copy's alignment.
+Aligning it to the other two costs nothing on the production path (the C consensus
+is unchanged) and takes the disagreement to zero.
 
 ## 4. Consequences for anyone verifying a change
 
-- **BED byte-identity at chromosome scale is not an achievable acceptance
-  criterion** with the current C extension. Two runs of the same commit differ,
-  and with `MALLOC_PERTURB_=0` the output depends even on the directory the repo
-  sits in — so a worktree baseline vs the live repo is not a fair comparison.
-- To compare two commits on real chromosomes, pin **both** `PYTHONHASHSEED` and
-  a **non-zero** `MALLOC_PERTURB_`. This was validated with a same-code /
-  different-path control: at `MALLOC_PERTURB_=255` the identical commit run from
-  two different worktrees produced byte-identical chr22 BED. Under that pinning
-  the accelerator refactor of 2026-07-09 (`dfcdbcb` → `8838507`) is
-  byte-identical at `MALLOC_PERTURB_` = 1 **and** 255.
-- The synthetic fixtures in `tests/fixtures/` do **not** trigger the read (their
-  tracebacks never reach column 0), so `pytest` and fixture-level BED diffs are
-  stable and remain a valid regression gate.
-- Published recall/precision figures are reproducible to about ±0.01 pp, but the
-  individual calls behind them are not.
+- Before this fix, **BED byte-identity at chromosome scale was not an achievable
+  acceptance criterion**: two runs of the same commit differed, and with
+  `MALLOC_PERTURB_=0` the output depended even on the directory the repo sat in.
+  To compare two commits across that boundary, pin **both** `PYTHONHASHSEED` and
+  a **non-zero** `MALLOC_PERTURB_`. That was validated with a same-code /
+  different-path control, and used to show the accelerator refactor
+  (`dfcdbcb` → `8838507`) was byte-identical at `MALLOC_PERTURB_` = 1 and 255.
+- After this fix, chr22 output is identical at `MALLOC_PERTURB_` = 0, 1 and 255,
+  so the pinning is no longer needed.
+- The synthetic fixtures never reached the uninitialised cells, so `pytest` and
+  fixture BED diffs were always a stable gate — they just could not see the bug.
+  `tests/test_align_parity.py` can.
+- `c_extensions/build.py` used to rebuild only when a `.so` was **missing**. The
+  libraries are gitignored, so anyone who had already built would have kept
+  running the old binary after pulling this fix, silently. It now rebuilds when
+  the `.c` is newer.
+
+## 5. What was done, and what it cost
+
+Four changes, in `align_accel.c`, `motif_utils.py` and `c_extensions/build.py`,
+described in §3 and pinned by `tests/test_align_parity.py`:
+
+1. `calloc` the traceback table (defence — the out-of-band cells are provably
+   never read, but a future traceback bug should not become a heap read);
+2. write the column-0 backpointer into `ptr_table`, not just `curr_ptr`;
+3. give the C loop the Python loop's extension bound;
+4. break consensus ties on the smallest base everywhere.
+
+Plus a stale-check in `build.py` so the fix actually reaches an existing checkout.
+
+**Determinism, chr22, `PYTHONHASHSEED=0`:** the fixed build emits byte-identical
+BED at `MALLOC_PERTURB_` = 0, 1 **and** 255. The undefined behaviour is gone; the
+pinning workaround from §4 is no longer needed.
+
+**Detection, chr22 vs the adotto ground truth (24 807 regions), catchH gate base:**
+
+| build | calls | region recall | region precision | bp recall | bp precision |
+|-------|------:|--------------:|-----------------:|----------:|-------------:|
+| shipped (undefined) | 66 907 | 84.50 % | 52.34 % | 47.80 % | 32.63 % |
+| memory bug only | 66 583 | 84.40 % | 52.60 % | 47.73 % | 32.66 % |
+| **all four** | **66 854** | **84.38 %** | **52.74 %** | **47.49 %** | **32.65 %** |
+
+It trades **0.12 pp of region recall for 0.40 pp of region precision** — 53 fewer
+calls, most of them the fabricated ones the garbage traceback used to invent.
+That is a net gain on the F1 the benchmark reports (64.6 % → 64.9 %), and it is
+the first time the number means anything, because the previous one was a sample
+from an undefined distribution.
+
+The synthetic fixtures shift slightly too: the same number of calls in each, with
+4–8 changed boundary/statistic lines in `synth_tier1`, `synth_mixed` and
+`synth_adjacent`. Every ground-truth threshold still passes.

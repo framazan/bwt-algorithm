@@ -90,7 +90,10 @@ static int align_one(
     }
 
     /* Full ptr table needed for traceback — allocate on heap (64-bit size). */
-    char *ptr_table = (char *)malloc(((size_t)m + 1) * cols_sz * sizeof(char));
+    /* calloc, not malloc: the fill loop below writes only [j_min..j_max] of each
+     * row, so nothing else in this table is ever assigned. 0 is the traceback's
+     * Stop code, matching _accelerators.pyx, which zero-fills its whole table. */
+    char *ptr_table = (char *)calloc(((size_t)m + 1) * cols_sz, sizeof(char));
     if (!ptr_table) {
         if (on_heap) { free(prev_row); free(curr_row); free(prev_ptr); free(curr_ptr); }
         return 0;
@@ -111,9 +114,14 @@ static int align_one(
         int j_max = i + band;
         if (j_max > w) j_max = w;
 
-        /* Init column 0 for this row */
+        /* Init column 0 for this row. The backpointer must go into ptr_table,
+         * which is what the traceback reads — curr_ptr is never read. Writing only
+         * curr_ptr left column 0 uninitialised, so any alignment that walked off
+         * the left edge read heap garbage and the whole caller became
+         * nondeterministic. _accelerators.pyx sets ptr[i*cols] = D here. */
         curr_row[0] = i;
         curr_ptr[0] = 'D';
+        ptr_table[(size_t)i * cols_sz] = 'D';
         /* Set out-of-band to inf */
         for (int j = 1; j < j_min; j++) curr_row[j] = inf;
         for (int j = j_max + 1; j <= w; j++) curr_row[j] = inf;
@@ -252,10 +260,17 @@ int align_repeat_region_c(
     int total_mm = 0, total_ins = 0, total_del = 0;
     int max_err = 0;
 
+    /* Same extension bound as MotifUtils.align_repeat_region:
+     *   min(seq_len, max(end, start + motif_len*min_copies) + max(motif_len*3, max_indel*4))
+     * The old form, end + motif_len*3 + max_indel*4, let the C loop run past where
+     * the Python one stopped, so the two implementations placed array boundaries
+     * differently. */
     int pos = start;
-    int safety = text_len;
-    if (end + motif_len * 3 + max_indel * 4 < safety)
-        safety = end + motif_len * 3 + max_indel * 4;
+    int base = end;
+    if (start + motif_len * min_copies > base) base = start + motif_len * min_copies;
+    int slack = motif_len * 3;
+    if (max_indel * 4 > slack) slack = max_indel * 4;
+    int safety = base + slack;
     if (safety > text_len) safety = text_len;
 
     while (pos < safety) {
