@@ -238,6 +238,25 @@ Byte-identity of the BED **under pinned allocator behaviour** is the acceptance
 criterion. The synthetic fixtures never reach the uninitialised cells, so
 V1/V2/V3-lite are unaffected and remain exact.
 
+### Results
+
+| check | result |
+|-------|--------|
+| V1 — `pytest` with the `.so` | **81 passed** (was 44) |
+| V2 — `pytest` with the `.so` removed | **47 passed**, 0 failed, only native-only tests skipped (was 1 failed / 34 passed / 9 skipped) |
+| V3-lite — 5 fixtures × 4 formats × 6 env configs, both accelerator paths | **byte-identical** to the `dfcdbcb` baseline |
+| V3 control — same commit, two different worktrees, `MALLOC_PERTURB_=255` | **byte-identical** (pinning works) |
+| **V3 — `dfcdbcb` vs `8838507`, chr22, `MALLOC_PERTURB_=255`** | **byte-identical**, 66 907 rows |
+| **V3 — same, `MALLOC_PERTURB_=1`** | **byte-identical** |
+
+Two independent garbage constants agree, and they agree with each other
+(`0x00` and `0xfe` are both non-opcodes, so the traceback stops identically).
+The refactor changes no output.
+
+Also measured, and reported separately: with `MALLOC_PERTURB_=0` the *real* heap
+garbage occasionally reads as an opcode, adding **12 spurious calls on chr22**
+relative to the pinned runs.
+
 ---
 
 ## 5. Risks

@@ -42,11 +42,19 @@ freshly `malloc`'d memory with `MALLOC_PERTURB_ ^ 0xff`, so this is a direct
 measurement that **detection depends on the contents of uninitialised heap
 memory**. chr22, identical code, `PYTHONHASHSEED=0`:
 
-| run | `MALLOC_PERTURB_` | rows | vs the first |
-|-----|------------------:|-----:|--------------|
-| A | 0   | 66 919 | — |
-| B | 0   | 66 919 | **byte-identical** |
-| D | 255 | 66 907 | **differs** |
+| run | `MALLOC_PERTURB_` | garbage byte | rows | vs run A |
+|-----|------------------:|-------------:|-----:|----------|
+| A | 0   | whatever the heap held | 66 919 | — |
+| B | 0   | same process history   | 66 919 | **byte-identical** |
+| D | 255 | `0x00`                 | 66 907 | **differs** |
+| G | 1   | `0xfe`                 | 66 907 | **differs from A, identical to D** |
+
+The last row is the tell. Neither `0x00` nor `0xfe` is one of the traceback's
+opcodes (`'M'`, `'S'`, `'D'`, `'I'`), so both make it stop at the first
+unwritten cell — deterministically, and identically. Only the *real* heap
+garbage occasionally lands on a byte that looks like an opcode, which lets the
+traceback keep walking a fabricated alignment path. **Those accidents produce 12
+extra calls on chr22 alone.**
 
 The read is in `src/c_extensions/align_accel.c`, the C accelerator behind
 `MotifUtils.align_repeat_region` (Tier 2 / satellite refinement — which is
@@ -129,10 +137,15 @@ points, not a drive-by commit. The patch is preserved at
 ## 4. Consequences for anyone verifying a change
 
 - **BED byte-identity at chromosome scale is not an achievable acceptance
-  criterion** with the current C extension. Two runs of the same commit differ.
+  criterion** with the current C extension. Two runs of the same commit differ,
+  and with `MALLOC_PERTURB_=0` the output depends even on the directory the repo
+  sits in — so a worktree baseline vs the live repo is not a fair comparison.
 - To compare two commits on real chromosomes, pin **both** `PYTHONHASHSEED` and
-  a **non-zero** `MALLOC_PERTURB_`. A non-zero value makes the garbage a
-  constant, which removes the run-to-run and path-to-path variation.
+  a **non-zero** `MALLOC_PERTURB_`. This was validated with a same-code /
+  different-path control: at `MALLOC_PERTURB_=255` the identical commit run from
+  two different worktrees produced byte-identical chr22 BED. Under that pinning
+  the accelerator refactor of 2026-07-09 (`dfcdbcb` → `8838507`) is
+  byte-identical at `MALLOC_PERTURB_` = 1 **and** 255.
 - The synthetic fixtures in `tests/fixtures/` do **not** trigger the read (their
   tracebacks never reach column 0), so `pytest` and fixture-level BED diffs are
   stable and remain a valid regression gate.
