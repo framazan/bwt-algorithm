@@ -207,22 +207,36 @@ out of scope. Bands E/F are out of scope.
 
 | tier | command | pre-change | required post-change |
 |------|---------|-----------|----------------------|
-| V1 | `pytest tests/ -q` with `.so` | 44 passed | 44+ passed, 0 failed |
-| V2 | `pytest tests/ -q`, `BWT_DISABLE_NATIVE=1` | 1 failed / 34 passed / 9 skipped | all passed, **0 skipped** |
-| V3-lite | 5 fixtures × {bed, trf} with `.so` | md5 baseline captured at `dfcdbcb` | **byte-identical** |
-| V3 | chr21+chr22 proxy under the catchH gate base | clean-HEAD worktree run | **byte-identical BED**, unchanged recall/precision |
+| V1 | `pytest tests/ -q` with `.so` | 44 passed | all passed, 0 failed |
+| V2 | `pytest tests/ -q` with the `.so` removed | 1 failed / 34 passed / 9 skipped | all passed, **0 ground-truth skips** |
+| V3-lite | 5 fixtures × {bed, trf, vcf, strfinder} × 6 env configs | md5 baseline captured at `dfcdbcb` | **byte-identical** |
+| V3 | chr22 under the catchH gate base, `PYTHONHASHSEED=0` + non-zero `MALLOC_PERTURB_` | clean-worktree run at `dfcdbcb` | **byte-identical BED** |
 
-V3 runs `src/main.py` over chr21 (47 Mb) and chr22 (52 Mb) with the exact `x_*`
-ledger environment — `TIER1_FMSCAN=1`, `TIER1_SHORT_PERIOD_MAX=9`,
-`TIER2_MISMATCH=0.30`, `CATCHALL_SCAN=1 CATCHALL_MIN_IDENTITY=0.72` — chosen
-because it exercises the widest set of code paths (Tier 1 FM-scan, Tier 2, Tier
-3, the satellite gap-fill, and the catch-all periodicity pass) in one run. The
-pre-change side runs from a detached `git worktree` at `dfcdbcb` so the working
-tree can be edited concurrently. Reference: the `x_base` ledger row scored
-84.05% region recall / 50.01% precision on this pool.
+> **V3 was redesigned mid-flight.** The original criterion — "chr21+chr22 BED
+> byte-identical" — turned out to be **unachievable**: two runs of the *same*
+> commit from the *same* worktree differ (pool 131 735 vs 131 736 rows, 67
+> sorted-diff lines). The caller reads uninitialised heap memory in
+> `align_accel.c`, so its output depends on the allocator, and with
+> `MALLOC_PERTURB_=0` even on the directory the repo sits in. See
+> `docs/2026-07-09-nondeterminism-uninitialised-ptr-table.md`.
+>
+> A **non-zero** `MALLOC_PERTURB_` makes that garbage a constant and restores
+> determinism, so V3 compares old and new under a pinned
+> `PYTHONHASHSEED=0` + `MALLOC_PERTURB_∈{1,255}`, with a same-code /
+> different-path control to confirm the pinning removed the path dependence.
+> chr22 alone is used (≈18 min) — it carries almost all of the variance.
 
-Byte-identity of the BED is the acceptance criterion; the recall/precision
-numbers are a secondary sanity check (identical BED ⇒ identical scores).
+V3 runs `src/main.py` with the exact `x_*` ledger environment —
+`TIER1_FMSCAN=1`, `TIER1_SHORT_PERIOD_MAX=9`, `TIER2_MISMATCH=0.30`,
+`CATCHALL_SCAN=1 CATCHALL_MIN_IDENTITY=0.72` — chosen because it exercises the
+widest set of code paths (Tier 1 FM-scan, Tier 2, Tier 3, the satellite gap-fill,
+and the catch-all periodicity pass) in one run. Both sides run from detached
+`git worktree`s so the live tree can be edited concurrently, and so the compared
+binaries cannot drift.
+
+Byte-identity of the BED **under pinned allocator behaviour** is the acceptance
+criterion. The synthetic fixtures never reach the uninitialised cells, so
+V1/V2/V3-lite are unaffected and remain exact.
 
 ---
 
