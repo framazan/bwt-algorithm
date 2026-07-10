@@ -72,7 +72,7 @@ pip install numba Cython
 
 ### Building Cython Extensions
 
-`_accelerators.pyx` provides performance-critical paths including Hamming distance computation, mismatch extension, LCP candidate detection, and DP alignment. Without compilation, pure-Python fallbacks are used, and some code paths return empty results.
+`_accelerators.pyx` provides performance-critical paths including Hamming distance computation, mismatch extension, LCP candidate detection, and DP alignment. Without compilation, pure-Python fallbacks take over. They are faithful — the same repeats are detected, just far more slowly — and `tests/test_accel_parity.py` holds the two paths to byte-identical output. Build the extension for any real run. Set `BWT_DISABLE_NATIVE=1` to force the pure-Python path.
 
 ```bash
 # Run from the project root
@@ -537,14 +537,17 @@ bwtandem/
 │   ├── tier3.py            # Tier3LongReadFinder: Long repeats + adaptive parameters
 │   ├── motif_utils.py      # MotifUtils: Canonical motifs, primitive period detection, DP alignment, statistics
 │   ├── models.py           # Data classes: TandemRepeat, RefinedRepeat, etc. + output formatters
-│   ├── accelerators.py     # Transparent Cython extension loader (falls back to Python if unavailable)
-│   ├── _accelerators.pyx   # Cython source: Hamming distance, LCP detection, DP alignment, etc.
-│   └── utils.py            # Common utilities
+│   ├── autocorr.py         # Shared autocorrelation primitives (periodicity at offset p)
+│   ├── coverage.py         # Interval -> boolean coverage mask
+│   ├── accelerators.py     # Cython extension loader + faithful pure-Python fallbacks
+│   └── _accelerators.pyx   # Cython source: Hamming distance, LCP detection, DP alignment, etc.
 ├── tests/
 │   ├── test_adaptive_params.py  # Tier 3 adaptive parameter unit tests (10)
 │   ├── test_anchor_scan.py      # Anchor-based boundary verification tests (5)
 │   ├── test_tier3_wiring.py     # Tier 3 integration wiring tests (3)
 │   ├── test_ground_truth.py     # Synthetic sequence regression tests (11)
+│   ├── test_accel_parity.py     # Compiled vs pure-Python paths must emit identical BED/TRF
+│   ├── test_accel_differential.py  # Each Python fallback vs its Cython original, randomised
 │   ├── test_random_stress.py    # Stress test with 30 random sequences
 │   └── fixtures/
 │         ├── generate_synthetic.py    # Synthetic data generation script (seed=42)
