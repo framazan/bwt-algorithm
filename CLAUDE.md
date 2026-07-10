@@ -146,6 +146,13 @@ The dominant short-STR recall levers are `TIER1_MIN_ARRAY_LEN` + `TIER1_MIN_SCOR
 precision. See `docs/2026-06-20-exp1-human-sensitivity.md` for the measured
 recall/precision frontier and the chosen operating point.
 
+**All recall/precision figures below predate `706fb76`.** They were measured with a
+`libalign_accel` that read uninitialised heap in its alignment traceback, so the
+caller was not reproducible (two runs of one commit differed). Fixed 2026-07-09;
+on chr22 the fix moves region recall −0.12 pp and region precision +0.40 pp. The
+operating points and their ordering are unchanged; the genome-scale numbers have
+not been re-run. See `docs/2026-07-09-nondeterminism-uninitialised-ptr-table.md`.
+
 **Exp1 recall op-point (v2.1, precision-leader):** on top of the comboChi base,
 `TIER2_MISMATCH=0.30` + `TIER1_FMSCAN_MIN_DENSITY=0.45` + `TIER1_FMSCAN_MIN_LLR=6.0`
 lifts full-genome adotto region recall **57.62%→59.04%, bp recall 35.11%→39.42%**,

@@ -3,6 +3,17 @@
 **For: Filip.**  Branch: `perf/exp1-human-sensitivity` (origin = github.com/wyim-pgl/bwt-algorithm).
 Date: 2026-06-25. Author: Won (with Claude Code).
 
+> **Numbers below predate `706fb76` (2026-07-09) and will shift slightly.** Every
+> figure on this page was measured with a build of `libalign_accel` that read
+> uninitialised heap memory in its alignment traceback, so the caller was not
+> reproducible: two runs of the same commit gave different calls. That is fixed;
+> the run-to-run variation is gone. Re-measured on chr22 against the adotto GT,
+> the fix moves region recall **84.50 % → 84.38 %** and region precision
+> **52.34 % → 52.74 %** (53 fewer calls, mostly ones the garbage traceback
+> invented). The genome-scale figures on this page have **not** been re-run. The
+> operating points, run commands and the shape of every conclusion are unchanged.
+> See `docs/2026-07-09-nondeterminism-uninitialised-ptr-table.md`.
+
 ---
 
 ## TL;DR
