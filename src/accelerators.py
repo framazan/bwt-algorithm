@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import math
 import os
+import sys
 import warnings
 from typing import List, Optional, Tuple
 
@@ -36,20 +37,38 @@ else:
         from . import _accelerators as _native  # type: ignore
     except Exception as exc:  # ImportError, or a numpy/Cython ABI mismatch
         _native = None
-        warnings.warn(
+        _message = (
             f"Compiled extension src/_accelerators could not be imported ({exc}); "
             "falling back to pure Python. Results are identical but detection will "
-            "be much slower. See CLAUDE.md 'Building Cython Extensions'.",
-            RuntimeWarning,
-            stacklevel=2,
+            "be much slower. See CLAUDE.md 'Building Cython Extensions'."
         )
+        try:
+            warnings.warn(_message, RuntimeWarning, stacklevel=2)
+        except RuntimeWarning:
+            # `-W error` / PYTHONWARNINGS=error escalates this advisory into an
+            # exception, which would make the package unimportable without the
+            # extension. The fallback is correct, so say so and keep going.
+            print(_message, file=sys.stderr)
 
 NATIVE_AVAILABLE = _native is not None
 
-# The .pyx reads this once at import to pick between the default fixed-consensus
-# extender and the rolling-consensus one; mirror that here so the check stays out
-# of the per-seed hot path.
-_EXT_ROLLING_REQUESTED = os.environ.get("TIER1_EXT_ROLLING", "0") not in ("0", "")
+
+def _rolling_extender_requested() -> bool:
+    """Parse TIER1_EXT_ROLLING exactly as `_accelerators.pyx` does at its import.
+
+    The .pyx uses `bool(int(...))`, so "00" is falsey and "" or "false" raise.
+    Diverging here would mean the same environment selects a different extender
+    depending on whether the extension happens to be built.
+    """
+    raw = os.environ.get("TIER1_EXT_ROLLING", "0")
+    try:
+        return bool(int(raw))
+    except ValueError:
+        raise ValueError(f"TIER1_EXT_ROLLING must be an integer, got {raw!r}") from None
+
+
+# Read once at import, like the .pyx, so the check stays out of the per-seed hot path.
+_EXT_ROLLING_REQUESTED = _rolling_extender_requested()
 
 AcceleratorResult = Optional[Tuple[int, int, int, int, int]]
 """(array_start, array_end, copies, full_start, full_end) or None."""

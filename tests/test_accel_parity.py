@@ -103,6 +103,49 @@ def test_rolling_extender_refuses_to_run_without_the_extension():
     assert "TIER1_EXT_ROLLING" in proc.stderr
 
 
+@pytest.mark.parametrize("raw,rolling", [("0", False), ("00", False), (" 1 ", True), ("1", True)])
+def test_rolling_flag_parses_like_the_pyx(monkeypatch, raw, rolling):
+    """`bool(int(raw))`, same as _accelerators.pyx reads it at its own import.
+
+    A looser parse here would mean `TIER1_EXT_ROLLING=00` picks the default
+    extender when the extension is built and blows up when it is not.
+    """
+    from src import accelerators as acc
+
+    monkeypatch.setenv("TIER1_EXT_ROLLING", raw)
+    assert acc._rolling_extender_requested() is rolling
+
+
+@pytest.mark.parametrize("raw", ["", "false", "yes"])
+def test_rolling_flag_rejects_non_integers_like_the_pyx(monkeypatch, raw):
+    from src import accelerators as acc
+
+    monkeypatch.setenv("TIER1_EXT_ROLLING", raw)
+    with pytest.raises(ValueError):
+        acc._rolling_extender_requested()
+
+
+def test_import_survives_warnings_as_errors_without_the_extension():
+    """`-W error` must not make the package unimportable; the fallback is correct."""
+    env = dict(os.environ)
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    env.pop("BWT_DISABLE_NATIVE", None)
+    # `None` in sys.modules makes the import of that name raise ImportError,
+    # which hides the compiled extension without touching the file on disk.
+    stub = (
+        "import sys\n"
+        "sys.modules['src._accelerators'] = None\n"
+        "import warnings; warnings.simplefilter('error')\n"
+        "import src.accelerators as a\n"
+        "assert a.NATIVE_AVAILABLE is False\n"
+        "print('ok')\n"
+    )
+    proc = subprocess.run([sys.executable, "-c", stub], cwd=REPO_ROOT, env=env,
+                          capture_output=True, text=True, timeout=120)
+    assert proc.returncode == 0, f"import died under warnings-as-errors: {proc.stderr}"
+    assert "ok" in proc.stdout
+
+
 def test_all_public_accelerators_are_bound_in_both_modes():
     """Every symbol the tiers import must exist on both paths."""
     consumed = ["extend_with_mismatches", "find_periodic_runs", "lcp_tandem_candidates",
