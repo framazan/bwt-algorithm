@@ -413,8 +413,8 @@ python3 -m src.main masked_genome.fa --mask both -t $(nproc) -v
 # Execution time profiling (outputs top 20 hotspots)
 python3 -m src.main input.fa --tiers tier1 --format trf --profile -v
 
-# Profile results are also saved to input.tier2_profile.prof
-# Additional analysis possible with: python -m pstats input.tier2_profile.prof
+# Profile results are also saved to input.profile.prof
+# Additional analysis possible with: python -m pstats input.profile.prof
 ```
 
 ---
@@ -436,15 +436,20 @@ pytest tests/test_tier3_wiring.py -v      # Tier 3 integration wiring
 pytest tests/test_ground_truth.py -v -s   # Regression tests (detailed output)
 ```
 
-### Test Composition (29 tests + stress tests)
+### Test Composition (84 tests + stress tests)
 
-| Test File | Test Count | Description | Cython Required |
+| Test File | Test Count | Description | Needs compiled `.so` |
 |-----------|-----------|-------------|-----------------|
 | `test_adaptive_params.py` | 10 | Unit tests for `compute_adaptive_params()`: per-preset behavior, GC/coverage impact, sequence length mode switching | No |
 | `test_anchor_scan.py` | 5 | Unit tests for `anchor_scan_boundaries()`: perfect repeats, flanking sequences, imperfect repeats, single copy | No |
 | `test_tier3_wiring.py` | 3 | Tier 3 mode parameter passing verification: initialization, defaults, seed scan wiring | No |
-| `test_ground_truth.py` | 11 | Regression tests with synthetic sequences: per-Tier sensitivity/precision verification | Tier 2/3 tests only |
-| `test_random_stress.py` | -- | Stress test with 30 random sequences (run with `python3 -m tests.test_random_stress`) | Yes |
+| `test_ground_truth.py` | 11 | Regression tests with synthetic sequences: per-Tier sensitivity/precision verification | No |
+| `test_autocorr.py` | 12 | Shared autocorrelation primitives (`src/autocorr.py`) | No |
+| `test_satellite_gapfill.py` | 2 | Divergent alpha-satellite interior gap-fill regression guard (self-generating) | No |
+| `test_accel_parity.py` | 31 | Compiled vs pure-Python accelerator path must emit byte-identical BED/VCF/TRF/STRfinder | Skips comparisons if absent |
+| `test_accel_differential.py` | 6 | Each pure-Python fallback vs its Cython original on randomised inputs | Skips if absent |
+| `test_align_parity.py` | 3 | `libalign_accel` C loop vs the Python alignment loop must agree | Skips if absent |
+| `test_random_stress.py` | -- | Stress test with 30 random sequences (run with `python3 -m tests.test_random_stress`) | Recommended |
 
 ### Regression Tests (Ground Truth)
 
@@ -474,7 +479,7 @@ The following criteria are applied when matching ground truth to predictions:
 
 For imperfect repeats, the tool may report a consensus motif different from the original motif, so period compatibility checks prevent correctly detected repeats from being classified as false negatives.
 
-#### Test Results (2026-03-30)
+#### Test Results
 
 **Regression Tests (Synthetic Sequences, 11 tests)**
 
@@ -499,7 +504,7 @@ For imperfect repeats, the tool may report a consensus motif different from the 
 
 The stress test validates the robustness of the detector by inserting 2-5 repeats into 30 random 50KB sequences. It uses reproducible seeds (1000-1029).
 
-> **Note**: Tier 2/3/Mixed/Adjacent tests require the Cython extension (`_accelerators.so`) to be built. If run without Cython, those tests are automatically skipped.
+> **Note**: All tiers now run in both builds — the pure-Python fallbacks are faithful, so the Tier 2/3 ground-truth tests are no longer skipped when the compiled `_accelerators.so` is absent. What *does* skip without the `.so` is the cross-implementation parity suite (`test_accel_parity.py`, `test_accel_differential.py`, `test_align_parity.py`), because there is then only one implementation to compare against. Build the extension to exercise those. Baseline: **84 passed** with the `.so`; ~58 passed plus parity-skips without it.
 
 ### Test Data
 
@@ -540,14 +545,16 @@ bwtandem/
 │   ├── autocorr.py         # Shared autocorrelation primitives (periodicity at offset p)
 │   ├── coverage.py         # Interval -> boolean coverage mask
 │   ├── accelerators.py     # Cython extension loader + faithful pure-Python fallbacks
-│   └── _accelerators.pyx   # Cython source: Hamming distance, LCP detection, DP alignment, etc.
+│   ├── _accelerators.pyx   # Cython source: Hamming distance, LCP detection, DP alignment, etc.
+│   └── c_extensions/       # ctypes C libraries (align_accel, bwt_accel, tier1_scan, tier2_accel); build.py auto-rebuilds when a .c is newer than its .so
 ├── tests/
 │   ├── test_adaptive_params.py  # Tier 3 adaptive parameter unit tests (10)
 │   ├── test_anchor_scan.py      # Anchor-based boundary verification tests (5)
 │   ├── test_tier3_wiring.py     # Tier 3 integration wiring tests (3)
 │   ├── test_ground_truth.py     # Synthetic sequence regression tests (11)
-│   ├── test_accel_parity.py     # Compiled vs pure-Python paths must emit identical BED/TRF
+│   ├── test_accel_parity.py     # Compiled vs pure-Python paths must emit identical BED/VCF/TRF/STRfinder
 │   ├── test_accel_differential.py  # Each Python fallback vs its Cython original, randomised
+│   ├── test_align_parity.py     # libalign_accel C loop vs the Python alignment loop must agree
 │   ├── test_random_stress.py    # Stress test with 30 random sequences
 │   └── fixtures/
 │         ├── generate_synthetic.py    # Synthetic data generation script (seed=42)
@@ -589,6 +596,25 @@ main.py
 ---
 
 ## Benchmarks
+
+### De-novo sensitivity across three species (catch-all pass)
+
+An opt-in **catch-all periodicity pass** (`CATCHALL_SCAN=1`) recovers the diverged
+short STRs the seed-based 3-tier pipeline structurally cannot find, closing the
+recall gap to ULTRA/tantan. Measured on the reproducible build `d52a4ff`
+(2026-07-11):
+
+| Genome | metric | catch-all OFF | catch-all ON (catchF) |
+|--------|--------|--:|--:|
+| Human GRCh38 (adotto v1.2.1) | region recall / adj precision | 57.6 % / — | **80.5 % / 79.5 %** |
+| Maize Mo17 | 3A microsatellite bp | 11.1 M | **22.3 M** (+100 %) |
+| Arabidopsis Col-CEN | CEN180 monomer recall | 99.68 % | 99.69 % (leave OFF) |
+
+The catch-all is a short-STR / microsatellite mechanism (period ≤ 20 bp): turn it
+**on for STR runs, off for satellite / centromere runs** (where BWTandem already
+saturates — 25/25 knob180, 17/17 TR-1, 17/17 CentC in maize; 99.7 % CEN180). It is
+opt-in, so all existing runs are unchanged. Full tables, all tools, and exact
+commands: [`docs/2026-06-25-catch-all-benchmark-for-filip.md`](docs/2026-06-25-catch-all-benchmark-for-filip.md).
 
 ### Synthetic Sequence Accuracy (44 ground truth repeats)
 
