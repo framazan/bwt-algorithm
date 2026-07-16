@@ -183,11 +183,9 @@ class TandemRepeat:
         else:
             core_seq = core_seq_full
 
-        # Allele_coverage - percentage (use percent_matches if available, else confidence)
-        if hasattr(self, 'percent_matches') and self.percent_matches is not None:
-            allele_coverage = f"{self.percent_matches:.0f}%"
-        else:
-            allele_coverage = f"{self.confidence * 100:.0f}%"
+        # Allele_coverage - percentage. percent_matches is a field defaulting to 0.0,
+        # so it is always present; the old confidence-based branch was unreachable.
+        allele_coverage = f"{self.percent_matches:.0f}%"
 
         # Alleles_ratio - for diploid; use "-" for haploid
         alleles_ratio = "-"

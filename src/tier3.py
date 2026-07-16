@@ -1,9 +1,11 @@
-import math  # Standard library for math functions (log10, etc.)
-import numpy as np  # NumPy for array operations and numerical computation
-from typing import List, Tuple, Set, Optional  # typing module for type hints
+import math
+import itertools
+import numpy as np
+from typing import List, Tuple, Set, Optional
 from .models import TandemRepeat  # Data class for tandem repeat results
 from .motif_utils import MotifUtils  # Motif analysis utilities (alignment, consensus, TRF statistics, etc.)
 from .bwt_core import BWTCore  # FM-index core module (BWT, backward search, etc.)
+from .coverage import intervals_to_mask  # shared interval -> boolean mask
 from .accelerators import anchor_scan_boundaries  # Cython-accelerated anchor-based boundary verification
 from .bwt_seed import bwt_kmer_seed_scan  # Shared BWT k-mer seeding pipeline
 
@@ -118,12 +120,8 @@ class Tier3LongReadFinder:
         if n < self.min_length * 2:
             return []
 
-        # Create boolean mask marking regions already found by previous tiers
-        mask = np.zeros(n, dtype=bool)  # Initially all positions are uncovered
-        for start, end in tier1_seen:
-            mask[start:min(end, n)] = True  # Mark regions found by Tier 1
-        for start, end in tier2_seen:
-            mask[start:min(end, n)] = True  # Mark regions found by Tier 2
+        # Regions already claimed by Tier 1 and Tier 2
+        mask = intervals_to_mask(itertools.chain(tier1_seen, tier2_seen), n)
 
         # Compute adaptive parameters based on sequence characteristics
         gc_content = float(np.mean((text_arr == ord('G')) | (text_arr == ord('C'))))  # Compute GC content

@@ -1,14 +1,16 @@
-import math
 import ctypes
+import os
 
 import numpy as np
 from typing import List, Tuple, Set, Optional
 import time
 from .models import TandemRepeat
 from .motif_utils import MotifUtils
-from .bwt_core import BWTCore, _kasai_lcp_uint8
-from .accelerators import extend_with_mismatches, lcp_tandem_candidates, find_tandem_runs
+from .bwt_core import BWTCore, _kasai_lcp_uint8, effective_length
+from .coverage import intervals_to_mask
+from .accelerators import extend_with_mismatches, lcp_tandem_candidates
 from .bwt_seed import bwt_kmer_seed_scan
+from .autocorr import windowed_match_counts, contiguous_true_runs  # shared periodicity primitives
 
 # Load Tier 2 C acceleration library
 try:
@@ -63,17 +65,40 @@ class Tier2LCPFinder:
         self.min_period = max(10, min_period)
         self.max_period = max_period
         self.max_short_motif = max_short_motif  # For FM-index search (1-9bp)
-        self.min_copies = 3  # Require at least 3 copies
-        self.min_array_length = 6  # Minimum total array length (for short repeats)
-        self.min_entropy = 1.0  # Minimum Shannon entropy
+        # Detection thresholds — tunable via env vars for parameter sweeps.
+        # Defaults reproduce the original hardcoded behaviour exactly.
+        self.min_copies = int(os.environ.get("TIER2_MIN_COPIES", "3"))  # Require at least 3 copies
+        self.min_array_length = int(os.environ.get("TIER2_MIN_ARRAY_LEN", "6"))
+        # required copies for short (<20bp) periods in the simple scan
+        self.short_req_copies = int(os.environ.get("TIER2_SHORT_REQ_COPIES", "3"))
+        # Approximate (autocorrelation) seeding for the diverged period-10-20
+        # notch — opt-in; default off reproduces baseline exactly. Detects local
+        # periodicity directly instead of requiring an exact seed (LCP plateau or
+        # exact k-mer recurrence), which diverged arrays never form.
+        self.approx_seed = int(os.environ.get("TIER2_APPROX_SEED") or "0")
+        self.approx_min_identity = float(os.environ.get("TIER2_APPROX_MIN_IDENTITY") or "0.78")
+        self.approx_max_period = int(os.environ.get("TIER2_APPROX_MAX_P") or "20")
+        self.approx_min_copies = int(os.environ.get("TIER2_APPROX_MIN_COPIES") or "2")
         self.allow_mismatches = allow_mismatches
         self.show_progress = show_progress
-        self.period_step = 1  # Step size for period scanning (increase to speed up)
-        self.allowed_mismatch_rate = max(0.0, allowed_mismatch_rate)
+        _mm = os.environ.get("TIER2_MISMATCH")
+        self.allowed_mismatch_rate = max(0.0, float(_mm) if _mm else allowed_mismatch_rate)
         self.allowed_indel_rate = max(0.0, allowed_indel_rate)
+        # Maximum period for Phase A's per-copy seed-and-extend + banded-DP
+        # refinement.  Phase A's aligner is O(period^2) per copy; on dense
+        # satellite arrays the LCP scan emits huge spurious periods (integer
+        # multiples of the true unit, up to ~max_period) that never yield a valid
+        # repeat yet dominate runtime/memory (observed ~30 GB / OOM on a 3 Mb
+        # alpha-HOR array).  Periods above this bound are skipped in Phase A —
+        # genuine long units are recovered by Phase B (BWT k-mer seeding) and
+        # Tier 3 (anchor-based), which scale to long periods.  Tunable; the
+        # default comfortably covers real tandem units (e.g. the ~2 kb alpha HOR)
+        # with several-fold margin.
+        self.long_unit_dp_max_period = int(
+            os.environ.get("TIER2_LONGUNIT_DP_MAX_PERIOD", "8192")
+        )
         self.sequence_str = self.bwt.text_arr.tobytes().decode('ascii', errors='replace')
         self._lcp_cache = None  # Lazily computed LCP array
-        self._bwt_call_count = 0  # Track BWT usage for diagnostics
 
     def _get_lcp_array(self) -> np.ndarray:
         """Get (or compute and cache) the LCP array."""
@@ -102,6 +127,21 @@ class Tier2LCPFinder:
 
         return MotifUtils.refined_to_repeat(chromosome, refined, tier, self.bwt.text_arr, strand=strand)
 
+    @staticmethod
+    def _record_repeat(repeat: TandemRepeat, out: List[TandemRepeat],
+                       covered: Set[Tuple[int, int]], covered_mask: np.ndarray,
+                       n: int) -> None:
+        """Append an accepted repeat and mark its span in the coverage structures.
+
+        Centralizes the "append to the result list + record (start, end) in
+        ``covered`` + set the coverage mask over [start, end)" invariant shared by
+        every detection phase (Phase A/B of both scans and the autocorr seeder),
+        so the three side effects always stay in lockstep.
+        """
+        out.append(repeat)
+        covered.add((repeat.start, repeat.end))
+        covered_mask[repeat.start:min(repeat.end, n)] = True
+
     def find_long_unit_repeats_strict(self, chromosome: str, min_unit_len: int = 20,
                                       max_unit_len: int = 120, max_mismatch: int = 2,
                                       min_copies: int = 2) -> List[TandemRepeat]:
@@ -125,11 +165,7 @@ class Tier2LCPFinder:
         """
         repeats = []
         text_arr = self.bwt.text_arr
-        n = int(text_arr.size)
-
-        # Exclude sentinel
-        if n > 0 and text_arr[n - 1] == 36:  # '$' = 36
-            n -= 1
+        n = effective_length(text_arr)
 
         covered: Set[Tuple[int, int]] = set()
 
@@ -160,6 +196,12 @@ class Tier2LCPFinder:
 
         # Process each period (longest first for proper nesting)
         for period in sorted(period_seeds.keys(), reverse=True):
+            # Skip pathologically large periods: Phase A's per-copy banded DP is
+            # O(period^2) and such periods (spurious LCP multiples on satellite
+            # arrays) blow up runtime/memory without producing valid repeats.
+            # Long real units are handled by Phase B and Tier 3.
+            if period > self.long_unit_dp_max_period:
+                continue
             seeds = sorted(set(period_seeds[period]))
 
             for seed_pos in seeds:
@@ -190,9 +232,7 @@ class Tier2LCPFinder:
                     tier=2, min_copies=max(2, min_copies)
                 )
                 if repeat:
-                    repeats.append(repeat)
-                    covered.add((repeat.start, repeat.end))
-                    covered_mask[repeat.start:min(repeat.end, n)] = True
+                    self._record_repeat(repeat, repeats, covered, covered_mask, n)
                     bwt_found += 1
 
         if self.show_progress:
@@ -226,33 +266,13 @@ class Tier2LCPFinder:
                 tier=2, min_copies=max(2, min_copies)
             )
             if repeat:
-                repeats.append(repeat)
-                covered.add((repeat.start, repeat.end))
-                covered_mask[repeat.start:min(repeat.end, n)] = True
+                self._record_repeat(repeat, repeats, covered, covered_mask, n)
                 fallback_found += 1
 
         if self.show_progress:
             print(f"  [{chromosome}] Tier 2 long-unit: Phase B found {fallback_found} additional repeats", flush=True)
 
         return repeats
-
-    def _get_max_mismatches_for_array(self, motif_len: int, n_copies: int) -> int:
-        """Calculate maximum allowed mismatches for full array.
-
-        Args:
-            motif_len: Length of the motif/period
-            n_copies: Number of tandem copies
-
-        Returns:
-            Maximum allowed mismatches across entire repeat array
-        """
-        total_length = motif_len * n_copies
-
-        if motif_len == 1:
-            return 0
-
-        allowed_rate = max(0.01, min(0.5, self.allowed_mismatch_rate))
-        return max(1, int(np.ceil(allowed_rate * total_length)))
     
     def find_long_repeats(self, chromosome: str, tier1_seen: Optional[Set[Tuple[int, int]]] = None,
                          max_scan_period: Optional[int] = None) -> List[TandemRepeat]:
@@ -292,10 +312,7 @@ class Tier2LCPFinder:
             max_scan_period: Optional maximum period to scan
         """
         s_arr = self.bwt.text_arr
-        n = int(s_arr.size)
-        # Exclude trailing sentinel if present ('$' == 36)
-        if n > 0 and s_arr[n - 1] == 36:
-            n -= 1
+        n = effective_length(s_arr)
 
         # Determine max period
         if max_scan_period is not None:
@@ -313,13 +330,9 @@ class Tier2LCPFinder:
 
         min_p = min(self.min_period, max_p)
         results: List[TandemRepeat] = []
-        seen: Set[Tuple[int, int, str]] = set()
         covered: Set[Tuple[int, int]] = set()
 
-        # Build tier1 mask
-        tier1_mask = np.zeros(n, dtype=bool)
-        for start, end in tier1_seen:
-            tier1_mask[start:min(end, n)] = True
+        tier1_mask = intervals_to_mask(tier1_seen, n)
 
         start_time = time.time()
 
@@ -366,7 +379,7 @@ class Tier2LCPFinder:
                     continue
 
                 arr_start, arr_end, copies, full_start, full_end = res
-                required_copies = 2 if period >= 20 else self.min_copies
+                required_copies = 2 if period >= 20 else self.short_req_copies
                 if copies < required_copies:
                     continue
 
@@ -383,9 +396,7 @@ class Tier2LCPFinder:
                     chromosome, full_start, full_end, motif, tier=2
                 )
                 if repeat:
-                    results.append(repeat)
-                    covered.add((repeat.start, repeat.end))
-                    covered_mask[repeat.start:min(repeat.end, n)] = True
+                    self._record_repeat(repeat, results, covered, covered_mask, n)
                     bwt_found += 1
 
         if self.show_progress:
@@ -427,13 +438,118 @@ class Tier2LCPFinder:
                 chromosome, cand.start, cand.end, motif, tier=2
             )
             if repeat:
-                results.append(repeat)
-                covered.add((repeat.start, repeat.end))
-                covered_mask[repeat.start:min(repeat.end, n)] = True
+                self._record_repeat(repeat, results, covered, covered_mask, n)
                 fallback_found += 1
 
         if self.show_progress:
             print(f"  [{chromosome}] Tier 2 simple scan: Phase B found {fallback_found} additional repeats "
                   f"in {time.time() - start_time:.2f}s total", flush=True)
 
+        # ===== Phase C: autocorrelation seeding for the diverged period 10-20 notch =====
+        # (opt-in via TIER2_APPROX_SEED). Phases A/B require an exact seed, so an
+        # array with a substitution in every copy yields zero seeds. Here we detect
+        # local periodicity directly (vectorized identity between offset-p windows),
+        # recovering diverged short/medium STRs that the exact paths cannot find.
+        if self.approx_seed:
+            ac_min_p = max(min_p, 10)
+            ac_max_p = min(self.approx_max_period, max_p)
+            if ac_max_p >= ac_min_p:
+                # Pass the original tier1 mask (not covered_mask): Phase B marks
+                # covered_mask for candidates it *speculatively* seeds even when
+                # they are then rejected, which would wrongly hide whole diverged
+                # arrays from Phase C. Phase C rebuilds exclusion from tier1 +
+                # the actually-accepted results.
+                approx_found = self._autocorr_seed(
+                    s_arr, n, ac_min_p, ac_max_p, tier1_mask,
+                    chromosome, results, covered,
+                )
+                if self.show_progress:
+                    print(f"  [{chromosome}] Tier 2 simple scan: Phase C (autocorr) "
+                          f"found {approx_found} repeats in {time.time() - start_time:.2f}s total",
+                          flush=True)
+
         return results
+
+    def _autocorr_seed(self, s_arr, n, min_p, max_p, protect_mask,
+                       chromosome, results, covered) -> int:
+        """Vectorized autocorrelation seeding for periods [min_p, max_p].
+
+        For each period p, identity[i] = fraction of matching bases between the
+        window s[i:i+W] and s[i+p:i+p+W] (W = 4*p), computed in O(n) via a cumsum
+        sliding window. Positions whose local identity clears
+        ``approx_min_identity`` (well above the 0.25 random-DNA expectation) and
+        that are not already covered seed ``extend_with_mismatches`` for real
+        boundaries; coverage marking keeps one call per array.
+
+        ``protect_mask`` marks positions claimed by earlier tiers; this method
+        rebuilds its own exclusion mask from it plus the already-accepted
+        ``covered`` repeats, so speculative (and rejected) Phase-B marks do not
+        hide diverged arrays.
+        """
+        found = 0
+        min_id = self.approx_min_identity
+        s = s_arr[:n]
+        # Exclusion mask = other-tier regions + accepted results only.
+        seen = protect_mask.copy()
+        for cs_, ce_ in covered:
+            if 0 <= cs_ < n:
+                seen[cs_:min(ce_, n)] = True
+        # Per-period cap on seed attempts (safety bound for pathological
+        # low-complexity input; real arrays are far fewer).
+        max_attempts = int(os.environ.get("TIER2_APPROX_MAX_SEEDS") or "200000")
+        for period in range(min_p, max_p + 1):
+            window = 4 * period
+            if n <= period + window:
+                continue
+            # A real array's periodicity persists over many window starts; require
+            # the high-identity stretch to span at least one period of window
+            # starts. This filters the single-window noise that low-complexity DNA
+            # produces in bulk (the cause of the naive version's O(millions) seeds).
+            min_run = max(period, 8)
+            winsum = windowed_match_counts(s, period, window)  # matches in [i, i+window)
+            if winsum is None:
+                continue
+            hit = winsum >= (min_id * window)             # bool mask over window starts
+            if not hit.any():
+                continue
+            # Contiguous high-identity runs (vectorized, no per-index Python).
+            run_s, run_e = contiguous_true_runs(hit)      # exclusive ends
+            attempts = 0
+            for rs, re_ in zip(run_s.tolist(), run_e.tolist()):
+                if re_ - rs < min_run:
+                    continue
+                if seen[rs]:
+                    continue
+                attempts += 1
+                if attempts > max_attempts:
+                    break
+                # Seed motif from the max-identity window start (clean interior).
+                seed = rs + int(np.argmax(winsum[rs:re_]))
+                # Array end comes directly from the run extent (the last window
+                # starting at re_-1 covers up to re_-1+window; +period margin), so
+                # no per-seed extender call is needed.
+                a_end = min(re_ + window + period, n)
+                motif = _reduce_to_primitive(
+                    s_arr[seed:seed + period].tobytes()
+                )
+                # Phase-align the refine start to the seed copy (the motif's
+                # source) by stepping whole periods back toward the run start: an
+                # unaligned start lands mid-copy and refine_repeat fails to lock
+                # onto the motif. Trim inward by one period on retry to shed any
+                # partial copy the run picked up at a flank.
+                ref_start = seed - ((seed - rs) // period) * period
+                repeat = None
+                for ss, ee in ((ref_start, a_end),
+                               (ref_start + period, a_end),
+                               (ref_start, a_end - period)):
+                    if ee - ss < 2 * period:
+                        continue
+                    repeat = self._refine_and_create_repeat(
+                        chromosome, ss, ee, motif, tier=2
+                    )
+                    if repeat:
+                        break
+                if repeat:
+                    self._record_repeat(repeat, results, covered, seen, n)
+                    found += 1
+        return found

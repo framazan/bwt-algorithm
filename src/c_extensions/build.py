@@ -17,6 +17,14 @@ def get_lib_path():
     return _lib_path('tier1_scan')
 
 
+_SOURCES = (
+    ('tier1_scan.c', 'tier1_scan'),
+    ('tier2_accel.c', 'tier2_accel'),
+    ('align_accel.c', 'align_accel'),
+    ('bwt_accel.c', 'bwt_accel'),
+)
+
+
 def _compile(src_name, lib_name):
     """Compile a single C source to a shared library."""
     import subprocess
@@ -30,21 +38,46 @@ def _compile(src_name, lib_name):
     return True
 
 
-def build():
-    """Compile all C extensions."""
-    ok = _compile('tier1_scan.c', 'tier1_scan')
-    ok2 = _compile('tier2_accel.c', 'tier2_accel')
-    ok3 = _compile('align_accel.c', 'align_accel')
-    ok4 = _compile('bwt_accel.c', 'bwt_accel')
-    return ok and ok2 and ok3 and ok4
+def _is_stale(src_name, lib_name):
+    """True if the shared library is missing or older than its C source.
+
+    The libraries are gitignored build artefacts, so a checkout that already has
+    them would otherwise keep running an old binary after a `git pull` that
+    changed the `.c` — silently, since nothing else notices.
+    """
+    out = _lib_path(lib_name)
+    if not os.path.exists(out):
+        return True
+    return os.path.getmtime(os.path.join(_EXT_DIR, src_name)) > os.path.getmtime(out)
+
+
+def build(force=False):
+    """Compile any C extension whose source is newer than its library."""
+    results = [_compile(src, lib) for src, lib in _SOURCES
+               if force or _is_stale(src, lib)]
+    return all(results)
+
+
+def _ensure(lib_name, src_name):
+    """Build `lib_name` if its library is missing or stale. Returns True on success."""
+    if _is_stale(src_name, lib_name):
+        return _compile(src_name, lib_name)
+    return True
+
+
+def _ensure_from_path(lib_path):
+    """Build/refresh the library at `lib_path` if its C source is newer."""
+    for src, lib in _SOURCES:
+        if _lib_path(lib) == lib_path:
+            return _ensure(lib, src)
+    return os.path.exists(lib_path)
 
 
 def load():
     """Load the Tier 1 C library, building if necessary."""
     lib_path = get_lib_path()
-    if not os.path.exists(lib_path):
-        if not build():
-            return None
+    if not _ensure_from_path(lib_path):
+        return None
     try:
         lib = ctypes.CDLL(lib_path)
         lib.find_period_runs.restype = c_int
@@ -68,9 +101,8 @@ def load():
 def load_tier2():
     """Load the Tier 2 C library, building if necessary."""
     lib_path = _lib_path('tier2_accel')
-    if not os.path.exists(lib_path):
-        if not build():
-            return None
+    if not _ensure_from_path(lib_path):
+        return None
     try:
         lib = ctypes.CDLL(lib_path)
 
@@ -117,9 +149,8 @@ def load_tier2():
 def load_bwt():
     """Load the BWT acceleration C library, building if necessary."""
     lib_path = _lib_path('bwt_accel')
-    if not os.path.exists(lib_path):
-        if not build():
-            return None
+    if not _ensure_from_path(lib_path):
+        return None
     try:
         lib = ctypes.CDLL(lib_path)
 
@@ -179,9 +210,8 @@ def load_bwt():
 def load_align():
     """Load the alignment acceleration C library, building if necessary."""
     lib_path = _lib_path('align_accel')
-    if not os.path.exists(lib_path):
-        if not build():
-            return None
+    if not _ensure_from_path(lib_path):
+        return None
     try:
         lib = ctypes.CDLL(lib_path)
 

@@ -11,17 +11,10 @@ from typing import List, Tuple, Set, Optional
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures")
 
-# Check if Cython accelerators are available
-try:
-    from src._accelerators import extend_with_mismatches as _native_ext
-    HAS_CYTHON = True
-except ImportError:
-    HAS_CYTHON = False
-
-NEEDS_CYTHON = pytest.mark.skipif(
-    not HAS_CYTHON,
-    reason="Cython _accelerators not compiled — Tier 2/3 need extend_with_mismatches"
-)
+# Tier 2/3 used to be skipped here when the Cython _accelerators extension was
+# absent, because the pure-Python stubs returned nothing and every case failed.
+# The fallbacks are faithful now (see src/accelerators.py), so both builds must
+# clear the same thresholds. tests/test_accel_parity.py pins them together.
 
 
 # ── Ground truth BED parsing ──────────────────────────────────
@@ -282,7 +275,6 @@ class TestTier1GroundTruth:
 
 # ── Tier 2 Tests ──────────────────────────────────────────────
 
-@NEEDS_CYTHON
 class TestTier2GroundTruth:
     """Tier 2 ground truth: sensitivity >= 90%, precision >= 90%."""
 
@@ -315,7 +307,6 @@ class TestTier2GroundTruth:
 
 # ── Tier 3 Tests ──────────────────────────────────────────────
 
-@NEEDS_CYTHON
 class TestTier3GroundTruth:
     """Tier 3 ground truth: sensitivity >= 90%, precision >= 90%."""
 
@@ -348,7 +339,6 @@ class TestTier3GroundTruth:
 
 # ── Mixed Tests ───────────────────────────────────────────────
 
-@NEEDS_CYTHON
 class TestMixedGroundTruth:
     """Mixed tiers ground truth: per-tier thresholds on a single sequence."""
 
@@ -393,7 +383,6 @@ class TestMixedGroundTruth:
 
 # ── Adjacent/Edge Case Tests ─────────────────────────────────
 
-@NEEDS_CYTHON
 class TestAdjacentGroundTruth:
     """Adjacent repeat edge cases: overall sensitivity >= 95%, precision >= 90%."""
 

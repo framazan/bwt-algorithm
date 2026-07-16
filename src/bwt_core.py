@@ -2,6 +2,22 @@ import numpy as np
 import ctypes
 from typing import List, Tuple, Dict, Union
 
+SENTINEL = ord('$')  # appended before BWT construction; never a repeat base
+
+
+def effective_length(text_arr: np.ndarray) -> int:
+    """Length of `text_arr` with any trailing '$' sentinel excluded.
+
+    Note Tier 1 and Tier 3 deliberately do *not* strip: they keep the sentinel in
+    `n` and rely on `min(end, n)` clamping plus downstream '$' checks. Only call
+    this where the caller means the sentinel-free length.
+    """
+    n = int(text_arr.size)
+    if n > 0 and text_arr[n - 1] == SENTINEL:
+        n -= 1
+    return n
+
+
 # Optional: JIT acceleration with numba when available
 HAVE_NUMBA = False
 try:
@@ -92,17 +108,16 @@ class BWTCore:
     """Core BWT construction and FM-index operations.
     """
 
-    # Base encoding for bit-masking (bcftools-inspired)
-    BASE_TO_BITS = {'A': 0, 'C': 1, 'G': 2, 'T': 3, 'N': 0}  # 2 bits per base
-    BITS_TO_BASE = {0: 'A', 1: 'C', 2: 'G', 3: 'T'}
-
     def __init__(self, text: str, sa_sample_rate: int = 32, occ_sample_rate: int = 128):
         """
         Initialize BWT with FM-index.
 
         Args:
             text: Input text (should end with a single '$' sentinel not present elsewhere)
-            sa_sample_rate: Sample every nth suffix array position for space efficiency
+            sa_sample_rate: Inert. Suffix-array sampling was removed — `locate_positions`
+                reads `suffix_array` directly, and at the rate of 1 that `finder` used, the
+                sampled dict duplicated the whole array as Python ints (tens of GB per
+                large chromosome). Accepted for call-site compatibility.
             occ_sample_rate: Occurrence checkpoints every nth position to reduce memory
         """
         if '$' in text[:-1]:
@@ -113,10 +128,7 @@ class BWTCore:
         self.sa_sample_rate = sa_sample_rate
         self.occ_sample_rate = occ_sample_rate
 
-
         self.text_arr = np.frombuffer(text.encode('utf-8'), dtype=np.uint8)
-
-        self._build_kmer_hash()
 
         # Build suffix array and BWT (memory-efficient)
         self.suffix_array = self._build_suffix_array()
@@ -128,7 +140,6 @@ class BWTCore:
         self.char_counts_code = {ord(k): v for k, v in self.char_counts.items()}
         self.char_totals_code = {ord(k): v for k, v in self.char_totals.items()}
         self.occ_checkpoints = self._build_occurrence_checkpoints()
-        self.sampled_sa = self._sample_suffix_array()
 
         # Prepare C-accelerated data structures for backward search
         self._c_bwt_ptr = None
@@ -140,63 +151,6 @@ class BWTCore:
         if _c_bwt_lib is not None:
             self._prepare_c_bwt_data()
 
-    def _build_kmer_hash(self, k: int = 8):
-        """Build hash table for k-mer positions (bcftools-inspired optimization).
-
-        Uses bit-masking for fast k-mer encoding (2 bits per base).
-        """
-        self.kmer_hash = {}  # hash -> list of positions
-        if self.n < k:
-            return
-
-        # Encode first k-mer
-        mask = (1 << (2 * k)) - 1  # k bases × 2 bits
-        w = 0
-        valid_count = 0
-
-        for i in range(min(k, self.n)):
-            base = self.text[i].upper()
-            if base in self.BASE_TO_BITS:
-                w = ((w << 2) | self.BASE_TO_BITS[base]) & mask
-                valid_count += 1
-
-        if valid_count == k:
-            if w not in self.kmer_hash:
-                self.kmer_hash[w] = []
-            self.kmer_hash[w].append(0)
-
-        # Rolling window
-        for i in range(k, self.n):
-            base = self.text[i].upper()
-            if base in self.BASE_TO_BITS:
-                w = ((w << 2) | self.BASE_TO_BITS[base]) & mask
-
-                if w not in self.kmer_hash:
-                    self.kmer_hash[w] = []
-                self.kmer_hash[w].append(i - k + 1)
-
-    def get_kmer_positions(self, kmer: str) -> List[int]:
-        """Get positions of k-mer using hash table (O(1) lookup).
-
-        Args:
-            kmer: k-mer sequence (must be valid DNA bases)
-
-        Returns:
-            List of positions where k-mer occurs
-        """
-        if len(kmer) != 8 or not self.kmer_hash:
-            # Hash is built only for 8-mers; use FM-index for any other length.
-            return self.locate_positions(kmer)
-
-        # Encode k-mer to hash
-        w = 0
-        for base in kmer.upper():
-            if base not in self.BASE_TO_BITS:
-                return []
-            w = (w << 2) | self.BASE_TO_BITS[base]
-
-        return self.kmer_hash.get(w, [])
-
     def clear(self):
         """Release heavy memory structures to let GC reclaim memory."""
         # Replace large attributes with minimal stubs
@@ -204,7 +158,6 @@ class BWTCore:
         self.text_arr = np.array([], dtype=np.uint8)
         self.bwt_arr = np.array([], dtype=np.uint8)
         self.suffix_array = np.array([], dtype=np.int32)
-        self.sampled_sa = {}
         self.occ_checkpoints = {}
         self.char_counts = {}
         self.char_totals = {}
@@ -377,13 +330,6 @@ class BWTCore:
         self._c_out_sp = self._c_out_buf[0:1].ctypes.data_as(ctypes.POINTER(ctypes.c_int))
         self._c_out_ep = self._c_out_buf[1:2].ctypes.data_as(ctypes.POINTER(ctypes.c_int))
 
-    def _sample_suffix_array(self) -> Dict[int, int]:
-        """Sample suffix array positions for space-efficient locating."""
-        sampled = {}
-        for i in range(0, self.n, self.sa_sample_rate):
-            sampled[i] = self.suffix_array[i]
-        return sampled
-    
     def rank(self, char: Union[str, int], pos: int) -> int:
         """Count occurrences of `char` in bwt[0:pos]. Vectorized with checkpoints.
 
@@ -490,18 +436,3 @@ class BWTCore:
         positions.sort()
         return positions
     
-    def _get_suffix_position(self, sa_index: int) -> int:
-        """Recover original text position from SA index using sampling."""
-        if sa_index in self.sampled_sa:
-            return self.sampled_sa[sa_index]
-        
-        # Walk using LF mapping until we hit a sampled position
-        steps = 0
-        current_idx = sa_index
-        
-        while current_idx not in self.sampled_sa:
-            code = int(self.bwt_arr[current_idx])
-            current_idx = self.char_counts_code[code] + self.rank(code, current_idx)
-            steps += 1
-        
-        return (self.sampled_sa[current_idx] + steps) % self.n

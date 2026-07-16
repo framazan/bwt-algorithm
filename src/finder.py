@@ -1,12 +1,16 @@
+import os    # Standard library for environment-variable overrides
 import time  # Standard library for measuring execution time
 import numpy as np  # NumPy for numerical operations and array processing
-from typing import List, Tuple, Set, Optional, Dict  # typing module for type hints
-from .bwt_core import BWTCore  # BWT/FM-index core data structure
+from typing import List, Tuple, Set, Optional  # typing module for type hints
+from .bwt_core import BWTCore, effective_length  # BWT/FM-index core data structure
+from .coverage import mask_from_repeats  # shared interval -> boolean mask
 from .models import TandemRepeat  # Tandem repeat data class
 from .tier1 import Tier1STRFinder  # Tier 1: Short perfect repeat finder
 from .tier2 import Tier2LCPFinder  # Tier 2: Medium-length imperfect repeat finder
 from .tier3 import Tier3LongReadFinder  # Tier 3: Long repeat sequence finder
 from .motif_utils import MotifUtils  # Motif canonicalization and statistics utilities
+from .autocorr import autocorr_identity, windowed_match_counts, contiguous_true_runs  # shared periodicity primitives
+
 
 class TandemRepeatFinder:
     """Main coordinator for multi-tier tandem repeat finding."""
@@ -31,8 +35,7 @@ class TandemRepeatFinder:
         self.min_array_bp = max(0, min_array_bp) if min_array_bp else None
         self.max_array_bp = max(0, max_array_bp) if max_array_bp else None
         if self.min_array_bp and self.max_array_bp and self.min_array_bp > self.max_array_bp:
-            # Swap to keep bounds consistent
-            # If lower bound exceeds upper bound, swap them for consistency
+            # If lower bound exceeds upper bound, swap them to keep bounds consistent
             self.min_array_bp, self.max_array_bp = self.max_array_bp, self.min_array_bp
 
         # Initialize BWT Core
@@ -79,6 +82,27 @@ class TandemRepeatFinder:
 
         # Only create Tier 3 instance if enabled, otherwise None
         self.tier3 = Tier3LongReadFinder(self.bwt, mode=tier3_mode) if "tier3" in self.enabled_tiers else None
+
+        # Satellite gap-fill tuning (env-overridable). Defaults are the improved
+        # operating point that recovers divergent-alpha-sat interior gaps which
+        # the 3-tier pipeline leaves uncovered between large-HOR-motif calls.
+        # SAT_FILL_MIN_IDENTITY: min autocorrelation identity to accept a gap as
+        #   satellite (0.45 captures ~46%-identity divergent alpha-sat; ~2.5x
+        #   above the ~0.18 autocorrelation floor of non-repetitive DNA).
+        # SAT_ANCHOR_MIN_MOTIF / SAT_ANCHOR_MAX_MOTIF: motif-length window for a
+        #   repeat to count as a satellite anchor whose neighbourhood is scanned
+        #   for uncovered gaps. MAX=0 means no upper bound, so large HOR-unit
+        #   calls (motif >> 300bp) also anchor gap scanning.
+        self.sat_fill_min_identity = float(os.environ.get("SAT_FILL_MIN_IDENTITY", "0.45"))
+        self.sat_anchor_min_motif = int(os.environ.get("SAT_ANCHOR_MIN_MOTIF", "100"))
+        self.sat_anchor_max_motif = int(os.environ.get("SAT_ANCHOR_MAX_MOTIF", "0"))
+        # Period window for the gap autocorrelation scan. Default 100-360 covers
+        # the alpha-satellite monomer (171bp) and the dimeric HOR period
+        # (2x171=342) where highly divergent arrays (e.g. chr3, ~46% monomer
+        # identity) carry their strongest periodic signal. The 0.45 identity
+        # floor stays ~2.5x above the ~0.18 autocorrelation of non-repetitive DNA.
+        self.sat_fill_min_period = int(os.environ.get("SAT_FILL_MIN_PERIOD", "100"))
+        self.sat_fill_max_period = int(os.environ.get("SAT_FILL_MAX_PERIOD", "360"))
 
     def find_all(self) -> List[TandemRepeat]:
         """Execute the full 3-tier finding pipeline."""
@@ -215,6 +239,20 @@ class TandemRepeatFinder:
             if len(final_repeats) == prev_count:
                 break
 
+        # Catch-all periodicity scan (opt-in CATCHALL_SCAN, default off): a
+        # low-stringency autocorrelation sweep over short periods in the regions
+        # NO tier/satellite pass covered, to recover entirely-missed diverged STRs
+        # (the dominant region-recall gap). Trades precision for recall; the
+        # identity/length knobs set the operating point.
+        if int(os.environ.get("CATCHALL_SCAN") or "0"):
+            t0 = time.time()
+            prev_count = len(final_repeats)
+            final_repeats = self._catchall_periodicity_fill(final_repeats)
+            final_repeats = self._merge_adjacent_repeats(final_repeats)
+            if self.show_progress:
+                print(f"  [{self.chromosome}] Catch-all scan: {time.time() - t0:.2f}s, "
+                      f"{len(final_repeats)} repeats (+{len(final_repeats) - prev_count})", flush=True)
+
         final_repeats = [r for r in final_repeats if self._repeat_within_bounds(r)]  # Filter to only results within user-specified bounds
 
         return final_repeats  # Return the final list of repeats
@@ -234,22 +272,18 @@ class TandemRepeatFinder:
 
             # Check overlap
             if current.start < prev.end:
-                # Two repeats overlap; calculate overlap amount
-                # Calculate overlap amount
+                # Two repeats overlap; calculate the overlap amount
                 overlap = min(prev.end, current.end) - max(prev.start, current.start)  # Actual overlapping bp count
                 overlap_ratio = overlap / min(prev.length, current.length)  # Overlap ratio relative to the shorter one
 
                 if overlap_ratio > 0.5:  # Significant overlap
-                    # If overlap exceeds 50%, select the one with the higher score
-                    # Keep the better one
-                    # Criteria: Length * (1 - mismatch_rate)
+                    # Keep the higher-scoring repeat. Score = length * (1 - mismatch_rate)
                     prev_score = prev.length * (1.0 - prev.mismatch_rate)   # Calculate score for previous repeat
                     curr_score = current.length * (1.0 - current.mismatch_rate)  # Calculate score for current repeat
 
                     if curr_score > prev_score:
                         filtered[-1] = current  # If current is better, replace previous with current
                 else:
-                    # Small overlap, keep both (maybe compound?)
                     # Small overlap; keep both repeats (may be a compound repeat)
                     filtered.append(current)
             else:
@@ -278,8 +312,8 @@ class TandemRepeatFinder:
             motif1 = prev.consensus_motif or prev.motif    # Consensus motif or original motif of the previous item
             motif2 = current.consensus_motif or current.motif  # Consensus motif or original motif of the current item
 
-            canon1, strand1 = MotifUtils.get_canonical_motif_stranded(motif1)  # Canonical form and strand direction of previous motif
-            canon2, strand2 = MotifUtils.get_canonical_motif_stranded(motif2)  # Canonical form and strand direction of current motif
+            canon1, _ = MotifUtils.get_canonical_motif_stranded(motif1)  # Canonical form of previous motif (strand unused here)
+            canon2, _ = MotifUtils.get_canonical_motif_stranded(motif2)  # Canonical form of current motif (strand unused here)
 
             # Allow merge if canonical motifs match and gap is small
             # For long-period repeats (satellite DNA), allow larger gaps
@@ -314,12 +348,8 @@ class TandemRepeatFinder:
                     gap_start_pos = prev.end
                     gap_end_pos = current.start
                     gap_seq = text_arr[gap_start_pos:gap_end_pos]
-                    gap_len = len(gap_seq)
-                    if gap_len >= mlen * 2:
-                        total = gap_len - mlen
-                        matches = int(np.sum(gap_seq[:total] == gap_seq[mlen:mlen + total]))
-                        identity = matches / total if total > 0 else 0
-                        merge_ok = identity >= 0.55
+                    if len(gap_seq) >= mlen * 2:
+                        merge_ok = autocorr_identity(gap_seq, mlen) >= 0.55
                 else:
                     # Short repeats: use direct motif comparison
                     motif_arr = np.frombuffer(actual_motif.encode('ascii'), dtype=np.uint8)
@@ -360,8 +390,7 @@ class TandemRepeatFinder:
         if motif_len == 0:
             return  # Cannot compute statistics with zero-length motif; return immediately
 
-        # Re-derive consensus and mismatch rate from the full merged region
-        # Recompute consensus and mismatch rate from the entire merged region
+        # Re-derive consensus and mismatch rate from the entire merged region
         consensus_arr, mm_rate, max_mm = MotifUtils.build_consensus_motif_array(
             text_arr, repeat.start, motif_len, int(repeat.copies)
         )
@@ -374,7 +403,6 @@ class TandemRepeatFinder:
             repeat.mismatch_rate = mm_rate  # Update mismatch rate
             repeat.max_mismatches_per_copy = max_mm  # Update maximum mismatches per copy
 
-            # Recalculate TRF stats
             # Recalculate TRF-compatible statistics
             (percent_matches, percent_indels, score, composition,
              entropy, actual_sequence) = MotifUtils.calculate_trf_statistics(
@@ -388,7 +416,6 @@ class TandemRepeatFinder:
             repeat.entropy = entropy                  # Update Shannon entropy
             repeat.actual_sequence = actual_sequence  # Update actual sequence string
 
-            # Update variations
             # Update per-copy variation summary
             variations = MotifUtils.summarize_variations_array(
                 text_arr, repeat.start, repeat.end, motif_len, consensus_arr
@@ -403,28 +430,15 @@ class TandemRepeatFinder:
         high inter-copy divergence.
         """
         text_arr = self.bwt.text_arr
-        text_str = self.sequence
         n = len(text_arr)
 
         if n < 1000:
             return repeats
 
-        # Build coverage mask from existing repeats
-        covered = np.zeros(n, dtype=bool)
-        for r in repeats:
-            covered[r.start:min(r.end, n)] = True
+        covered = mask_from_repeats(repeats, n)
 
-        # Find uncovered blocks >= 300bp using numpy
-        transitions = np.diff(covered.astype(np.int8))
-        # Starts of uncovered regions: transition from True(1) to False(0) = -1
-        # Ends of uncovered regions: transition from False(0) to True(1) = +1
-        gap_starts = np.where(transitions == -1)[0] + 1  # Position after last covered
-        gap_ends = np.where(transitions == 1)[0] + 1     # First covered position
-        # Handle boundaries
-        if not covered[0]:
-            gap_starts = np.concatenate(([0], gap_starts))
-        if not covered[-1]:
-            gap_ends = np.concatenate((gap_ends, [n]))
+        # Find uncovered blocks >= 300bp
+        gap_starts, gap_ends = contiguous_true_runs(~covered)
         uncovered_blocks = [(int(s), int(e)) for s, e in zip(gap_starts, gap_ends) if e - s >= 300]
 
         if not uncovered_blocks:
@@ -434,8 +448,11 @@ class TandemRepeatFinder:
         satellite_positions = []
         for r in repeats:
             m = r.consensus_motif or r.motif
-            if m and 100 <= len(m) <= 300:
-                satellite_positions.append((r.start, r.end))
+            if not m or len(m) < self.sat_anchor_min_motif:
+                continue
+            if self.sat_anchor_max_motif and len(m) > self.sat_anchor_max_motif:
+                continue
+            satellite_positions.append((r.start, r.end))
 
         # Build a proximity mask: only scan blocks near satellite regions
         # This avoids scanning the entire non-centromeric sequence
@@ -472,12 +489,8 @@ class TandemRepeatFinder:
                 if w_size < 300:
                     continue
 
-                for p in range(100, min(301, w_size // 2)):
-                    total = w_size - p
-                    if total <= 0:
-                        continue
-                    matches = int(np.sum(w_region[:total] == w_region[p:p + total]))
-                    identity = matches / total
+                for p in range(self.sat_fill_min_period, min(self.sat_fill_max_period + 1, w_size // 2)):
+                    identity = autocorr_identity(w_region, p)
                     if identity > best_identity:
                         best_identity = identity
                         best_period = p
@@ -487,7 +500,7 @@ class TandemRepeatFinder:
                 if best_identity > 0.80:
                     break
 
-            if best_identity < 0.55 or best_period < 50:
+            if best_identity < self.sat_fill_min_identity or best_period < 50:
                 continue
 
             use_motif = text_arr[best_w_start:best_w_start + best_period].tobytes().decode('ascii', errors='replace')
@@ -508,6 +521,85 @@ class TandemRepeatFinder:
             return filled
 
         return repeats
+
+    def _catchall_periodicity_fill(self, repeats: List[TandemRepeat]) -> List[TandemRepeat]:
+        """Low-stringency autocorrelation sweep over short periods (default 1-20)
+        in regions NO tier/satellite pass covered.
+
+        The 3-tier pipeline only emits where it can form a seed; diverged short
+        STRs (a substitution in most copies) form none and are missed entirely —
+        the dominant region-recall gap vs ULTRA/tantan. This pass detects local
+        periodicity directly (vectorized identity between offset-p windows) and
+        emits a call wherever an uncovered region is periodic above
+        ``CATCHALL_MIN_IDENTITY``. It deliberately trades precision for recall;
+        the identity/length knobs set the operating point. Opt-in (CATCHALL_SCAN).
+        """
+        text_arr = self.bwt.text_arr
+        n = effective_length(text_arr)
+        if n < 8:
+            return repeats
+
+        min_p = max(1, int(os.environ.get("CATCHALL_MIN_P") or "1"))
+        max_p = int(os.environ.get("CATCHALL_MAX_P") or "20")
+        min_id = float(os.environ.get("CATCHALL_MIN_IDENTITY") or "0.72")
+        min_len = int(os.environ.get("CATCHALL_MIN_LEN") or "20")
+        # Precision-recovery gates (drop the unsupported low-complexity calls that
+        # over-extend bp precision; defaults are permissive so the recall frontier
+        # is unchanged unless these are raised).
+        min_copies = float(os.environ.get("CATCHALL_MIN_COPIES") or "2")
+        min_entropy = float(os.environ.get("CATCHALL_MIN_ENTROPY") or "0")
+
+        covered = mask_from_repeats(repeats, n)
+
+        s = text_arr[:n]
+        new_repeats: List[TandemRepeat] = []
+        # Longest period first so a genuine k-mer STR claims its region before a
+        # shorter sub-period grabs a fragment of it.
+        for period in range(min(max_p, n // 2), min_p - 1, -1):
+            window = max(2 * period, 12)
+            if n <= period + window:
+                continue
+            winsum = windowed_match_counts(s, period, window)
+            if winsum is None:
+                continue
+            m = winsum.size
+            hit = (winsum >= (min_id * window)) & (~covered[:m])
+            if not hit.any():
+                continue
+            run_s, run_e = contiguous_true_runs(hit)
+            for a, b in zip(run_s.tolist(), run_e.tolist()):
+                start = a
+                end = min(b + window, n)
+                if end - start < min_len:
+                    continue
+                if (end - start) / period < min_copies:
+                    continue
+                seg = covered[start:end]
+                if seg.size and seg.mean() > 0.3:
+                    continue
+                if min_entropy > 0.0 and MotifUtils.calculate_entropy_array(text_arr[start:end]) < min_entropy:
+                    continue
+                # identity (for mismatch_rate); seed motif from the run start
+                local = winsum[a:b]
+                ident = float(local.max()) / window if local.size else min_id
+                motif_raw = text_arr[start:start + period].tobytes().decode('ascii', errors='replace')
+                if not motif_raw or any(c not in 'ACGT' for c in motif_raw):
+                    continue
+                canon, strand = MotifUtils.get_canonical_motif_stranded(motif_raw)
+                new_repeats.append(TandemRepeat(
+                    chrom=self.chromosome, start=start, end=end,
+                    motif=canon, copies=(end - start) / period,
+                    length=end - start, tier="catchall",
+                    consensus_motif=canon, mismatch_rate=max(0.0, 1.0 - ident),
+                    strand=strand,
+                ))
+                covered[start:end] = True
+
+        if not new_repeats:
+            return repeats
+        out = list(repeats) + new_repeats
+        out.sort(key=lambda x: x.start)
+        return out
 
     def cleanup(self):
         """Release resources."""
