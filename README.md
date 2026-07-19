@@ -188,6 +188,54 @@ python3 -m src.main masked_genome.fa --mask both -v
 
 ---
 
+## Advanced Tuning Parameters
+
+In addition to the standard options, the algorithm exposes several advanced tuning parameters via CLI flags. These were previously configured via environment variables but are now fully exposed in the CLI.
+
+### Acceleration Parameters
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--disable-native` | `False` | Disable Cython native extensions and fall back to pure Python |
+| `--tier1-ext-rolling` | `0` | Enable Tier 1 rolling extension logic (0 or 1) |
+
+### Tier 1 Parameters (Short Perfect Repeats)
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--tier1-min-copies` | `3` | Minimum copies required to seed a repeat |
+| `--tier1-min-array-len` | `26` | Minimum overall array length |
+| `--tier1-min-entropy` | `1.0` | Minimum Shannon entropy (if entropy gate enabled) |
+| `--tier1-entropy-gate` | `0` | Enable low-complexity suppression via entropy (0 or 1) |
+| `--tier1-min-score` | `30.0` | Minimum quality score `length * (1 - mismatch_rate)` |
+| `--tier1-fmscan` | `0` | Mode for FM-index statistical scanner (0=off, 1=additive, 2=replacement) |
+| `--tier1-mismatch` | None | Override allowed mismatch rate (e.g., 0.2) |
+
+*(Run `python3 -m src.main --help` to see all available Tier 1 tuning parameters, including FM-scan fine-tuning thresholds)*
+
+### Tier 2 Parameters (Medium/Imperfect Repeats)
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--tier2-min-copies` | `3` | Minimum copies required |
+| `--tier2-min-array-len` | `6` | Minimum array length for Tier 2 |
+| `--tier2-approx-seed` | `0` | Autocorrelation seeding for highly diverged repeats (0 or 1) |
+| `--tier2-approx-min-identity` | `0.78` | Minimum identity for approximate seeding |
+| `--tier2-longunit-dp-max-period`| `8192` | Maximum period for per-copy O(P^2) dynamic programming alignment |
+
+### Satellite Fill Parameters
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--sat-fill-min-identity` | `0.45` | Minimum autocorrelation identity for satellite gap-fill |
+| `--sat-anchor-min-motif` | `100` | Minimum motif size to trigger satellite scanning |
+| `--sat-fill-min-period` | `100` | Minimum period to check for satellite autocorrelation |
+| `--sat-fill-max-period` | `360` | Maximum period to check for satellite autocorrelation |
+
+### Catchall Scan Parameters
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--catchall-scan` | `0` | Enable low-stringency autocorrelation sweep for missed diverged STRs |
+| `--catchall-min-identity` | `0.72` | Minimum identity to accept a catchall periodic region |
+
+---
+
 ## 3-Tier Detection Pipeline
 
 The `TandemRepeatFinder` coordinator builds a `BWTCore` FM-index once per chromosome, then runs the enabled Tiers sequentially. Each Tier receives information about regions already detected by previous Tiers to avoid redundant work.

@@ -23,7 +23,9 @@ class TandemRepeatFinder:
                  enabled_tiers: Optional[Set[str]] = None,
                  min_array_bp: Optional[int] = None,
                  max_array_bp: Optional[int] = None,
-                 tier3_mode: str = "balanced"):
+                 tier3_mode: str = "balanced",
+                 config: dict = None):
+        self.config = config or {}
         self.sequence = sequence  # DNA sequence string to analyze
         self.chromosome = chromosome  # Chromosome name (used in output records)
         self.min_period = min_period  # Minimum motif length (bp) to search for
@@ -65,7 +67,8 @@ class TandemRepeatFinder:
                 min_motif_length=tier1_min, # Minimum motif length
                 allowed_mismatch_rate=0.2,  # Allowed mismatch rate 20%
                 allowed_indel_rate=0.1,     # Allowed indel rate 10%
-                show_progress=show_progress # Pass progress display flag
+                show_progress=show_progress, # Pass progress display flag
+                config=self.config          # Pass configuration dict
             )
 
         self.tier2 = None  # Initialize Tier 2 finder (default None)
@@ -77,7 +80,8 @@ class TandemRepeatFinder:
                 max_period=max_period,      # Maximum motif length
                 allowed_mismatch_rate=0.2,  # Allowed mismatch rate 20%
                 allowed_indel_rate=0.1,     # Allowed indel rate 10%
-                show_progress=show_progress # Pass progress display flag
+                show_progress=show_progress, # Pass progress display flag
+                config=self.config          # Pass configuration dict
             )
 
         # Only create Tier 3 instance if enabled, otherwise None
@@ -93,16 +97,16 @@ class TandemRepeatFinder:
         #   repeat to count as a satellite anchor whose neighbourhood is scanned
         #   for uncovered gaps. MAX=0 means no upper bound, so large HOR-unit
         #   calls (motif >> 300bp) also anchor gap scanning.
-        self.sat_fill_min_identity = float(os.environ.get("SAT_FILL_MIN_IDENTITY", "0.45"))
-        self.sat_anchor_min_motif = int(os.environ.get("SAT_ANCHOR_MIN_MOTIF", "100"))
-        self.sat_anchor_max_motif = int(os.environ.get("SAT_ANCHOR_MAX_MOTIF", "0"))
+        self.sat_fill_min_identity = float(self.config.get("sat_fill_min_identity", 0.45))
+        self.sat_anchor_min_motif = int(self.config.get("sat_anchor_min_motif", 100))
+        self.sat_anchor_max_motif = int(self.config.get("sat_anchor_max_motif", 0))
         # Period window for the gap autocorrelation scan. Default 100-360 covers
         # the alpha-satellite monomer (171bp) and the dimeric HOR period
         # (2x171=342) where highly divergent arrays (e.g. chr3, ~46% monomer
         # identity) carry their strongest periodic signal. The 0.45 identity
         # floor stays ~2.5x above the ~0.18 autocorrelation of non-repetitive DNA.
-        self.sat_fill_min_period = int(os.environ.get("SAT_FILL_MIN_PERIOD", "100"))
-        self.sat_fill_max_period = int(os.environ.get("SAT_FILL_MAX_PERIOD", "360"))
+        self.sat_fill_min_period = int(self.config.get("sat_fill_min_period", 100))
+        self.sat_fill_max_period = int(self.config.get("sat_fill_max_period", 360))
 
     def find_all(self) -> List[TandemRepeat]:
         """Execute the full 3-tier finding pipeline."""
@@ -244,7 +248,7 @@ class TandemRepeatFinder:
         # NO tier/satellite pass covered, to recover entirely-missed diverged STRs
         # (the dominant region-recall gap). Trades precision for recall; the
         # identity/length knobs set the operating point.
-        if int(os.environ.get("CATCHALL_SCAN") or "0"):
+        if int(self.config.get("catchall_scan", 0)):
             t0 = time.time()
             prev_count = len(final_repeats)
             final_repeats = self._catchall_periodicity_fill(final_repeats)
@@ -539,15 +543,15 @@ class TandemRepeatFinder:
         if n < 8:
             return repeats
 
-        min_p = max(1, int(os.environ.get("CATCHALL_MIN_P") or "1"))
-        max_p = int(os.environ.get("CATCHALL_MAX_P") or "20")
-        min_id = float(os.environ.get("CATCHALL_MIN_IDENTITY") or "0.72")
-        min_len = int(os.environ.get("CATCHALL_MIN_LEN") or "20")
+        min_p = max(1, int(self.config.get("catchall_min_p", 1)))
+        max_p = int(self.config.get("catchall_max_p", 20))
+        min_id = float(self.config.get("catchall_min_identity", 0.72))
+        min_len = int(self.config.get("catchall_min_len", 20))
         # Precision-recovery gates (drop the unsupported low-complexity calls that
         # over-extend bp precision; defaults are permissive so the recall frontier
         # is unchanged unless these are raised).
-        min_copies = float(os.environ.get("CATCHALL_MIN_COPIES") or "2")
-        min_entropy = float(os.environ.get("CATCHALL_MIN_ENTROPY") or "0")
+        min_copies = float(self.config.get("catchall_min_copies", 2.0))
+        min_entropy = float(self.config.get("catchall_min_entropy", 0.0))
 
         covered = mask_from_repeats(repeats, n)
 

@@ -37,7 +37,8 @@ def apply_mask(seq: str, mask_mode: str) -> str:
 
 def _process_chromosome(chrom: str, seq: str, min_period: int, max_period: int,
                         enabled_tiers: set, show_progress: bool,
-                        min_array_bp, max_array_bp, tier3_mode: str) -> List[TandemRepeat]:
+                        min_array_bp, max_array_bp, tier3_mode: str,
+                        config: dict = None) -> List[TandemRepeat]:
     """Process a single chromosome — designed to be called in parallel."""
     finder = TandemRepeatFinder(
         seq,
@@ -49,6 +50,7 @@ def _process_chromosome(chrom: str, seq: str, min_period: int, max_period: int,
         min_array_bp=min_array_bp,
         max_array_bp=max_array_bp,
         tier3_mode=tier3_mode,
+        config=config,
     )
     repeats = finder.find_all()
     finder.cleanup()
@@ -105,7 +107,71 @@ def main():
                         help="Masking mode: none=ignore masks, soft=skip lowercase regions, "
                              "hard=skip N regions, both=skip both (default: none)")  # Masking mode option
 
+    # Acceleration Parameters
+    accel_group = parser.add_argument_group("Acceleration Parameters")
+    accel_group.add_argument("--disable-native", action="store_true", help="Disable Cython native extensions (fallback to pure Python)")
+    accel_group.add_argument("--tier1-ext-rolling", type=int, default=0, help="Tier1 rolling extension flag (default: 0)")
+
+    # Tier 1 Parameters
+    t1_group = parser.add_argument_group("Tier 1 Parameters")
+    t1_group.add_argument("--tier1-min-copies", type=int, default=3, help="Tier 1 min copies (default: 3)")
+    t1_group.add_argument("--tier1-min-array-len", type=int, default=26, help="Tier 1 min array length (default: 26)")
+    t1_group.add_argument("--tier1-min-entropy", type=float, default=1.0, help="Tier 1 min entropy (default: 1.0)")
+    t1_group.add_argument("--tier1-entropy-gate", type=int, default=0, help="Tier 1 entropy gate (default: 0)")
+    t1_group.add_argument("--tier1-min-score", type=float, default=30.0, help="Tier 1 min score (default: 30)")
+    t1_group.add_argument("--tier1-short-period-max", type=int, default=0, help="Tier 1 short period max (default: 0)")
+    t1_group.add_argument("--tier1-short-min-array-len", type=int, default=None, help="Tier 1 short min array length (defaults to --tier1-min-array-len)")
+    t1_group.add_argument("--tier1-short-min-score", type=float, default=None, help="Tier 1 short min score (defaults to --tier1-min-score)")
+    t1_group.add_argument("--tier1-copybase", type=int, default=12, help="Tier 1 copybase (default: 12)")
+    t1_group.add_argument("--tier1-copyadd", type=int, default=3, help="Tier 1 copyadd (default: 3)")
+    t1_group.add_argument("--tier1-ext-copies", type=int, default=5, help="Tier 1 extension copies (default: 5)")
+    t1_group.add_argument("--tier1-stitch-gap", type=int, default=0, help="Tier 1 stitch gap (default: 0)")
+    t1_group.add_argument("--tier1-mismatch", type=str, default=None, help="Tier 1 mismatch limit or comma-separated limits by period (default: None)")
+    t1_group.add_argument("--tier1-fmscan", type=int, default=0, help="Tier 1 FM-scan mode flag (default: 0)")
+    t1_group.add_argument("--tier1-fmscan-min-p", type=int, default=1, help="Tier 1 FM-scan min period (default: 1)")
+    t1_group.add_argument("--tier1-fmscan-max-p", type=int, default=6, help="Tier 1 FM-scan max period (default: 6)")
+    t1_group.add_argument("--tier1-fmscan-max-gap", type=int, default=2, help="Tier 1 FM-scan max gap copies (default: 2)")
+    t1_group.add_argument("--tier1-fmscan-min-occ", type=int, default=3, help="Tier 1 FM-scan min occurrences (default: 3)")
+    t1_group.add_argument("--tier1-fmscan-min-span", type=int, default=20, help="Tier 1 FM-scan min span (default: 20)")
+    t1_group.add_argument("--tier1-fmscan-min-density", type=float, default=0.50, help="Tier 1 FM-scan min density (default: 0.50)")
+    t1_group.add_argument("--tier1-fmscan-min-llr", type=float, default=8.0, help="Tier 1 FM-scan min LLR (default: 8.0)")
+    t1_group.add_argument("--tier1-fmscan-max-occ-total", type=int, default=20000000, help="Tier 1 FM-scan max total occurrences (default: 20M)")
+
+    # Tier 2 Parameters
+    t2_group = parser.add_argument_group("Tier 2 Parameters")
+    t2_group.add_argument("--tier2-min-copies", type=int, default=3, help="Tier 2 min copies (default: 3)")
+    t2_group.add_argument("--tier2-min-array-len", type=int, default=6, help="Tier 2 min array length (default: 6)")
+    t2_group.add_argument("--tier2-short-req-copies", type=int, default=3, help="Tier 2 short required copies (default: 3)")
+    t2_group.add_argument("--tier2-approx-seed", type=int, default=0, help="Tier 2 approx seed flag (default: 0)")
+    t2_group.add_argument("--tier2-approx-min-identity", type=float, default=0.78, help="Tier 2 approx min identity (default: 0.78)")
+    t2_group.add_argument("--tier2-approx-max-p", type=int, default=20, help="Tier 2 approx max period (default: 20)")
+    t2_group.add_argument("--tier2-approx-min-copies", type=int, default=2, help="Tier 2 approx min copies (default: 2)")
+    t2_group.add_argument("--tier2-mismatch", type=str, default=None, help="Tier 2 mismatch limits (default: None)")
+    t2_group.add_argument("--tier2-longunit-dp-max-period", type=int, default=8192, help="Tier 2 max period for DP (default: 8192)")
+    t2_group.add_argument("--tier2-approx-max-seeds", type=int, default=200000, help="Tier 2 max approx seeds (default: 200,000)")
+
+    # Satellite Fill Parameters
+    sat_group = parser.add_argument_group("Satellite Fill Parameters")
+    sat_group.add_argument("--sat-fill-min-identity", type=float, default=0.45, help="Sat fill min identity (default: 0.45)")
+    sat_group.add_argument("--sat-anchor-min-motif", type=int, default=100, help="Sat anchor min motif (default: 100)")
+    sat_group.add_argument("--sat-anchor-max-motif", type=int, default=0, help="Sat anchor max motif (default: 0)")
+    sat_group.add_argument("--sat-fill-min-period", type=int, default=100, help="Sat fill min period (default: 100)")
+    sat_group.add_argument("--sat-fill-max-period", type=int, default=360, help="Sat fill max period (default: 360)")
+
+    # Catchall Parameters
+    catchall_group = parser.add_argument_group("Catchall Scan Parameters")
+    catchall_group.add_argument("--catchall-scan", type=int, default=0, help="Enable catchall scan (default: 0)")
+    catchall_group.add_argument("--catchall-min-p", type=int, default=1, help="Catchall min period (default: 1)")
+    catchall_group.add_argument("--catchall-max-p", type=int, default=20, help="Catchall max period (default: 20)")
+    catchall_group.add_argument("--catchall-min-identity", type=float, default=0.72, help="Catchall min identity (default: 0.72)")
+    catchall_group.add_argument("--catchall-min-len", type=int, default=20, help="Catchall min length (default: 20)")
+    catchall_group.add_argument("--catchall-min-copies", type=float, default=2.0, help="Catchall min copies (default: 2.0)")
+    catchall_group.add_argument("--catchall-min-entropy", type=float, default=0.0, help="Catchall min entropy (default: 0.0)")
+
     args = parser.parse_args()  # Parse command-line arguments
+
+    from .accelerators import configure_accelerators
+    configure_accelerators(args.disable_native, bool(args.tier1_ext_rolling))
 
     if not os.path.exists(args.fasta_file):
         # Print error message and exit if input file does not exist
@@ -152,7 +218,8 @@ def main():
             repeats = _process_chromosome(
                 chrom, seq, args.min_period, args.max_period,
                 enabled_tiers, args.verbose,
-                args.min_array_bp, args.max_array_bp, args.tier3_mode
+                args.min_array_bp, args.max_array_bp, args.tier3_mode,
+                config=vars(args)
             )
             all_repeats.extend(repeats)
     else:
@@ -166,7 +233,8 @@ def main():
                     _process_chromosome,
                     chrom, seq, args.min_period, args.max_period,
                     enabled_tiers, args.verbose,
-                    args.min_array_bp, args.max_array_bp, args.tier3_mode
+                    args.min_array_bp, args.max_array_bp, args.tier3_mode,
+                    config=vars(args)
                 )
                 futures[future] = chrom
 

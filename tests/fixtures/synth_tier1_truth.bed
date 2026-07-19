@@ -1,9 +1,0 @@
-#chrom	start	end	motif	copies	tier
-synth_tier1	8000	8060	AC	30	1
-synth_tier1	20060	20120	ATG	20	1
-synth_tier1	30120	30180	AAAT	15	1
-synth_tier1	42180	42252	AGCAGC	12	1
-synth_tier1	53252	53352	TTTC	25	1
-synth_tier1	64352	64402	A	50	1
-synth_tier1	73402	73492	AATGG	18	1
-synth_tier1	83492	83562	CT	35	1

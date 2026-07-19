@@ -28,47 +28,25 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 
-_DISABLED = os.environ.get("BWT_DISABLE_NATIVE") == "1"
+_DISABLED = False
 
-if _DISABLED:
+try:
+    from . import _accelerators as _native  # type: ignore
+except Exception as exc:  # ImportError, or a numpy/Cython ABI mismatch
     _native = None
-else:
+    _message = (
+        f"Compiled extension src/_accelerators could not be imported ({exc}); "
+        "falling back to pure Python. Results are identical but detection will "
+        "be much slower. See the README."
+    )
     try:
-        from . import _accelerators as _native  # type: ignore
-    except Exception as exc:  # ImportError, or a numpy/Cython ABI mismatch
-        _native = None
-        _message = (
-            f"Compiled extension src/_accelerators could not be imported ({exc}); "
-            "falling back to pure Python. Results are identical but detection will "
-            "be much slower. See CLAUDE.md 'Building Cython Extensions'."
-        )
-        try:
-            warnings.warn(_message, RuntimeWarning, stacklevel=2)
-        except RuntimeWarning:
-            # `-W error` / PYTHONWARNINGS=error escalates this advisory into an
-            # exception, which would make the package unimportable without the
-            # extension. The fallback is correct, so say so and keep going.
-            print(_message, file=sys.stderr)
+        warnings.warn(_message, RuntimeWarning, stacklevel=2)
+    except RuntimeWarning:
+        print(_message, file=sys.stderr)
 
 NATIVE_AVAILABLE = _native is not None
 
-
-def _rolling_extender_requested() -> bool:
-    """Parse TIER1_EXT_ROLLING exactly as `_accelerators.pyx` does at its import.
-
-    The .pyx uses `bool(int(...))`, so "00" is falsey and "" or "false" raise.
-    Diverging here would mean the same environment selects a different extender
-    depending on whether the extension happens to be built.
-    """
-    raw = os.environ.get("TIER1_EXT_ROLLING", "0")
-    try:
-        return bool(int(raw))
-    except ValueError:
-        raise ValueError(f"TIER1_EXT_ROLLING must be an integer, got {raw!r}") from None
-
-
-# Read once at import, like the .pyx, so the check stays out of the per-seed hot path.
-_EXT_ROLLING_REQUESTED = _rolling_extender_requested()
+_EXT_ROLLING_REQUESTED = False
 
 AcceleratorResult = Optional[Tuple[int, int, int, int, int]]
 """(array_start, array_end, copies, full_start, full_end) or None."""
@@ -119,7 +97,7 @@ def _extend_with_mismatches_py(s_arr: np.ndarray, start_pos: int, period: int,
         raise NotImplementedError(
             "TIER1_EXT_ROLLING=1 selects the rolling-consensus extender, which "
             "exists only in the compiled _accelerators extension. Build it "
-            "(see CLAUDE.md) or unset TIER1_EXT_ROLLING."
+            "or unset the flag."
         )
 
     if period <= 0:
@@ -305,15 +283,32 @@ def _anchor_scan_boundaries_py(text_arr: np.ndarray, seed_pos: int, period: int,
 # Public bindings
 # --------------------------------------------------------------------------
 
-if NATIVE_AVAILABLE:
-    extend_with_mismatches = _native.extend_with_mismatches
-    find_periodic_runs = _native.find_periodic_runs
-    lcp_tandem_candidates = _native.lcp_tandem_candidates
-    align_unit_to_window = _native.align_unit_to_window
-    anchor_scan_boundaries = _native.anchor_scan_boundaries
-else:
-    extend_with_mismatches = _extend_with_mismatches_py
-    find_periodic_runs = _find_periodic_runs_py
-    lcp_tandem_candidates = _lcp_tandem_candidates_py
-    align_unit_to_window = _align_unit_to_window_py
-    anchor_scan_boundaries = _anchor_scan_boundaries_py
+extend_with_mismatches = None
+find_periodic_runs = None
+lcp_tandem_candidates = None
+align_unit_to_window = None
+anchor_scan_boundaries = None
+
+def configure_accelerators(disable_native: bool, ext_rolling: bool) -> None:
+    global _DISABLED, _EXT_ROLLING_REQUESTED
+    global extend_with_mismatches, find_periodic_runs, lcp_tandem_candidates
+    global align_unit_to_window, anchor_scan_boundaries
+
+    _DISABLED = disable_native
+    _EXT_ROLLING_REQUESTED = ext_rolling
+
+    if not _DISABLED and NATIVE_AVAILABLE:
+        extend_with_mismatches = _native.extend_with_mismatches
+        find_periodic_runs = _native.find_periodic_runs
+        lcp_tandem_candidates = _native.lcp_tandem_candidates
+        align_unit_to_window = _native.align_unit_to_window
+        anchor_scan_boundaries = _native.anchor_scan_boundaries
+    else:
+        extend_with_mismatches = _extend_with_mismatches_py
+        find_periodic_runs = _find_periodic_runs_py
+        lcp_tandem_candidates = _lcp_tandem_candidates_py
+        align_unit_to_window = _align_unit_to_window_py
+        anchor_scan_boundaries = _anchor_scan_boundaries_py
+
+# Initialize with defaults
+configure_accelerators(False, False)

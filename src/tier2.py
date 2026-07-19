@@ -59,7 +59,8 @@ class Tier2LCPFinder:
     def __init__(self, bwt_core: BWTCore, min_period: int = 1, max_period: int = 1000,
                  max_short_motif: int = 9, allow_mismatches: bool = True,
                  allowed_mismatch_rate: float = 0.2, allowed_indel_rate: float = 0.1,
-                 show_progress: bool = False):
+                 show_progress: bool = False, config: dict = None):
+        self.config = config or {}
         self.bwt = bwt_core
         # Tier 2 is designed for non-microsatellite motifs; enforce >=10bp
         self.min_period = max(10, min_period)
@@ -67,21 +68,21 @@ class Tier2LCPFinder:
         self.max_short_motif = max_short_motif  # For FM-index search (1-9bp)
         # Detection thresholds — tunable via env vars for parameter sweeps.
         # Defaults reproduce the original hardcoded behaviour exactly.
-        self.min_copies = int(os.environ.get("TIER2_MIN_COPIES", "3"))  # Require at least 3 copies
-        self.min_array_length = int(os.environ.get("TIER2_MIN_ARRAY_LEN", "6"))
+        self.min_copies = int(self.config.get("tier2_min_copies", 3))  # Require at least 3 copies
+        self.min_array_length = int(self.config.get("tier2_min_array_len", 6))
         # required copies for short (<20bp) periods in the simple scan
-        self.short_req_copies = int(os.environ.get("TIER2_SHORT_REQ_COPIES", "3"))
+        self.short_req_copies = int(self.config.get("tier2_short_req_copies", 3))
         # Approximate (autocorrelation) seeding for the diverged period-10-20
         # notch — opt-in; default off reproduces baseline exactly. Detects local
         # periodicity directly instead of requiring an exact seed (LCP plateau or
         # exact k-mer recurrence), which diverged arrays never form.
-        self.approx_seed = int(os.environ.get("TIER2_APPROX_SEED") or "0")
-        self.approx_min_identity = float(os.environ.get("TIER2_APPROX_MIN_IDENTITY") or "0.78")
-        self.approx_max_period = int(os.environ.get("TIER2_APPROX_MAX_P") or "20")
-        self.approx_min_copies = int(os.environ.get("TIER2_APPROX_MIN_COPIES") or "2")
+        self.approx_seed = int(self.config.get("tier2_approx_seed", 0))
+        self.approx_min_identity = float(self.config.get("tier2_approx_min_identity", 0.78))
+        self.approx_max_period = int(self.config.get("tier2_approx_max_p", 20))
+        self.approx_min_copies = int(self.config.get("tier2_approx_min_copies", 2))
         self.allow_mismatches = allow_mismatches
         self.show_progress = show_progress
-        _mm = os.environ.get("TIER2_MISMATCH")
+        _mm = self.config.get("tier2_mismatch")
         self.allowed_mismatch_rate = max(0.0, float(_mm) if _mm else allowed_mismatch_rate)
         self.allowed_indel_rate = max(0.0, allowed_indel_rate)
         # Maximum period for Phase A's per-copy seed-and-extend + banded-DP
@@ -95,8 +96,9 @@ class Tier2LCPFinder:
         # default comfortably covers real tandem units (e.g. the ~2 kb alpha HOR)
         # with several-fold margin.
         self.long_unit_dp_max_period = int(
-            os.environ.get("TIER2_LONGUNIT_DP_MAX_PERIOD", "8192")
+            self.config.get("tier2_longunit_dp_max_period", 8192)
         )
+        self.approx_max_seeds = int(self.config.get("tier2_approx_max_seeds", 200000))
         self.sequence_str = self.bwt.text_arr.tobytes().decode('ascii', errors='replace')
         self._lcp_cache = None  # Lazily computed LCP array
 
@@ -496,7 +498,7 @@ class Tier2LCPFinder:
                 seen[cs_:min(ce_, n)] = True
         # Per-period cap on seed attempts (safety bound for pathological
         # low-complexity input; real arrays are far fewer).
-        max_attempts = int(os.environ.get("TIER2_APPROX_MAX_SEEDS") or "200000")
+        max_attempts = self.approx_max_seeds
         for period in range(min_p, max_p + 1):
             window = 4 * period
             if n <= period + window:

@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 continuumio/miniconda3
+FROM continuumio/miniconda3
 
 LABEL author="Filip Ramazan"
 LABEL version="v1.0"
@@ -44,7 +44,7 @@ RUN git clone https://github.com/vlothec/TRASH /opt/TRASH && \
     cd /opt/TRASH && \
     chmod +x TRASH_install.sh TRASH_run.sh && \
     ./TRASH_install.sh --def
-    
+
 ENV PATH=/opt/conda/bin:/opt/TRASH:/usr/local/bin:${PATH}
 
 # Copy BWTandem into the image
@@ -56,8 +56,7 @@ RUN cd /opt/bwtandem && python -m src.c_extensions.build
 # Compile BWTandem Cython extension (if present)
 RUN cd /opt/bwtandem && \
     if [ -f src/_accelerators.pyx ]; then \
-        python -c "from setuptools import setup, Extension; from Cython.Build import cythonize; import numpy as np; ext_modules = [Extension('src._accelerators', ['src/_accelerators.pyx'], include_dirs=[np.get_include()], extra_compile_args=['-std=c99'])]; setup(script_args=['build_ext', '--inplace'], ext_modules=cythonize(ext_modules, compiler_directives={'language_level': '3'}))"; \
+    python -c "from setuptools import setup, Extension; from Cython.Build import cythonize; import numpy as np; ext_modules = [Extension('src._accelerators', ['src/_accelerators.pyx'], include_dirs=[np.get_include()], extra_compile_args=['-std=c99'])]; setup(script_args=['build_ext', '--inplace'], ext_modules=cythonize(ext_modules, compiler_directives={'language_level': '3'}))"; \
     fi
 
 CMD ["/bin/bash"]
-

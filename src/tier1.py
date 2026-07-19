@@ -40,19 +40,20 @@ class Tier1STRFinder:
     def __init__(self, text_arr: np.ndarray, bwt_core: BWTCore, max_motif_length: int = 9,
                  min_motif_length: int = 1,
                  allowed_mismatch_rate: float = 0.2, allowed_indel_rate: float = 0.1,
-                 show_progress: bool = False):
+                 show_progress: bool = False, config: dict = None):
+        self.config = config or {}
         self.text_arr = text_arr
         self.bwt = bwt_core
         self.max_motif_length = max(1, max_motif_length)
         self.min_motif_length = max(1, min(min_motif_length, self.max_motif_length))
         # Detection thresholds — tunable via env vars for parameter sweeps.
         # Defaults reproduce the original hardcoded behaviour exactly.
-        self.min_copies = int(os.environ.get("TIER1_MIN_COPIES", "3"))
-        self.min_array_length = int(os.environ.get("TIER1_MIN_ARRAY_LEN", "26"))
-        self.min_entropy = float(os.environ.get("TIER1_MIN_ENTROPY", "1.0"))
+        self.min_copies = int(self.config.get("tier1_min_copies", 3))
+        self.min_array_length = int(self.config.get("tier1_min_array_len", 26))
+        self.min_entropy = float(self.config.get("tier1_min_entropy", 1.0))
         # entropy gate is OFF by default (preserves baseline); opt-in for sweeps
-        self.entropy_gate = bool(int(os.environ.get("TIER1_ENTROPY_GATE", "0")))
-        self.min_score = float(os.environ.get("TIER1_MIN_SCORE", "30"))
+        self.entropy_gate = bool(int(self.config.get("tier1_entropy_gate", 0)))
+        self.min_score = float(self.config.get("tier1_min_score", 30.0))
         # Period-stratified relaxation of the length/score acceptance gate.
         # Short motifs (motif_len <= short_period_max) frequently form short
         # perfect cores (e.g. a 7-copy dinucleotide = 14 bp) that sit inside a
@@ -61,23 +62,23 @@ class Tier1STRFinder:
         # relaxed ONLY for short motifs while keeping longer motifs strict.
         # Defaults reproduce baseline exactly: short_period_max=0 disables the
         # stratification, and the short thresholds inherit the global ones.
-        self.short_period_max = int(os.environ.get("TIER1_SHORT_PERIOD_MAX") or "0")
+        self.short_period_max = int(self.config.get("tier1_short_period_max", 0))
         self.short_min_array_length = int(
-            os.environ.get("TIER1_SHORT_MIN_ARRAY_LEN") or str(self.min_array_length))
+            self.config.get("tier1_short_min_array_len") if self.config.get("tier1_short_min_array_len") is not None else self.min_array_length)
         self.short_min_score = float(
-            os.environ.get("TIER1_SHORT_MIN_SCORE") or str(self.min_score))
+            self.config.get("tier1_short_min_score") if self.config.get("tier1_short_min_score") is not None else self.min_score)
         # dynamic_min_copies = max(min_copies, copy_base // motif_len + copy_add)
-        self.copy_base = int(os.environ.get("TIER1_COPYBASE", "12"))
-        self.copy_add = int(os.environ.get("TIER1_COPYADD", "3"))
+        self.copy_base = int(self.config.get("tier1_copybase", 12))
+        self.copy_add = int(self.config.get("tier1_copyadd", 3))
         # perfect seed copies required before mismatch extension is attempted
-        self.ext_copies_short = int(os.environ.get("TIER1_EXT_COPIES", "5"))
+        self.ext_copies_short = int(self.config.get("tier1_ext_copies", 5))
         # Stitch-seeding: merge adjacent same-period perfect sub-runs separated
         # by a short, phase-aligned gap (<= stitch_gap * motif_len) into a single
         # candidate before extend/refine. Recovers cores fragmented by isolated
         # mismatches that drop individual sub-runs below the copy threshold.
         # Default 0 = disabled (baseline behaviour preserved).
-        self.stitch_gap = int(os.environ.get("TIER1_STITCH_GAP", "0"))
-        _mm = os.environ.get("TIER1_MISMATCH")
+        self.stitch_gap = int(self.config.get("tier1_stitch_gap", 0))
+        _mm = self.config.get("tier1_mismatch")
         self.allowed_mismatch_rate = max(0.0, float(_mm) if _mm else allowed_mismatch_rate)
         self.allowed_indel_rate = max(0.0, allowed_indel_rate)
         self.show_progress = show_progress
@@ -89,34 +90,34 @@ class Tier1STRFinder:
         #   0 = off (baseline)
         #   1 = run as an ADDITIONAL source merged with the sliding-window scan
         #   2 = run as a REPLACEMENT for the sliding-window scan
-        self.fmscan_mode = int(os.environ.get("TIER1_FMSCAN") or "0")
+        self.fmscan_mode = int(self.config.get("tier1_fmscan", 0))
         # Period range for the FM-index detector (independent of the global
         # tier1 range so it can be restricted for proof-of-concept / speed).
-        self.fmscan_min_p = int(os.environ.get("TIER1_FMSCAN_MIN_P") or "1")
-        self.fmscan_max_p = int(os.environ.get("TIER1_FMSCAN_MAX_P") or "6")
+        self.fmscan_min_p = int(self.config.get("tier1_fmscan_min_p", 1))
+        self.fmscan_max_p = int(self.config.get("tier1_fmscan_max_p", 6))
         # Gap tolerance: a periodic run may skip up to this many consecutive
         # expected copies (each skip = a diverged/mismatched copy) and still be
         # treated as one array.
-        self.fmscan_max_gap_copies = int(os.environ.get("TIER1_FMSCAN_MAX_GAP") or "2")
+        self.fmscan_max_gap_copies = int(self.config.get("tier1_fmscan_max_gap", 2))
         # Minimum observed perfect-motif occurrences (anchors) in a run.
-        self.fmscan_min_occ = int(os.environ.get("TIER1_FMSCAN_MIN_OCC") or "3")
+        self.fmscan_min_occ = int(self.config.get("tier1_fmscan_min_occ", 3))
         # Minimum reported array span (bp) for an accepted run.
-        self.fmscan_min_span = int(os.environ.get("TIER1_FMSCAN_MIN_SPAN") or "20")
+        self.fmscan_min_span = int(self.config.get("tier1_fmscan_min_span", 20))
         # Density floor: observed occurrences / expected copies (span/p). A
         # perfect array -> 1.0; diverged arrays sit a bit below 1.0; random
         # low-complexity stretches sit well below. THIS is the discriminator.
         # Default 0.50 = the validated operating point (see docstring / docs):
         # additive mode at density=0.50, llr=8 dominates the gate-tuning OP1 on
         # chr21 AND chr22 (more recall at equal adjusted precision).
-        self.fmscan_min_density = float(os.environ.get("TIER1_FMSCAN_MIN_DENSITY") or "0.50")
+        self.fmscan_min_density = float(self.config.get("tier1_fmscan_min_density", 0.50))
         # Significance floor: Poisson log-likelihood ratio of the observed
         # perfect-copy count vs the i.i.d. background expectation. Accept only
         # runs whose LLR exceeds this. Higher = stricter / higher precision.
         # Default 8.0 = the validated operating point.
-        self.fmscan_min_llr = float(os.environ.get("TIER1_FMSCAN_MIN_LLR") or "8.0")
+        self.fmscan_min_llr = float(self.config.get("tier1_fmscan_min_llr", 8.0))
         # Skip motifs with more than this many genome-wide occurrences (pure
         # low-complexity floods, e.g. poly-A); they cannot be localized cheaply.
-        self.fmscan_max_occ_total = int(os.environ.get("TIER1_FMSCAN_MAX_OCC_TOTAL") or "20000000")
+        self.fmscan_max_occ_total = int(self.config.get("tier1_fmscan_max_occ_total", 20000000))
 
     def _build_repeat(self, chromosome: str, refined, tier: int = 1) -> TandemRepeat:
         return MotifUtils.refined_to_repeat(chromosome, refined, tier, self.text_arr, strand='+')

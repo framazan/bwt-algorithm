@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 continuumio/miniconda3
+FROM continuumio/miniconda3
 
 LABEL author="Filip Ramazan"
 LABEL version="v1.0"
